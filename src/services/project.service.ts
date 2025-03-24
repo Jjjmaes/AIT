@@ -224,13 +224,13 @@ class ProjectService {
       throw new ForbiddenError('只有项目管理者可以删除项目');
     }
 
-    // 已经有进度的项目不能删除，只能归档
+    // 已经有进度的项目不能删除，只能取消
     if (project.progress.totalSegments > 0) {
-      project.status = ProjectStatus.ARCHIVED;
+      project.status = ProjectStatus.CANCELLED;
       await project.save();
       return { 
         success: true, 
-        message: '项目已归档，因为已存在翻译进度，不能直接删除' 
+        message: '项目已取消，因为已存在翻译进度，不能直接删除' 
       };
     }
 
