@@ -67,12 +67,23 @@ export const callAIService = async (config: AIRequestConfig): Promise<string> =>
   try {
     switch (config.provider) {
       case AIProvider.OPENAI: {
+        const messages = [];
+        
+        if (config.systemMessage) {
+          messages.push({
+            role: 'system' as const,
+            content: config.systemMessage
+          });
+        }
+        
+        messages.push({
+          role: 'user' as const,
+          content: config.userMessage
+        });
+
         const response = await openaiClient.chat.completions.create({
           model: config.model,
-          messages: [
-            ...(config.systemMessage ? [{ role: 'system', content: config.systemMessage }] : []),
-            { role: 'user', content: config.userMessage }
-          ],
+          messages,
           temperature: config.temperature ?? 0.7,
           max_tokens: config.maxTokens,
           top_p: config.topP ?? 1,
@@ -89,21 +100,23 @@ export const callAIService = async (config: AIRequestConfig): Promise<string> =>
       case AIProvider.ANTHROPIC: {
         const response = await anthropicClient.messages.create({
           model: config.model,
-          system: config.systemMessage,
+          max_tokens: config.maxTokens || 1024,
           messages: [
-            { role: 'user', content: config.userMessage }
+            {
+              role: 'user',
+              content: config.userMessage
+            }
           ],
+          system: config.systemMessage,
           temperature: config.temperature ?? 0.7,
-          max_tokens: config.maxTokens,
-          top_p: config.topP ?? 1,
         });
         
-        const content = response.content[0]?.text;
-        if (!content) {
-          throw new Error('No content returned from Anthropic');
+        const content = response.content[0];
+        if (!content || content.type !== 'text') {
+          throw new Error('No text content returned from Anthropic');
         }
         
-        return content;
+        return content.text;
       }
       
       case AIProvider.GROK:

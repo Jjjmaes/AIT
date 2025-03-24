@@ -1,24 +1,24 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { Request } from 'express';
 import { IUser } from '../models/user.model';
 
 // JWT配置
-export const JWT_SECRET = process.env.JWT_SECRET || 'your_default_secret_key';
-export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_EXPIRES_IN = '24h';
 
 // 生成JWT令牌
 export const generateToken = (user: IUser): string => {
   const payload = {
-    userId: user._id,
+    sub: user.id,
     email: user.email,
     role: user.role
   };
 
-  return jwt.sign(
-    payload,
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  const options: SignOptions = {
+    expiresIn: JWT_EXPIRES_IN
+  };
+
+  return jwt.sign(payload, JWT_SECRET, options);
 };
 
 // 验证JWT令牌
@@ -26,7 +26,7 @@ export const verifyToken = (token: string): any => {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    throw new Error('Invalid token');
+    throw error;
   }
 };
 

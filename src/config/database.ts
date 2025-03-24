@@ -5,18 +5,8 @@ dotenv.config();
 
 const connectDB = async (): Promise<void> => {
   try {
-    const options = {
-      // 使用新的连接字符串解析器
-      useNewUrlParser: true as any,
-      // 使用统一拓扑结构
-      useUnifiedTopology: true as any,
-    };
-
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/translation-platform';
-    
-    await mongoose.connect(uri, options);
-    
-    console.log('MongoDB connection established successfully');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/translation-platform');
+    console.log('连接到MongoDB成功');
     
     // 监听MongoDB连接事件
     mongoose.connection.on('error', (err) => {
@@ -32,7 +22,7 @@ const connectDB = async (): Promise<void> => {
     });
     
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('连接到MongoDB失败:', error);
     process.exit(1);
   }
 };

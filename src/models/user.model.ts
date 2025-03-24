@@ -1,54 +1,66 @@
 // ===== 第二步：创建用户模型 =====
 // src/models/user.model.ts
 
-import mongoose, { Document, Schema } from 'mongoose';
-import bcrypt from 'bcrypt';
+import mongoose, { Document } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
+// 用户角色枚举
 export enum UserRole {
   ADMIN = 'admin',
+  TRANSLATOR = 'translator',
   REVIEWER = 'reviewer'
 }
 
-interface IUser extends Document {
+// 用户状态枚举
+export enum UserStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive'
+}
+
+// 用户接口
+export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
   role: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
+  status: UserStatus;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-const userSchema = new Schema<IUser>(
-  {
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true
-    },
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      lowercase: true
-    },
-    password: {
-      type: String,
-      required: true,
-      select: false // 默认查询不返回密码
-    },
-    role: {
-      type: String,
-      enum: Object.values(UserRole),
-      default: UserRole.REVIEWER
-    }
+// 用户Schema
+const userSchema = new mongoose.Schema<IUser>({
+  username: {
+    type: String,
+    required: [true, '用户名不能为空'],
+    unique: true,
+    trim: true
   },
-  {
-    timestamps: true
+  email: {
+    type: String,
+    required: [true, '邮箱不能为空'],
+    unique: true,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, '请输入有效的邮箱地址']
+  },
+  password: {
+    type: String,
+    required: [true, '密码不能为空'],
+    minlength: [6, '密码长度不能小于6位']
+  },
+  role: {
+    type: String,
+    enum: Object.values(UserRole),
+    default: UserRole.TRANSLATOR
+  },
+  status: {
+    type: String,
+    enum: Object.values(UserStatus),
+    default: UserStatus.ACTIVE
   }
-);
+}, {
+  timestamps: true
+});
 
 // 密码加密中间件
 userSchema.pre('save', async function(next) {
@@ -57,17 +69,21 @@ userSchema.pre('save', async function(next) {
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    return next();
-  } catch (error) {
-    return next(error as Error);
+    next();
+  } catch (error: any) {
+    next(error);
   }
 });
 
 // 密码比较方法
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
 };
 
-// 导出用户模型
 const User = mongoose.model<IUser>('User', userSchema);
+
 export default User;

@@ -5,12 +5,12 @@ import { Request, Response, NextFunction } from 'express';
 
 export class ApiError extends Error {
   statusCode: number;
-  status: string;
+  success: boolean;
 
   constructor(statusCode: number, message: string) {
     super(message);
     this.statusCode = statusCode;
-    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
+    this.success = false;
 
     Error.captureStackTrace(this, this.constructor);
   }
@@ -23,7 +23,7 @@ export const errorHandler = (
   next: NextFunction
 ) => {
   err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
+  err.success = false;
 
   res.status(err.statusCode).json({
     success: false,
