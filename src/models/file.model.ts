@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export enum FileStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
+  READY = 'ready',
+  TRANSLATING = 'translating',
   TRANSLATED = 'translated',
   REVIEWING = 'reviewing',
   COMPLETED = 'completed',
@@ -12,7 +14,10 @@ export enum FileStatus {
 export enum FileType {
   TXT = 'txt',
   JSON = 'json',
-  MD = 'md'
+  MD = 'md',
+  DOCX = 'docx',
+  MEMOQ_XLIFF = 'mqxliff',
+  XLIFF = 'xliff'
 }
 
 export interface IFile extends Document {
@@ -27,6 +32,24 @@ export interface IFile extends Document {
   translatedCount: number;
   reviewedCount: number;
   path: string;
+  uploadedBy: mongoose.Types.ObjectId;
+  storageUrl: string;
+  formatInfo: {
+    preserveFormatting: boolean;
+    originalFormat: string;
+    targetFormat: string;
+  };
+  processingOptions: {
+    maxSegmentLength: number;
+    minSegmentLength: number;
+    preserveFormatting: boolean;
+  };
+  metadata: {
+    sourceLanguage: string;
+    targetLanguage: string;
+    category: string;
+    tags: string[];
+  };
   processedAt?: Date;
   processingStartedAt?: Date;
   processingCompletedAt?: Date;
@@ -85,6 +108,43 @@ const fileSchema = new Schema<IFile>(
       type: String,
       required: true
     },
+    uploadedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    storageUrl: {
+      type: String,
+      required: true
+    },
+    formatInfo: {
+      preserveFormatting: {
+        type: Boolean,
+        default: true
+      },
+      originalFormat: String,
+      targetFormat: String
+    },
+    processingOptions: {
+      maxSegmentLength: {
+        type: Number,
+        default: 1000
+      },
+      minSegmentLength: {
+        type: Number,
+        default: 100
+      },
+      preserveFormatting: {
+        type: Boolean,
+        default: true
+      }
+    },
+    metadata: {
+      sourceLanguage: String,
+      targetLanguage: String,
+      category: String,
+      tags: [String]
+    },
     processedAt: Date,
     processingStartedAt: Date,
     processingCompletedAt: Date,
@@ -100,5 +160,7 @@ const fileSchema = new Schema<IFile>(
 fileSchema.index({ projectId: 1 });
 fileSchema.index({ status: 1 });
 fileSchema.index({ type: 1 });
+fileSchema.index({ uploadedBy: 1 });
+fileSchema.index({ 'metadata.sourceLanguage': 1, 'metadata.targetLanguage': 1 });
 
 export const File = mongoose.model<IFile>('File', fileSchema);

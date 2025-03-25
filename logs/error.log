@@ -1,0 +1,13 @@
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-25T08:34:25.745Z"}
+{"level":"error","message":"Error exporting file: segment_model_1.Segment.find(...).sort is not a function","timestamp":"2025-03-25T08:34:25.783Z"}
+{"level":"error","message":"Error exporting file: segment_model_1.Segment.find(...).sort is not a function","timestamp":"2025-03-25T08:34:25.784Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-25T08:35:14.877Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-25T08:35:14.898Z"}
+{"level":"error","message":"Error exporting file: segments.map is not a function","timestamp":"2025-03-25T08:35:14.908Z"}
+{"level":"error","message":"Error exporting file: segments.map is not a function","timestamp":"2025-03-25T08:35:14.913Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-25T08:36:12.848Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-25T08:36:12.865Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-25T08:36:55.428Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-25T08:36:55.445Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-25T08:37:53.975Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-25T08:37:54.001Z"}

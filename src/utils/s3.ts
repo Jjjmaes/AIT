@@ -1,109 +1,54 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { config } from '../config';
-import { ValidationError } from './errors';
-import * as fs from 'fs';
+import { getSignedUrl as getS3SignedUrl } from '@aws-sdk/s3-request-presigner';
+import logger from './logger';
 
 const s3Client = new S3Client({
-  region: config.aws.region,
+  region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
-    accessKeyId: config.aws.accessKeyId,
-    secretAccessKey: config.aws.secretAccessKey
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
   }
 });
 
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'translation-platform';
+
 /**
- * 上传文件到S3
+ * 上传文件到 S3
  */
 export async function uploadToS3(
-  filePath: string,
+  filePath: string | Buffer,
   key: string,
   contentType: string
 ): Promise<string> {
-  if (!filePath || !key || !contentType) {
-    throw new ValidationError('文件路径、键值和内容类型不能为空');
-  }
-
-  if (!fs.existsSync(filePath)) {
-    throw new ValidationError('文件不存在');
-  }
-
   try {
     const command = new PutObjectCommand({
-      Bucket: config.aws.bucketName,
+      Bucket: BUCKET_NAME,
       Key: key,
-      ContentType: contentType,
-      Body: fs.createReadStream(filePath)
-    });
-
-    await s3Client.send(command);
-    return `https://${config.aws.bucketName}.s3.${config.aws.region}.amazonaws.com/${key}`;
-  } catch (error) {
-    throw new ValidationError('文件上传失败');
-  }
-}
-
-/**
- * 从S3删除文件
- */
-export async function deleteFromS3(key: string): Promise<void> {
-  if (!key) {
-    throw new ValidationError('文件键值不能为空');
-  }
-
-  try {
-    const command = new DeleteObjectCommand({
-      Bucket: config.aws.bucketName,
-      Key: key
-    });
-
-    await s3Client.send(command);
-  } catch (error) {
-    throw new ValidationError('文件删除失败');
-  }
-}
-
-/**
- * 获取S3文件的签名URL
- */
-export async function getSignedUrlForUpload(key: string, contentType: string): Promise<string> {
-  if (!key || !contentType) {
-    throw new ValidationError('文件键值和内容类型不能为空');
-  }
-
-  try {
-    const command = new PutObjectCommand({
-      Bucket: config.aws.bucketName,
-      Key: key,
+      Body: filePath,
       ContentType: contentType
     });
 
-    return getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    await s3Client.send(command);
+    logger.info(`File uploaded successfully to S3: ${key}`);
+    return `https://${BUCKET_NAME}.s3.amazonaws.com/${key}`;
   } catch (error) {
-    throw new ValidationError('获取签名URL失败');
+    logger.error(`Error uploading file to S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 }
 
 /**
- * 获取S3文件内容
+ * 从 S3 获取文件内容
  */
 export async function getFileContent(key: string): Promise<string> {
-  if (!key) {
-    throw new ValidationError('文件键值不能为空');
-  }
-
   try {
     const command = new GetObjectCommand({
-      Bucket: config.aws.bucketName,
+      Bucket: BUCKET_NAME,
       Key: key
     });
 
     const response = await s3Client.send(command);
     const chunks: Uint8Array[] = [];
-
-    if (!response.Body) {
-      throw new ValidationError('文件内容为空');
-    }
 
     for await (const chunk of response.Body as any) {
       chunks.push(chunk);
@@ -111,9 +56,42 @@ export async function getFileContent(key: string): Promise<string> {
 
     return Buffer.concat(chunks).toString('utf-8');
   } catch (error) {
-    if (error instanceof ValidationError) {
-      throw error;
-    }
-    throw new ValidationError('获取文件内容失败');
+    logger.error(`Error getting file content from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+}
+
+/**
+ * 从 S3 删除文件
+ */
+export async function deleteFromS3(key: string): Promise<void> {
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key
+    });
+
+    await s3Client.send(command);
+    logger.info(`File deleted successfully from S3: ${key}`);
+  } catch (error) {
+    logger.error(`Error deleting file from S3: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
+  }
+}
+
+/**
+ * 获取文件的预签名 URL
+ */
+export async function getSignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key
+    });
+
+    return await getS3SignedUrl(s3Client, command, { expiresIn });
+  } catch (error) {
+    logger.error(`Error generating signed URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 } 

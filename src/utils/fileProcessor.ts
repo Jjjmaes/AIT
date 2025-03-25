@@ -1,6 +1,7 @@
 import { FileType } from '../models/file.model';
 import { SegmentStatus } from '../models/segment.model';
 import { ValidationError } from './errors';
+import logger from './logger';
 
 interface ProcessOptions {
   maxSegmentLength?: number;
