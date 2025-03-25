@@ -5,18 +5,18 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.model';
-import { ApiError } from '../middleware/error.middleware';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { ConflictError, UnauthorizedError, NotFoundError } from '../utils/errors';
 
 // 注册新用户
 const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, email, password } = req.body;
     
-    // 检查用户是否已存在
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    // 检查用户名和邮箱是否已被注册
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
     if (existingUser) {
-      return next(new ApiError(409, '用户名或邮箱已被注册'));
+      return next(new ConflictError('用户名或邮箱已被注册'));
     }
     
     // 创建新用户
@@ -58,13 +58,13 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
     // 查找用户
     const user = await User.findOne({ email });
     if (!user) {
-      return next(new ApiError(401, '邮箱或密码不正确'));
+      return next(new UnauthorizedError('邮箱或密码不正确'));
     }
     
     // 验证密码
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return next(new ApiError(401, '邮箱或密码不正确'));
+      return next(new UnauthorizedError('邮箱或密码不正确'));
     }
     
     // 生成JWT令牌
@@ -95,12 +95,12 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 const getCurrentUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
-      return next(new ApiError(401, '请先登录'));
+      return next(new UnauthorizedError('请先登录'));
     }
 
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
-      return next(new ApiError(404, '用户不存在'));
+      return next(new NotFoundError('用户不存在'));
     }
 
     const userData = {
@@ -131,7 +131,7 @@ const logout = (req: Request, res: Response) => {
 const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
-      return next(new ApiError(401, '请先登录'));
+      return next(new UnauthorizedError('请先登录'));
     }
 
     const userId = req.user.id;
@@ -141,7 +141,7 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
     if (email) {
       const existingUser = await User.findOne({ email, _id: { $ne: userId } });
       if (existingUser) {
-        return next(new ApiError(409, '该邮箱已被其他用户使用'));
+        return next(new ConflictError('该邮箱已被其他用户使用'));
       }
     }
 
@@ -153,7 +153,7 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
     );
 
     if (!user) {
-      return next(new ApiError(404, '用户不存在'));
+      return next(new NotFoundError('用户不存在'));
     }
 
     res.status(200).json({
@@ -174,24 +174,20 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
 const changePassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
-      return next(new ApiError(401, '请先登录'));
+      return next(new UnauthorizedError('请先登录'));
     }
 
-    const userId = req.user.id;
-    const { currentPassword, newPassword } = req.body;
-
-    // 获取用户并验证当前密码
-    const user = await User.findById(userId).select('+password');
+    const user = await User.findById(req.user.id);
     if (!user) {
-      return next(new ApiError(404, '用户不存在'));
+      return next(new NotFoundError('用户不存在'));
     }
 
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const { currentPassword, newPassword } = req.body;
+    const isPasswordValid = await user.comparePassword(currentPassword);
     if (!isPasswordValid) {
-      return next(new ApiError(401, '当前密码不正确'));
+      return next(new UnauthorizedError('当前密码不正确'));
     }
 
-    // 更新密码
     user.password = newPassword;
     await user.save();
 

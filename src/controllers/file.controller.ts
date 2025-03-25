@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import fileService from '../services/file.service';
 import { File, FileStatus } from '../models/file.model';
 import { Segment } from '../models/segment.model';
-import { ApiError } from '../utils/apiError';
+import { NotFoundError, ValidationError } from '../utils/errors';
 
 export class FileController {
   /**
@@ -30,7 +30,7 @@ export class FileController {
 
       const file = await File.findById(fileId);
       if (!file) {
-        throw new ApiError(404, '文件不存在');
+        throw new NotFoundError('文件不存在');
       }
 
       // 构建查询条件
@@ -71,12 +71,12 @@ export class FileController {
 
       const file = await File.findById(fileId);
       if (!file) {
-        throw new ApiError(404, '文件不存在');
+        throw new NotFoundError('文件不存在');
       }
 
       if (status) {
         if (!Object.values(FileStatus).includes(status)) {
-          throw new ApiError(400, '无效的文件状态');
+          throw new ValidationError('无效的文件状态');
         }
         file.status = status;
       }

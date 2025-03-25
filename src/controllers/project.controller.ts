@@ -3,7 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { projectService, CreateProjectDTO, UpdateProjectDTO } from '../services/project.service';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { ValidationError } from '../utils/errors';
+import { ValidationError, AppError } from '../utils/errors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { ProjectStatus, ProjectPriority } from '../models/project.model';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, FileType, IFile } from '../models/file.model';
-import { ApiError } from '../utils/apiError';
 import { handleError } from '../utils/errorHandler';
 
 // 配置文件上传
@@ -43,7 +42,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   if (allowedTypes.includes(ext as FileType)) {
     cb(null, true);
   } else {
-    cb(new Error(`不支持的文件类型: ${ext}`));
+    cb(new ValidationError(`不支持的文件类型: ${ext}`));
   }
 };
 
@@ -210,33 +209,31 @@ export default class ProjectController {
           message: '未授权的访问'
         });
       }
+
       const { projectId } = req.params;
-      
-      if (!req.file) {
-        throw new ApiError(400, '请上传文件');
+      const file = req.file;
+
+      if (!file) {
+        throw new ValidationError('请上传文件');
       }
 
       const fileData = {
-        originalName: req.file.originalname,
-        fileName: req.file.filename,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype,
-        filePath: req.file.path
+        originalName: file.originalname,
+        fileName: file.filename,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        filePath: file.path
       };
-      
-      const file = await projectService.uploadProjectFile(projectId, userId, fileData);
-      
+
+      const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);
+
       res.status(201).json({
         success: true,
         data: {
-          file
+          file: uploadedFile
         }
       });
     } catch (error) {
-      // 如果发生错误，删除上传的文件
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       next(error);
     }
   }
@@ -358,7 +355,7 @@ export default class ProjectController {
       const userId = req.user?.id;
 
       if (!userId) {
-        throw new ApiError(401, '未授权');
+        throw new AppError('未授权', 401);
       }
 
       await projectService.updateProjectProgress(projectId, userId, { status, progress });

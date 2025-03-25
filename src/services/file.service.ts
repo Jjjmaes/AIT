@@ -1,6 +1,7 @@
 import { File, FileStatus, FileType } from '../models/file.model';
-import { Segment } from '../models/segment.model';
-import { ApiError } from '../utils/apiError';
+import { Segment, SegmentStatus } from '../models/segment.model';
+import { NotFoundError, ValidationError } from '../utils/errors';
+import { processFile as processFileContent } from '../utils/fileProcessor';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,62 +16,81 @@ class FileService {
   /**
    * 处理文件分段
    */
-  async processFile(fileId: string, options: ProcessFileOptions = {}): Promise<void> {
+  async processFile(fileId: string, options: any = {}) {
+    // 获取文件信息
     const file = await File.findById(fileId);
     if (!file) {
-      throw new ApiError(404, '文件不存在');
+      throw new NotFoundError('文件不存在');
     }
 
+    // 检查文件状态
     if (file.status !== FileStatus.PENDING) {
-      throw new ApiError(400, '文件状态不正确，只能处理待处理状态的文件');
+      throw new ValidationError('文件状态不正确，只能处理待处理状态的文件');
     }
 
     try {
-      // 更新文件状态为处理中
-      file.status = FileStatus.PROCESSING;
-      await file.save();
-
       // 读取文件内容
-      const filePath = path.join(__dirname, '../../uploads', file.fileName);
-      const content = await fs.promises.readFile(filePath, 'utf-8');
+      const content = await this.readFileContent(file);
 
-      // 根据文件类型选择不同的处理方式
-      let segments: string[] = [];
-      switch (file.type) {
-        case FileType.TXT:
-          segments = this.processTextFile(content, options);
-          break;
-        case FileType.JSON:
-          segments = this.processJsonFile(content, options);
-          break;
-        case FileType.MD:
-          segments = this.processMarkdownFile(content, options);
-          break;
-        default:
-          throw new ApiError(400, '不支持的文件类型');
+      // 获取文件类型
+      const fileType = this.getFileType(file.originalName);
+      if (!fileType) {
+        throw new ValidationError('不支持的文件类型');
       }
 
-      // 创建段落记录
-      const segmentDocs = segments.map((content, index) => ({
-        fileId: file._id,
-        content,
-        order: index,
-        status: 'pending'
-      }));
-      await Segment.insertMany(segmentDocs);
+      // 处理文件内容
+      const segments = await processFileContent(content, fileType, options);
 
-      // 更新文件信息
+      // 保存分段信息
+      await Segment.create(
+        segments.map((segment, index) => ({
+          fileId: file._id,
+          content: segment.content,
+          order: index + 1,
+          status: SegmentStatus.PENDING,
+          originalLength: segment.originalLength,
+          translatedLength: segment.translatedLength,
+          metadata: segment.metadata
+        }))
+      );
+
+      // 更新文件状态
+      file.status = FileStatus.PROCESSING;
       file.segmentCount = segments.length;
-      file.status = FileStatus.TRANSLATED;
-      file.processedAt = new Date();
       await file.save();
 
+      return segments;
     } catch (error) {
-      // 处理失败，更新文件状态
-      file.status = FileStatus.ERROR;
-      file.error = error instanceof Error ? error.message : '文件处理失败';
-      await file.save();
+      // 如果是 JSON 文件解析错误
+      if (error instanceof SyntaxError) {
+        throw new ValidationError('无效的 JSON 文件');
+      }
       throw error;
+    }
+  }
+
+  /**
+   * 读取文件内容
+   */
+  private async readFileContent(file: any): Promise<string> {
+    // TODO: 实现文件内容读取逻辑
+    return '';
+  }
+
+  /**
+   * 获取文件类型
+   */
+  private getFileType(filename: string): FileType | null {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'txt':
+        return FileType.TXT;
+      case 'json':
+        return FileType.JSON;
+      case 'md':
+        return FileType.MD;
+      default:
+        return null;
     }
   }
 
@@ -148,7 +168,7 @@ class FileService {
       processObject(json);
       return segments;
     } catch (error) {
-      throw new ApiError(400, '无效的 JSON 文件');
+      throw new ValidationError('无效的 JSON 文件');
     }
   }
 
