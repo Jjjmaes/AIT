@@ -1,14 +1,16 @@
 // src/services/project.service.ts
 
-import Project, { IProject, ProjectStatus, ProjectPriority } from '../models/project.model';
-import File, { IFile, FileStatus, FileType } from '../models/file.model';
-import Segment, { ISegment, SegmentStatus } from '../models/segment.model';
-import mongoose from 'mongoose';
+import { Project, IProject, ProjectStatus, ProjectPriority } from '../models/project.model';
+import { File, IFile, FileStatus, FileType } from '../models/file.model';
+import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
+import mongoose, { Types } from 'mongoose';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import mime from 'mime-types';
+import { uploadToS3, deleteFromS3, getFileContent } from '../utils/s3';
+import { processFile } from '../utils/fileProcessor';
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -18,8 +20,8 @@ export interface CreateProjectDTO {
   description?: string;
   sourceLanguage: string;
   targetLanguage: string;
-  manager?: string;
-  reviewers?: string[];
+  managerId: Types.ObjectId;
+  reviewers?: Types.ObjectId[];
   translationPromptTemplate: string;
   reviewPromptTemplate: string;
   deadline?: Date;
@@ -50,72 +52,28 @@ export interface UploadFileDTO {
   filePath: string;
 }
 
-class ProjectService {
+export class ProjectService {
   /**
    * 创建新项目
    */
-  async createProject(
-    userId: string, 
-    projectData: CreateProjectDTO
-  ): Promise<IProject> {
-    try {
-      // 设置默认值
-      const manager = projectData.manager || userId;
-      const reviewers = projectData.reviewers || [];
-      
-      // 确保创建者在审阅者列表中（如果不是管理者）
-      if (manager !== userId && !reviewers.includes(userId)) {
-        reviewers.push(userId);
-      }
-
-      const newProject = new Project({
-        ...projectData,
-        manager,
-        reviewers,
-        progress: {
-          totalSegments: 0,
-          translatedSegments: 0,
-          reviewedSegments: 0
-        },
-        status: ProjectStatus.DRAFT,
-        priority: projectData.priority || ProjectPriority.MEDIUM
-      });
-
-      await newProject.save();
-      return newProject;
-    } catch (error: any) {
-      if (error.code === 11000) {
-        throw new ValidationError('项目名称已存在');
-      }
-      throw error;
-    }
+  async createProject(data: Partial<IProject>): Promise<IProject> {
+    const project = new Project(data);
+    return project.save();
   }
 
   /**
    * 获取单个项目信息
    */
-  async getProjectById(
-    projectId: string, 
-    userId: string
-  ): Promise<IProject> {
-    const project = await Project.findById(projectId)
-      .populate('manager', 'username email displayName')
-      .populate('reviewers', 'username email displayName')
-      .populate('translationPromptTemplate', 'name')
-      .populate('reviewPromptTemplate', 'name');
-
+  async getProjectById(projectId: string, userId: string): Promise<IProject> {
+    const project = await Project.findById(projectId);
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
-    // 检查用户是否有权限查看项目
-    const isManager = project.manager._id.toString() === userId;
-    const isReviewer = project.reviewers.some(
-      (user: any) => user._id.toString() === userId
-    );
-
-    if (!isManager && !isReviewer) {
-      throw new ForbiddenError('无权访问此项目');
+    // 检查用户权限
+    if (project.managerId.toString() !== userId && 
+        !project.reviewers?.some(reviewer => reviewer.toString() === userId)) {
+      throw new ForbiddenError('没有权限访问此项目');
     }
 
     return project;
@@ -183,76 +141,52 @@ class ProjectService {
   /**
    * 更新项目信息
    */
-  async updateProject(
-    projectId: string, 
-    userId: string, 
-    updateData: UpdateProjectDTO
-  ): Promise<IProject> {
+  async updateProject(projectId: string, userId: string, data: UpdateProjectDTO): Promise<IProject> {
     const project = await Project.findById(projectId);
-
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
-    // 检查用户是否有权限更新项目
-    if (project.manager.toString() !== userId) {
-      throw new ForbiddenError('只有项目管理者可以修改项目信息');
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限更新项目');
     }
 
-    // 更新项目信息
-    Object.assign(project, updateData);
-    await project.save();
+    // 转换字符串ID为ObjectId
+    const updateData: Partial<IProject> = {
+      ...data,
+      managerId: data.manager ? new mongoose.Types.ObjectId(data.manager) : undefined,
+      reviewers: data.reviewers?.map(id => new mongoose.Types.ObjectId(id))
+    };
 
-    return this.getProjectById(projectId, userId);
+    Object.assign(project, updateData);
+    return project.save();
   }
 
   /**
    * 删除项目
    */
-  async deleteProject(
-    projectId: string, 
-    userId: string
-  ): Promise<{ success: boolean; message: string }> {
+  async deleteProject(projectId: string, userId: string): Promise<{ message: string }> {
     const project = await Project.findById(projectId);
-
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
-    // 检查用户是否有权限删除项目
-    if (project.manager.toString() !== userId) {
-      throw new ForbiddenError('只有项目管理者可以删除项目');
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限删除项目');
     }
 
-    // 已经有进度的项目不能删除，只能取消
-    if (project.progress.totalSegments > 0) {
-      project.status = ProjectStatus.CANCELLED;
-      await project.save();
-      return { 
-        success: true, 
-        message: '项目已取消，因为已存在翻译进度，不能直接删除' 
-      };
-    }
-
-    // 删除项目相关的文件和段落
-    const files = await File.find({ project: projectId });
-    
-    // 删除物理文件
+    // 删除项目相关的文件
+    const files = await File.find({ projectId });
     for (const file of files) {
-      if (fs.existsSync(file.path)) {
-        await unlinkAsync(file.path);
-      }
+      await deleteFromS3(file.path);
     }
-    
-    // 删除数据库记录
-    await Segment.deleteMany({ file: { $in: files.map(f => f._id) } });
-    await File.deleteMany({ project: projectId });
-    await Project.findByIdAndDelete(projectId);
 
-    return { 
-      success: true,
-      message: '项目已成功删除' 
-    };
+    // 删除项目相关的段落
+    await Segment.deleteMany({ fileId: { $in: files.map(f => f._id) } });
+    await File.deleteMany({ projectId });
+    await Project.deleteOne({ _id: projectId });
+
+    return { message: '项目删除成功' };
   }
 
   /**
@@ -261,146 +195,103 @@ class ProjectService {
   async uploadProjectFile(
     projectId: string,
     userId: string,
-    fileData: UploadFileDTO
+    fileData: {
+      originalName: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      filePath: string;
+    }
   ): Promise<IFile> {
-    // 检查项目是否存在
     const project = await Project.findById(projectId);
-
     if (!project) {
-      // 删除上传的文件
-      await unlinkAsync(fileData.filePath);
       throw new NotFoundError('项目不存在');
     }
 
-    // 检查用户是否有权限上传文件
-    const isManager = project.manager.toString() === userId;
-    const isReviewer = project.reviewers.some(
-      (id) => id.toString() === userId
-    );
-
-    if (!isManager && !isReviewer) {
-      // 删除上传的文件
-      await unlinkAsync(fileData.filePath);
-      throw new ForbiddenError('无权访问此项目');
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限上传文件');
     }
 
     // 确定文件类型
-    const fileExtension = path.extname(fileData.originalName).toLowerCase().substring(1);
-    let fileType: FileType;
-    
-    switch (fileExtension) {
-      case 'docx':
-      case 'doc':
-        fileType = FileType.DOCX;
-        break;
-      case 'txt':
-        fileType = FileType.TXT;
-        break;
-      case 'html':
-      case 'htm':
-        fileType = FileType.HTML;
-        break;
-      case 'xml':
-        fileType = FileType.XML;
-        break;
-      case 'json':
-        fileType = FileType.JSON;
-        break;
-      case 'md':
-        fileType = FileType.MARKDOWN;
-        break;
-      case 'csv':
-        fileType = FileType.CSV;
-        break;
-      case 'xlsx':
-      case 'xls':
-        fileType = FileType.EXCEL;
-        break;
-      default:
-        // 不支持的文件类型
-        await unlinkAsync(fileData.filePath);
-        throw new ValidationError(`不支持的文件类型: ${fileExtension}`);
+    const fileType = fileData.mimeType.split('/')[1] as FileType;
+    if (!Object.values(FileType).includes(fileType)) {
+      throw new Error('不支持的文件类型');
     }
+
+    // 上传文件到 S3
+    const key = `projects/${projectId}/${Date.now()}-${fileData.originalName}`;
+    const fileUrl = await uploadToS3(fileData.filePath, key, fileData.mimeType);
 
     // 创建文件记录
-    const file = new File({
-      name: fileData.fileName,
+    const newFile = new File({
+      projectId,
+      fileName: fileData.fileName,
       originalName: fileData.originalName,
-      project: projectId,
-      path: fileData.filePath,
+      fileSize: fileData.fileSize,
+      mimeType: fileData.mimeType,
       type: fileType,
-      size: fileData.fileSize,
-      status: FileStatus.PENDING
+      status: FileStatus.PENDING,
+      path: key
     });
 
-    await file.save();
-
-    // 如果项目是草稿状态，更新为进行中
-    if (project.status === ProjectStatus.DRAFT) {
-      project.status = ProjectStatus.IN_PROGRESS;
-      await project.save();
-    }
-
-    // 注意：实际应用中这里应该使用队列系统(如Bull)来处理文件分段
-    // 为了简化演示，我们这里只返回文件信息
-    // this.processFile(file._id);
-
-    return file;
+    return newFile.save();
   }
 
   /**
-   * 处理文件分段（简化版，实际应用中会更复杂）
+   * 处理文件
    */
-  async processFile(fileId: string): Promise<void> {
+  async processFile(fileId: string, userId: string): Promise<void> {
     const file = await File.findById(fileId);
-
     if (!file) {
       throw new NotFoundError('文件不存在');
     }
 
+    const project = await Project.findById(file.projectId);
+    if (!project) {
+      throw new NotFoundError('项目不存在');
+    }
+
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限处理文件');
+    }
+
     try {
-      // 更新文件状态为处理中
       file.status = FileStatus.PROCESSING;
       file.processingStartedAt = new Date();
       await file.save();
 
-      // 读取文件内容
-      const fileContent = fs.readFileSync(file.path, 'utf8');
+      // 从 S3 获取文件内容
+      const fileContent = await getFileContent(file.path);
 
-      // 简单地按段落分割文本（实际应用中需要更复杂的逻辑）
-      const segments = fileContent
-        .split(/\n\s*\n/)
-        .filter((segment) => segment.trim().length > 0);
+      // 处理文件
+      const segments = await processFile(fileContent, file.type);
 
       // 创建段落记录
-      const segmentPromises = segments.map((text, index) => {
-        const segment = new Segment({
-          file: file._id,
-          index: index + 1,
-          sourceText: text.trim(),
-          status: SegmentStatus.PENDING
-        });
-        return segment.save();
-      });
+      const segmentDocs = segments.map(segment => ({
+        ...segment,
+        fileId: file._id
+      }));
+      await Segment.insertMany(segmentDocs);
 
-      await Promise.all(segmentPromises);
-
-      // 更新文件状态和段落数量
+      // 更新文件状态
       file.status = FileStatus.TRANSLATED;
-      file.segmentCount = segments.length;
       file.processingCompletedAt = new Date();
+      file.segmentCount = segments.length;
       await file.save();
 
-      // 更新项目统计
-      const project = await Project.findById(file.project);
-      if (project) {
-        project.progress.totalSegments += segments.length;
-        await project.save();
-      }
+      // 更新项目进度
+      await this.updateProjectProgress(project._id.toString(), userId, {
+        progress: {
+          totalSegments: segments.length,
+          translatedSegments: 0,
+          reviewedSegments: 0
+        }
+      });
     } catch (error) {
-      // 处理错误
+      const err = error as Error;
       file.status = FileStatus.ERROR;
-      file.errorDetails = error instanceof Error ? error.message : String(error);
+      file.error = err.message || '处理文件时发生错误';
+      file.errorDetails = err.stack || '';
       await file.save();
       throw error;
     }
@@ -413,13 +304,16 @@ class ProjectService {
     projectId: string,
     userId: string
   ): Promise<IFile[]> {
-    // 检查项目是否存在以及用户权限
-    await this.getProjectById(projectId, userId);
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new NotFoundError('项目不存在');
+    }
 
-    // 获取文件列表
-    return File.find({
-      project: projectId
-    }).sort({ createdAt: -1 });
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限查看项目文件');
+    }
+
+    return File.find({ projectId });
   }
 
   /**
@@ -444,13 +338,13 @@ class ProjectService {
     }
 
     // 检查用户权限（通过项目关联）
-    const project = await Project.findById(file.project);
+    const project = await Project.findById(file.projectId);
     if (!project) {
       throw new NotFoundError('关联项目不存在');
     }
 
-    const isManager = project.manager.toString() === userId;
-    const isReviewer = project.reviewers.some(reviewer => 
+    const isManager = project.managerId.toString() === userId;
+    const isReviewer = project.reviewers?.some((reviewer: Types.ObjectId) => 
       reviewer.toString() === userId
     );
 
@@ -483,85 +377,92 @@ class ProjectService {
   }
 
   /**
-   * 更新文件和项目进度统计
+   * 更新文件进度
    */
-  async updateFileProgress(fileId: string): Promise<void> {
+  async updateFileProgress(fileId: string, userId: string): Promise<void> {
     const file = await File.findById(fileId);
     if (!file) {
       throw new NotFoundError('文件不存在');
     }
 
-    // 计算已翻译和已审阅的段落数量
-    const translatedCount = await Segment.countDocuments({
-      file: fileId,
-      status: { $in: [SegmentStatus.TRANSLATED, SegmentStatus.REVIEWING, SegmentStatus.REVIEWED, SegmentStatus.COMPLETED] }
-    });
-
-    const reviewedCount = await Segment.countDocuments({
-      file: fileId,
-      status: { $in: [SegmentStatus.REVIEWED, SegmentStatus.COMPLETED] }
-    });
-
-    // 更新文件统计
-    file.translatedCount = translatedCount;
-    file.reviewedCount = reviewedCount;
-
-    // 更新文件状态
-    if (file.segmentCount > 0 && reviewedCount === file.segmentCount) {
-      file.status = FileStatus.COMPLETED;
-    } else if (translatedCount > 0) {
-      file.status = reviewedCount > 0 ? FileStatus.REVIEWING : FileStatus.TRANSLATED;
+    const project = await Project.findById(file.projectId);
+    if (!project) {
+      throw new NotFoundError('项目不存在');
     }
 
-    await file.save();
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限更新文件进度');
+    }
 
-    // 更新项目统计
-    await this.updateProjectProgress(file.project.toString());
+    // 获取文件段落的统计信息
+    const segments = await Segment.find({ fileId });
+    const translatedCount = segments.filter(s => s.status === SegmentStatus.TRANSLATED).length;
+    const reviewedCount = segments.filter(s => s.status === SegmentStatus.COMPLETED).length;
+
+    // 更新项目进度
+    await this.updateProjectProgress(project._id.toString(), userId, {
+      progress: {
+        totalSegments: segments.length,
+        translatedSegments: translatedCount,
+        reviewedSegments: reviewedCount
+      }
+    });
   }
 
   /**
-   * 计算项目进度统计
+   * 更新项目进度
    */
   async updateProjectProgress(
-    projectId: string
+    projectId: string,
+    userId: string,
+    updateData: {
+      status?: ProjectStatus;
+      progress?: {
+        totalSegments?: number;
+        translatedSegments?: number;
+        reviewedSegments?: number;
+      };
+    }
   ): Promise<void> {
-    // 获取项目所有文件
-    const files = await File.find({
-      project: projectId
-    });
-
-    // 计算总段落数、已翻译段落数和已审校段落数
-    let totalSegments = 0;
-    let translatedSegments = 0;
-    let reviewedSegments = 0;
-
-    for (const file of files) {
-      totalSegments += file.segmentCount;
-      translatedSegments += file.translatedCount;
-      reviewedSegments += file.reviewedCount;
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new NotFoundError('项目不存在');
     }
 
-    // 更新项目进度
-    await Project.findByIdAndUpdate(projectId, {
-      'progress.totalSegments': totalSegments,
-      'progress.translatedSegments': translatedSegments,
-      'progress.reviewedSegments': reviewedSegments
-    });
+    // 检查用户权限
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限更新项目进度');
+    }
 
     // 更新项目状态
-    const project = await Project.findById(projectId);
-    if (project) {
-      // 如果所有段落都已审校，更新项目状态为已完成
-      if (totalSegments > 0 && reviewedSegments === totalSegments) {
-        project.status = ProjectStatus.COMPLETED;
-        await project.save();
-      } else if (project.status === ProjectStatus.DRAFT && totalSegments > 0) {
-        // 如果项目还是草稿状态但已有段落，更新为进行中
-        project.status = ProjectStatus.IN_PROGRESS;
-        await project.save();
+    if (updateData.status) {
+      project.status = updateData.status;
+    }
+
+    // 更新进度
+    if (updateData.progress) {
+      const { totalSegments, translatedSegments, reviewedSegments } = updateData.progress;
+      
+      if (totalSegments !== undefined) {
+        project.progress.totalSegments = totalSegments;
+      }
+      if (translatedSegments !== undefined) {
+        project.progress.translatedSegments = translatedSegments;
+      }
+      if (reviewedSegments !== undefined) {
+        project.progress.reviewedSegments = reviewedSegments;
+      }
+
+      // 计算完成百分比
+      if (project.progress.totalSegments > 0) {
+        project.progress.completionPercentage = Math.round(
+          (project.progress.translatedSegments / project.progress.totalSegments) * 100
+        );
       }
     }
+
+    await project.save();
   }
 }
 
-export default new ProjectService();
+export const projectService = new ProjectService();

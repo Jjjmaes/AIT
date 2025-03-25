@@ -55,9 +55,15 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
     
-    // 查找用户并验证密码
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    // 查找用户
+    const user = await User.findOne({ email });
+    if (!user) {
+      return next(new ApiError(401, '邮箱或密码不正确'));
+    }
+    
+    // 验证密码
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
       return next(new ApiError(401, '邮箱或密码不正确'));
     }
     
@@ -86,25 +92,31 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 // 获取当前用户信息
-const getCurrentUser = (req: AuthRequest, res: Response) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      message: '请先登录'
+const getCurrentUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      return next(new ApiError(401, '请先登录'));
+    }
+
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return next(new ApiError(404, '用户不存在'));
+    }
+
+    const userData = {
+      id: user._id,
+      email: user.email,
+      username: user.username,
+      role: user.role
+    };
+
+    res.status(200).json({
+      success: true,
+      data: userData
     });
+  } catch (error) {
+    next(error);
   }
-
-  const userData = {
-    id: req.user.id,
-    email: req.user.email,
-    username: req.user.username,
-    role: req.user.role
-  };
-
-  res.status(200).json({
-    success: true,
-    data: userData
-  });
 };
 
 // 用户登出（仅在客户端实现，这里仅作为API端点）

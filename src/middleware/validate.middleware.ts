@@ -2,16 +2,24 @@
 // src/middleware/validate.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
-import { validationResult } from 'express-validator';
+import { AnyZodObject, ZodError } from 'zod';
 import { ApiError } from './error.middleware';
 
-export const validate = (req: Request, res: Response, next: NextFunction) => {
-  const errors = validationResult(req);
-  
-  if (!errors.isEmpty()) {
-    const message = errors.array().map(err => `${err.msg}`).join(', ');
-    return next(new ApiError(400, message));
-  }
-  
-  next();
+export const validate = (schema: AnyZodObject) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      schema.parse({
+        body: req.body,
+        query: req.query,
+        params: req.params
+      });
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const message = error.errors.map(err => err.message).join(', ');
+        return next(new ApiError(400, message));
+      }
+      next(error);
+    }
+  };
 }; 

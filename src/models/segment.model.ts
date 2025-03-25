@@ -1,13 +1,11 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document } from 'mongoose';
 import { IFile } from './file.model';
 import { IUser } from './user.model';
 
 export enum SegmentStatus {
   PENDING = 'pending',
-  TRANSLATING = 'translating',
   TRANSLATED = 'translated',
   REVIEWING = 'reviewing',
-  REVIEWED = 'reviewed',
   COMPLETED = 'completed',
   ERROR = 'error'
 }
@@ -34,36 +32,24 @@ export interface IIssue {
 }
 
 export interface ISegment extends Document {
-  file: mongoose.Types.ObjectId | IFile;
-  index: number;
-  sourceText: string;
-  aiTranslation?: string;
-  aiReview?: string;
-  finalTranslation?: string;
+  fileId: mongoose.Types.ObjectId;
+  content: string;
+  translation?: string;
+  originalLength: number;
+  translatedLength: number;
   status: SegmentStatus;
-  issues: IIssue[];
-  reviewer?: mongoose.Types.ObjectId | IUser;
-  translationMetadata?: {
-    aiModel: string;
-    promptTemplateId: mongoose.Types.ObjectId;
-    tokenCount: number;
-    processingTime: number;
+  translator?: mongoose.Types.ObjectId;
+  reviewer?: mongoose.Types.ObjectId;
+  metadata?: {
+    path?: string;
+    [key: string]: any;
   };
-  reviewMetadata?: {
-    aiModel: string;
-    promptTemplateId: mongoose.Types.ObjectId;
-    tokenCount: number;
-    processingTime: number;
-    acceptedChanges: boolean;
-    modificationDegree?: number;
-  };
-  translationCompletedAt?: Date;
-  reviewCompletedAt?: Date;
+  error?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const IssueSchema: Schema = new Schema({
+const IssueSchema = new Schema<IIssue>({
   type: { 
     type: String, 
     enum: Object.values(IssueType),
@@ -88,64 +74,54 @@ const IssueSchema: Schema = new Schema({
   _id: true 
 });
 
-const SegmentSchema: Schema = new Schema({
-  file: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'File',
-    required: true 
+const segmentSchema = new Schema<ISegment>(
+  {
+    fileId: {
+      type: Schema.Types.ObjectId,
+      ref: 'File',
+      required: true
+    },
+    content: {
+      type: String,
+      required: true
+    },
+    translation: String,
+    originalLength: {
+      type: Number,
+      required: true
+    },
+    translatedLength: {
+      type: Number,
+      default: 0
+    },
+    status: {
+      type: String,
+      enum: Object.values(SegmentStatus),
+      default: SegmentStatus.PENDING
+    },
+    translator: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reviewer: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    metadata: {
+      type: Map,
+      of: Schema.Types.Mixed
+    },
+    error: String
   },
-  index: { 
-    type: Number, 
-    required: true 
-  },
-  sourceText: { 
-    type: String, 
-    required: true 
-  },
-  aiTranslation: { 
-    type: String 
-  },
-  aiReview: { 
-    type: String 
-  },
-  finalTranslation: { 
-    type: String 
-  },
-  status: { 
-    type: String, 
-    enum: Object.values(SegmentStatus),
-    default: SegmentStatus.PENDING 
-  },
-  issues: [IssueSchema],
-  reviewer: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'User' 
-  },
-  translationMetadata: {
-    aiModel: { type: String },
-    promptTemplateId: { type: Schema.Types.ObjectId, ref: 'PromptTemplate' },
-    tokenCount: { type: Number },
-    processingTime: { type: Number }
-  },
-  reviewMetadata: {
-    aiModel: { type: String },
-    promptTemplateId: { type: Schema.Types.ObjectId, ref: 'PromptTemplate' },
-    tokenCount: { type: Number },
-    processingTime: { type: Number },
-    acceptedChanges: { type: Boolean },
-    modificationDegree: { type: Number }
-  },
-  translationCompletedAt: { 
-    type: Date 
-  },
-  reviewCompletedAt: { 
-    type: Date 
+  {
+    timestamps: true
   }
-}, { 
-  timestamps: true 
-});
+);
 
-// 创建复合索引以便快速查找某个文件中的所有段落
-SegmentSchema.index({ file: 1, index: 1 });
+// 创建索引
+segmentSchema.index({ fileId: 1 });
+segmentSchema.index({ status: 1 });
+segmentSchema.index({ translator: 1 });
+segmentSchema.index({ reviewer: 1 });
 
-export default mongoose.model<ISegment>('Segment', SegmentSchema);
+export const Segment = mongoose.model<ISegment>('Segment', segmentSchema);

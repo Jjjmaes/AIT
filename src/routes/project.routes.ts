@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { authenticateJwt } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import ProjectController from '../controllers/project.controller';
+import { validateCreateProject, validateUpdateProject, validateUpdateProjectProgress } from '../validators/projectValidator';
 import multer from 'multer';
 
 const router = Router();
@@ -16,13 +17,13 @@ router.use(authenticateJwt);
 router.get('/', projectController.getProjects.bind(projectController));
 
 // 创建新项目
-router.post('/', projectController.createProject.bind(projectController));
+router.post('/', validate(validateCreateProject), projectController.createProject.bind(projectController));
 
 // 获取单个项目信息
 router.get('/:projectId', projectController.getProject.bind(projectController));
 
 // 更新项目信息
-router.put('/:projectId', projectController.updateProject.bind(projectController));
+router.put('/:projectId', validate(validateUpdateProject), projectController.updateProject.bind(projectController));
 
 // 删除项目
 router.delete('/:projectId', projectController.deleteProject.bind(projectController));
@@ -39,5 +40,8 @@ router.get('/:projectId/files', projectController.getProjectFiles.bind(projectCo
 
 // 获取文件段落列表
 router.get('/files/:fileId/segments', projectController.getFileSegments.bind(projectController));
+
+// 更新项目进度
+router.put('/:projectId/progress', validate(validateUpdateProjectProgress), projectController.updateProjectProgress.bind(projectController));
 
 export default router;

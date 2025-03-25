@@ -10,10 +10,9 @@ const router = Router();
 router.get('/profile', authenticateJwt, authController.getCurrentUser);
 
 // 更新用户信息
-router.put('/profile', authenticateJwt, validateUpdateUser, validate, authController.updateProfile);
+router.put('/profile', authenticateJwt, validate(validateUpdateUser), authController.updateProfile);
 
 // 修改密码
-router.put('/password', authenticateJwt, validateChangePassword, validate, authController.changePassword);
+router.put('/password', authenticateJwt, validate(validateChangePassword), authController.changePassword);
 
-const userRoutes = router;
-export default userRoutes; 
+export default router; 

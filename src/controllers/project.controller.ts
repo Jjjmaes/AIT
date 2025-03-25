@@ -1,7 +1,7 @@
 // src/controllers/project.controller.ts
 
 import { Request, Response, NextFunction } from 'express';
-import projectService, { CreateProjectDTO, UpdateProjectDTO } from '../services/project.service';
+import { projectService, CreateProjectDTO, UpdateProjectDTO } from '../services/project.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ValidationError } from '../utils/errors';
 import multer from 'multer';
@@ -10,8 +10,9 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { ProjectStatus, ProjectPriority } from '../models/project.model';
 import { SegmentStatus } from '../models/segment.model';
-import { FileStatus, FileType } from '../models/file.model';
+import { FileStatus, FileType, IFile } from '../models/file.model';
 import { ApiError } from '../utils/apiError';
+import { handleError } from '../utils/errorHandler';
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -67,9 +68,12 @@ export default class ProjectController {
           message: '未授权的访问'
         });
       }
-      const projectData: CreateProjectDTO = req.body;
+      const projectData: CreateProjectDTO = {
+        ...req.body,
+        managerId: userId
+      };
       
-      const project = await projectService.createProject(userId, projectData);
+      const project = await projectService.createProject(projectData);
       
       res.status(201).json({
         success: true,
@@ -269,9 +273,16 @@ export default class ProjectController {
    */
   async processFile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: '未授权的访问'
+        });
+      }
       const { fileId } = req.params;
       
-      await projectService.processFile(fileId);
+      await projectService.processFile(fileId, userId);
       
       res.status(200).json({
         success: true,
@@ -317,9 +328,16 @@ export default class ProjectController {
    */
   async updateFileProgress(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: '未授权的访问'
+        });
+      }
       const { fileId } = req.params;
       
-      await projectService.updateFileProgress(fileId);
+      await projectService.updateFileProgress(fileId, userId);
       
       res.status(200).json({
         success: true,
@@ -336,13 +354,15 @@ export default class ProjectController {
   async updateProjectProgress(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { projectId } = req.params;
-      
-      await projectService.updateProjectProgress(projectId);
-      
-      res.status(200).json({
-        success: true,
-        message: '项目进度已更新'
-      });
+      const { status, progress } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw new ApiError(401, '未授权');
+      }
+
+      await projectService.updateProjectProgress(projectId, userId, { status, progress });
+      res.json({ message: '项目进度更新成功' });
     } catch (error) {
       next(error);
     }
@@ -351,57 +371,71 @@ export default class ProjectController {
   /**
    * 获取项目统计信息
    */
-  async getProjectStats(req: AuthRequest, res: Response, next: NextFunction) {
+  async getProjectStats(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: '未授权的访问'
-        });
-      }
-      const { projectId } = req.params;
-      
-      // 获取项目详情
+      const projectId = req.params.projectId;
+      const userId = req.user!.id;
+
+      // 获取项目基本信息
       const project = await projectService.getProjectById(projectId, userId);
       
-      // 获取项目文件
+      // 获取项目文件列表
       const files = await projectService.getProjectFiles(projectId, userId);
       
-      // 计算统计信息
-      const stats = {
+      // 计算文件统计信息
+      const fileStats = {
         totalFiles: files.length,
-        totalSegments: project.progress.totalSegments,
-        translatedSegments: project.progress.translatedSegments,
-        reviewedSegments: project.progress.reviewedSegments,
-        translationProgress: project.progress.totalSegments > 0 
-          ? Math.round((project.progress.translatedSegments / project.progress.totalSegments) * 100) 
-          : 0,
-        reviewProgress: project.progress.totalSegments > 0 
-          ? Math.round((project.progress.reviewedSegments / project.progress.totalSegments) * 100) 
-          : 0,
-        fileStats: files.map(file => ({
-          id: file._id,
-          name: file.originalName,
-          type: file.type,
-          status: file.status,
-          segmentCount: file.segmentCount,
-          translatedCount: file.translatedCount,
-          reviewedCount: file.reviewedCount,
-          progress: file.segmentCount > 0 
-            ? Math.round((file.reviewedCount / file.segmentCount) * 100) 
-            : 0
-        }))
+        filesByStatus: {
+          pending: files.filter((f: IFile) => f.status === FileStatus.PENDING).length,
+          processing: files.filter((f: IFile) => f.status === FileStatus.PROCESSING).length,
+          translated: files.filter((f: IFile) => f.status === FileStatus.TRANSLATED).length,
+          reviewing: files.filter((f: IFile) => f.status === FileStatus.REVIEWING).length,
+          completed: files.filter((f: IFile) => f.status === FileStatus.COMPLETED).length,
+          error: files.filter((f: IFile) => f.status === FileStatus.ERROR).length
+        },
+        totalSegments: files.reduce((sum: number, f: IFile) => sum + (f.segmentCount || 0), 0),
+        translatedSegments: files.reduce((sum: number, f: IFile) => sum + (f.translatedCount || 0), 0),
+        reviewedSegments: files.reduce((sum: number, f: IFile) => sum + (f.reviewedCount || 0), 0)
       };
-      
-      res.status(200).json({
+
+      // 计算项目进度
+      const progress = {
+        total: project.progress.totalSegments,
+        translated: project.progress.translatedSegments,
+        reviewed: project.progress.reviewedSegments,
+        percentage: project.progress.totalSegments > 0 
+          ? Math.round((project.progress.reviewedSegments / project.progress.totalSegments) * 100)
+          : 0
+      };
+
+      // 计算时间统计
+      const timeStats = {
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        deadline: project.deadline,
+        daysUntilDeadline: project.deadline 
+          ? Math.ceil((new Date(project.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+          : null
+      };
+
+      res.json({
         success: true,
         data: {
-          stats
+          project: {
+            id: project._id,
+            name: project.name,
+            status: project.status,
+            priority: project.priority,
+            sourceLanguage: project.sourceLanguage,
+            targetLanguage: project.targetLanguage
+          },
+          files: fileStats,
+          progress,
+          time: timeStats
         }
       });
     } catch (error) {
-      next(error);
+      handleError(error, res);
     }
   }
 }

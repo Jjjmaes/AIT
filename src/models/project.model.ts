@@ -1,11 +1,10 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
 import { IUser } from './user.model';
 
 // 项目状态枚举
 export enum ProjectStatus {
   DRAFT = 'draft',
   IN_PROGRESS = 'in_progress',
-  REVIEWING = 'reviewing',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled'
 }
@@ -14,8 +13,7 @@ export enum ProjectStatus {
 export enum ProjectPriority {
   LOW = 'low',
   MEDIUM = 'medium',
-  HIGH = 'high',
-  URGENT = 'urgent'
+  HIGH = 'high'
 }
 
 // 项目进度接口
@@ -23,116 +21,98 @@ interface IProjectProgress {
   totalSegments: number;
   translatedSegments: number;
   reviewedSegments: number;
-  lastUpdated: Date;
+  completionPercentage: number;
 }
 
-// 项目接口
-export interface IProject extends Document {
+// 项目基础接口
+interface IProjectBase {
   name: string;
   description?: string;
   sourceLanguage: string;
   targetLanguage: string;
-  manager: mongoose.Types.ObjectId | IUser;
-  reviewers: mongoose.Types.ObjectId[] | IUser[];
-  translationPromptTemplate: mongoose.Types.ObjectId;
-  reviewPromptTemplate: mongoose.Types.ObjectId;
-  deadline?: Date;
-  priority: ProjectPriority;
+  managerId: mongoose.Types.ObjectId;
+  reviewers?: mongoose.Types.ObjectId[];
   status: ProjectStatus;
+  priority: ProjectPriority;
+  deadline?: Date;
   progress: IProjectProgress;
-  files: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
 
+// 项目接口（包含 _id）
+export interface IProject extends IProjectBase {
+  _id: mongoose.Types.ObjectId;
+}
+
+// 项目文档类型（用于 Mongoose）
+export type ProjectDocument = mongoose.Document & IProjectBase;
+
 // 项目Schema
-const projectSchema = new mongoose.Schema<IProject>({
-  name: {
-    type: String,
-    required: [true, '项目名称不能为空'],
-    trim: true,
-    minlength: [3, '项目名称至少需要3个字符'],
-    maxlength: [100, '项目名称不能超过100个字符']
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: [500, '项目描述不能超过500个字符']
-  },
-  sourceLanguage: {
-    type: String,
-    required: [true, '源语言不能为空'],
-    trim: true
-  },
-  targetLanguage: {
-    type: String,
-    required: [true, '目标语言不能为空'],
-    trim: true
-  },
-  manager: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, '项目管理者不能为空']
-  },
-  reviewers: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  translationPromptTemplate: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'PromptTemplate',
-    required: [true, '翻译提示词模板不能为空']
-  },
-  reviewPromptTemplate: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'PromptTemplate',
-    required: [true, '审校提示词模板不能为空']
-  },
-  deadline: {
-    type: Date
-  },
-  priority: {
-    type: String,
-    enum: Object.values(ProjectPriority),
-    default: ProjectPriority.MEDIUM
-  },
-  status: {
-    type: String,
-    enum: Object.values(ProjectStatus),
-    default: ProjectStatus.DRAFT
-  },
-  progress: {
-    totalSegments: {
-      type: Number,
-      default: 0
+const projectSchema = new mongoose.Schema<ProjectDocument>(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true
     },
-    translatedSegments: {
-      type: Number,
-      default: 0
+    description: String,
+    sourceLanguage: {
+      type: String,
+      required: true
     },
-    reviewedSegments: {
-      type: Number,
-      default: 0
+    targetLanguage: {
+      type: String,
+      required: true
     },
-    lastUpdated: {
-      type: Date,
-      default: Date.now
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    reviewers: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    status: {
+      type: String,
+      enum: Object.values(ProjectStatus),
+      default: ProjectStatus.DRAFT
+    },
+    priority: {
+      type: String,
+      enum: Object.values(ProjectPriority),
+      default: ProjectPriority.MEDIUM
+    },
+    deadline: Date,
+    progress: {
+      totalSegments: {
+        type: Number,
+        default: 0
+      },
+      translatedSegments: {
+        type: Number,
+        default: 0
+      },
+      reviewedSegments: {
+        type: Number,
+        default: 0
+      },
+      completionPercentage: {
+        type: Number,
+        default: 0
+      }
     }
   },
-  files: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'File'
-  }]
-}, {
-  timestamps: true
-});
+  {
+    timestamps: true
+  }
+);
 
 // 创建索引
-projectSchema.index({ name: 1, manager: 1 }, { unique: true });
+projectSchema.index({ managerId: 1 });
 projectSchema.index({ status: 1 });
 projectSchema.index({ priority: 1 });
 projectSchema.index({ deadline: 1 });
 
-const Project = mongoose.model<IProject>('Project', projectSchema);
-
-export default Project;
+export const Project = mongoose.model<ProjectDocument>('Project', projectSchema);
