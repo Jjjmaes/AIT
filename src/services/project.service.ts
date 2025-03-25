@@ -55,10 +55,14 @@ export interface UpdateProjectDTO {
 // 定义文件上传DTO
 export interface UploadFileDTO {
   originalName: string;
-  fileName: string;
   fileSize: number;
   mimeType: string;
   filePath: string;
+  fileName?: string;  // 保持向后兼容
+  sourceLanguage?: string;  // 新增，可选
+  targetLanguage?: string;  // 新增，可选
+  category?: string;  // 新增，可选
+  tags?: string[];  // 新增，可选
 }
 
 export class ProjectService {
@@ -203,7 +207,7 @@ export class ProjectService {
   /**
    * 上传项目文件
    */
-  async uploadProjectFile(projectId: string, userId: string, fileData: any) {
+  async uploadProjectFile(projectId: string, userId: string, fileData: UploadFileDTO) {
     const project = await Project.findById(projectId);
     if (!project) {
       throw new NotFoundError('项目不存在');
@@ -222,21 +226,28 @@ export class ProjectService {
     const key = `projects/${projectId}/${Date.now()}-${fileData.originalName}`;
     const s3Url = await uploadToS3(fileData.filePath, key, fileData.mimeType);
 
-    const file = new File({
-      ...fileData,
+    const file = await File.create({
       projectId: new Types.ObjectId(projectId),
-      uploadedBy: userId,
-      status: FileStatus.PENDING,
+      fileName: fileData.originalName,
+      originalName: fileData.originalName,
+      fileSize: fileData.fileSize,
+      mimeType: fileData.mimeType,
       type: fileType,
-      s3Url
+      status: FileStatus.PENDING,
+      uploadedBy: new Types.ObjectId(userId),
+      storageUrl: s3Url,
+      path: fileData.filePath,
+      metadata: {
+        sourceLanguage: fileData.sourceLanguage || project.sourceLanguage,
+        targetLanguage: fileData.targetLanguage || project.targetLanguage,
+        category: fileData.category,
+        tags: fileData.tags
+      }
     });
 
-    await file.save();
     logger.info(`File ${file.id} uploaded successfully to project ${projectId}`);
 
-    const result = file.toObject();
-    const { toObject, ...cleanResult } = result;
-    return cleanResult;
+    return file;
   }
 
   /**
@@ -311,11 +322,7 @@ export class ProjectService {
     }
 
     const files = await File.find({ projectId: new Types.ObjectId(projectId) });
-    return files.map(file => {
-      const result = file.toObject();
-      const { toObject, ...cleanResult } = result;
-      return cleanResult;
-    });
+    return files.map(file => file.toObject());
   }
 
   /**
@@ -400,12 +407,30 @@ export class ProjectService {
     const segments = await Segment.find({ fileId });
     const translatedCount = segments.filter(s => s.status === SegmentStatus.TRANSLATED).length;
     const reviewedCount = segments.filter(s => s.status === SegmentStatus.COMPLETED).length;
+    const totalCount = segments.length;
+
+    // 更新文件进度
+    file.progress = {
+      total: totalCount,
+      completed: reviewedCount,
+      translated: translatedCount,
+      percentage: totalCount > 0 ? (reviewedCount / totalCount) * 100 : 0
+    };
+
+    // 更新文件状态
+    if (reviewedCount === totalCount) {
+      file.status = FileStatus.COMPLETED;
+    } else if (translatedCount > 0) {
+      file.status = FileStatus.TRANSLATED;
+    }
+
+    await file.save();
 
     // 更新项目进度
     await this.updateProjectProgress(project._id.toString(), userId, {
       completionPercentage: 0,
       translatedWords: translatedCount,
-      totalWords: segments.length
+      totalWords: totalCount
     });
   }
 
@@ -413,13 +438,14 @@ export class ProjectService {
    * 更新项目进度
    */
   async updateProjectProgress(projectId: string, userId: string, data: ProjectProgressDto): Promise<IProject> {
-    const project = await Project.findOne({
-      _id: projectId,
-      managerId: userId
-    });
+    const project = await Project.findById(projectId);
 
     if (!project) {
       throw new NotFoundError('项目不存在');
+    }
+
+    if (project.managerId.toString() !== userId) {
+      throw new ForbiddenError('没有权限更新项目进度');
     }
 
     project.progress = {

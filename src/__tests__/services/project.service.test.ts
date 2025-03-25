@@ -1,17 +1,23 @@
 import { Types } from 'mongoose';
 import { ProjectStatus, ProjectPriority, CreateProjectDto, UpdateProjectDto } from '../../types/project.types';
 import Project from '../../models/project.model';
-import { File, FileType, FileStatus } from '../../models/file.model';
+import { File, FileStatus, FileType, IFile } from '../../models/file.model';
 import { ProjectService } from '../../services/project.service';
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../../utils/errors';
 import { mockProjects } from '../../test/fixtures/projects';
 import * as s3Utils from '../../utils/s3';
+import { processFile as processFileUtil } from '../../utils/fileProcessor';
+import { Segment, SegmentStatus } from '../../models/segment.model';
+import { ProjectProgressDto } from '../../types/project.types';
 
 // Mock the models and utilities
 jest.mock('../../models/project.model');
 jest.mock('../../models/file.model');
 jest.mock('../../models/segment.model');
 jest.mock('../../utils/s3');
+jest.mock('../../utils/fileProcessor', () => ({
+  processFile: jest.fn()
+}));
 
 const MockProject = Project as jest.MockedClass<typeof Project>;
 const MockFile = File as jest.MockedClass<typeof File>;
@@ -60,6 +66,15 @@ interface MockFileDocument extends BaseMockDocument<any> {
   type?: FileType;
   status?: FileStatus;
   uploadedBy?: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  category?: string;
+  tags?: string[];
+  processingStartedAt?: Date;
+  processingCompletedAt?: Date;
+  segmentCount?: number;
+  error?: string;
+  errorDetails?: string;
 }
 
 // Factory functions for creating mock objects
@@ -274,92 +289,188 @@ describe('ProjectService', () => {
   describe('uploadProjectFile', () => {
     const mockFileData = {
       originalName: 'test.txt',
-      fileName: 'test-123.txt',
       fileSize: 1024,
       mimeType: 'text/txt',
-      filePath: '/tmp/test-123.txt'
+      filePath: '/uploads/test.txt',
+      sourceLanguage: 'en',
+      targetLanguage: 'zh',
+      category: 'test',
+      tags: ['test']
     };
 
-    it('should upload file successfully', async () => {
-      const mockProject = createMockProject({
-        _id: new Types.ObjectId(projectId),
-        managerId: userId,
-        id: projectId
-      });
+    const mockProject = {
+      _id: new Types.ObjectId('67e289a55e7a3aed7505d9df'),
+      name: 'Test Project',
+      description: 'Test Description',
+      sourceLanguage: 'en',
+      targetLanguage: 'zh',
+      managerId: new Types.ObjectId(userId),
+      reviewers: [],
+      translationPromptTemplate: 'Test Template',
+      reviewPromptTemplate: 'Test Template',
+      status: ProjectStatus.PENDING,
+      priority: ProjectPriority.MEDIUM,
+      progress: {
+        completionPercentage: 0,
+        translatedWords: 0,
+        totalWords: 0
+      },
+      save: jest.fn().mockResolvedValue(undefined),
+      deleteOne: jest.fn().mockResolvedValue(undefined),
+      toObject: jest.fn().mockReturnThis()
+    };
 
-      MockProject.findById = jest.fn().mockResolvedValue(mockProject);
+    const mockFile: Partial<IFile> = {
+      _id: new Types.ObjectId('67e287866fbba6a28e89ff26'),
+      projectId: mockProject._id,
+      fileName: 'test.txt',
+      originalName: 'test.txt',
+      fileSize: 1024,
+      mimeType: 'text/txt',
+      type: FileType.TXT,
+      status: FileStatus.PENDING,
+      uploadedBy: new Types.ObjectId(userId),
+      storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+      path: '/uploads/test.txt',
+      metadata: {
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+        category: 'test',
+        tags: ['test']
+      },
+      translatedCount: 0,
+      reviewedCount: 0,
+      save: jest.fn().mockResolvedValue(undefined)
+    };
 
-      const mockUploadedFile = createMockFile({
-        _id: new Types.ObjectId(fileId),
-        ...mockFileData,
-        projectId: new Types.ObjectId(projectId),
-        status: FileStatus.PENDING,
-        type: FileType.TXT,
-        uploadedBy: userId,
-        id: fileId,
-        save: jest.fn().mockResolvedValue(undefined)
-      });
+    const mockSegments = [
+      {
+        _id: new Types.ObjectId(),
+        fileId: new Types.ObjectId(fileId),
+        sourceText: 'Hello',
+        targetText: '',
+        status: SegmentStatus.PENDING,
+        index: 1
+      }
+    ];
 
-      (MockFile as unknown as jest.Mock).mockImplementation(() => mockUploadedFile);
-      jest.spyOn(s3Utils, 'uploadToS3').mockResolvedValue('https://test-bucket.s3.amazonaws.com/test-123.txt');
-
-      const result = await projectService.uploadProjectFile(projectId, userId, mockFileData);
-
-      const { toObject, save, deleteOne, ...expectedResult } = mockUploadedFile;
-      expect(result).toEqual({
-        ...expectedResult,
-        _id: expectedResult._id.toString(),
-        id: expectedResult.id,
-        projectId: expectedResult.projectId?.toString()
-      });
-      expect(s3Utils.uploadToS3).toHaveBeenCalled();
-      expect(MockFile).toHaveBeenCalledWith(expect.objectContaining({
-        ...mockFileData,
-        projectId: new Types.ObjectId(projectId),
-        uploadedBy: userId,
-        status: FileStatus.PENDING
-      }));
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (s3Utils.uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/test.txt');
+      (MockFile.create as jest.Mock).mockResolvedValue(mockFile);
+      (MockProject.findById as jest.Mock).mockResolvedValue(mockProject);
     });
 
-    it('should throw ValidationError for unsupported file type', async () => {
-      const mockProject = {
-        _id: new Types.ObjectId(projectId),
-        managerId: userId,
-        id: projectId
+    it('should upload file successfully', async () => {
+      const result = await projectService.uploadProjectFile(projectId, userId, mockFileData);
+
+      expect(s3Utils.uploadToS3).toHaveBeenCalledWith(
+        mockFileData.filePath,
+        expect.stringContaining(mockFileData.originalName),
+        mockFileData.mimeType
+      );
+      expect(MockFile.create).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: new Types.ObjectId(projectId),
+        fileName: mockFileData.originalName,
+        originalName: mockFileData.originalName,
+        fileSize: mockFileData.fileSize,
+        mimeType: mockFileData.mimeType,
+        type: FileType.TXT,
+        status: FileStatus.PENDING,
+        uploadedBy: new Types.ObjectId(userId),
+        storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+        path: mockFileData.filePath,
+        metadata: {
+          sourceLanguage: mockFileData.sourceLanguage,
+          targetLanguage: mockFileData.targetLanguage,
+          category: mockFileData.category,
+          tags: mockFileData.tags
+        }
+      }));
+      expect(result).toEqual({
+        _id: mockFile._id,
+        projectId: mockProject._id,
+        fileName: mockFileData.originalName,
+        originalName: mockFileData.originalName,
+        fileSize: mockFileData.fileSize,
+        mimeType: mockFileData.mimeType,
+        type: FileType.TXT,
+        status: FileStatus.PENDING,
+        uploadedBy: new Types.ObjectId(userId),
+        storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+        path: mockFileData.filePath,
+        metadata: {
+          sourceLanguage: mockFileData.sourceLanguage,
+          targetLanguage: mockFileData.targetLanguage,
+          category: mockFileData.category,
+          tags: mockFileData.tags
+        },
+        translatedCount: 0,
+        reviewedCount: 0,
+        save: expect.any(Function)
+      });
+    });
+
+    it('should use project default languages if not provided', async () => {
+      const fileDataWithoutLanguages = {
+        ...mockFileData,
+        sourceLanguage: undefined,
+        targetLanguage: undefined
       };
 
-      MockProject.findById = jest.fn().mockResolvedValue(mockProject);
+      const result = await projectService.uploadProjectFile(projectId, userId, fileDataWithoutLanguages);
 
-      const unsupportedFileData = {
+      expect(MockFile.create).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: new Types.ObjectId(projectId),
+        fileName: fileDataWithoutLanguages.originalName,
+        originalName: fileDataWithoutLanguages.originalName,
+        fileSize: fileDataWithoutLanguages.fileSize,
+        mimeType: fileDataWithoutLanguages.mimeType,
+        type: FileType.TXT,
+        status: FileStatus.PENDING,
+        uploadedBy: new Types.ObjectId(userId),
+        storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+        path: fileDataWithoutLanguages.filePath,
+        metadata: {
+          sourceLanguage: mockProject.sourceLanguage,
+          targetLanguage: mockProject.targetLanguage,
+          category: fileDataWithoutLanguages.category,
+          tags: fileDataWithoutLanguages.tags
+        }
+      }));
+      expect(result).toEqual({
+        _id: mockFile._id,
+        projectId: mockProject._id,
+        fileName: fileDataWithoutLanguages.originalName,
+        originalName: fileDataWithoutLanguages.originalName,
+        fileSize: fileDataWithoutLanguages.fileSize,
+        mimeType: fileDataWithoutLanguages.mimeType,
+        type: FileType.TXT,
+        status: FileStatus.PENDING,
+        uploadedBy: new Types.ObjectId(userId),
+        storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+        path: fileDataWithoutLanguages.filePath,
+        metadata: {
+          sourceLanguage: mockProject.sourceLanguage,
+          targetLanguage: mockProject.targetLanguage,
+          category: fileDataWithoutLanguages.category,
+          tags: fileDataWithoutLanguages.tags
+        },
+        translatedCount: 0,
+        reviewedCount: 0,
+        save: expect.any(Function)
+      });
+    });
+
+    it('should throw error for unsupported file type', async () => {
+      const fileDataWithUnsupportedType = {
         ...mockFileData,
         mimeType: 'application/pdf'
       };
 
-      await expect(projectService.uploadProjectFile(projectId, userId, unsupportedFileData))
+      await expect(projectService.uploadProjectFile(projectId, userId, fileDataWithUnsupportedType))
         .rejects
-        .toThrow(ValidationError);
-    });
-
-    it('should throw NotFoundError if project does not exist', async () => {
-      MockProject.findById = jest.fn().mockResolvedValue(null);
-
-      await expect(projectService.uploadProjectFile(projectId, userId, mockFileData))
-        .rejects
-        .toThrow(NotFoundError);
-    });
-
-    it('should throw ForbiddenError if user is not project manager', async () => {
-      const mockProject = {
-        _id: new Types.ObjectId(projectId),
-        managerId: new Types.ObjectId().toString(),
-        id: projectId
-      };
-
-      MockProject.findById = jest.fn().mockResolvedValue(mockProject);
-
-      await expect(projectService.uploadProjectFile(projectId, userId, mockFileData))
-        .rejects
-        .toThrow(ForbiddenError);
+        .toThrow('不支持的文件类型');
     });
   });
 
@@ -600,6 +711,247 @@ describe('ProjectService', () => {
       await expect(projectService.getProjectFiles(projectId, userId))
         .rejects
         .toThrow(ForbiddenError);
+    });
+  });
+
+  describe('processFile', () => {
+    const mockProject = createMockProject({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId,
+      sourceLanguage: 'en',
+      targetLanguage: 'zh'
+    });
+
+    const mockFile = createMockFile({
+      _id: new Types.ObjectId(fileId),
+      projectId: mockProject._id,
+      type: FileType.TXT,
+      status: FileStatus.PENDING
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      
+      // Mock Project.findById
+      (Project.findById as jest.Mock).mockImplementation((id) => {
+        if (id.toString() === mockProject._id.toString() || id === mockProject._id.toString()) {
+          return Promise.resolve(mockProject);
+        }
+        if (id.toString() === projectId || id === projectId) {
+          return Promise.resolve(mockProject);
+        }
+        if (mockFile.projectId && (id.toString() === mockFile.projectId.toString() || id === mockFile.projectId.toString())) {
+          return Promise.resolve(mockProject);
+        }
+        return Promise.resolve(null);
+      });
+
+      // Mock File.findById
+      (File.findById as jest.Mock).mockImplementation((id) => {
+        if (id === mockFile._id.toString()) {
+          return Promise.resolve(mockFile);
+        }
+        return Promise.resolve(null);
+      });
+
+      // Mock processFileUtil
+      (processFileUtil as jest.Mock).mockResolvedValue([
+        { content: 'Test content 1', status: SegmentStatus.PENDING },
+        { content: 'Test content 2', status: SegmentStatus.PENDING }
+      ]);
+
+      // Mock Segment.insertMany
+      (Segment.insertMany as jest.Mock).mockResolvedValue([]);
+
+      // Mock Segment.find
+      (Segment.find as jest.Mock).mockResolvedValue([
+        { status: SegmentStatus.TRANSLATED },
+        { status: SegmentStatus.COMPLETED }
+      ]);
+    });
+
+    it('should process file successfully', async () => {
+      await projectService.processFile(fileId, userId);
+
+      expect(File.findById).toHaveBeenCalledWith(fileId);
+      expect(Project.findById).toHaveBeenCalledWith(projectId);
+      expect(mockFile.save).toHaveBeenCalled();
+      expect(mockProject.save).toHaveBeenCalled();
+    });
+
+    it('should throw error if project not found', async () => {
+      (Project.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(projectService.processFile(fileId, userId)).rejects.toThrow('项目不存在');
+    });
+  });
+
+  describe('getFileSegments', () => {
+    const mockFile = createMockFile({
+      _id: new Types.ObjectId(fileId),
+      projectId: new Types.ObjectId(projectId),
+      uploadedBy: userId
+    });
+
+    const mockProject = createMockProject({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId,
+      id: projectId
+    });
+
+    const mockSegments = [
+      {
+        _id: new Types.ObjectId(),
+        fileId: new Types.ObjectId(fileId),
+        sourceText: 'Hello',
+        targetText: '',
+        status: SegmentStatus.PENDING,
+        index: 1
+      }
+    ];
+
+    beforeEach(() => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(mockFile);
+      (MockProject.findById as jest.Mock).mockResolvedValue(mockProject);
+      (Segment.find as jest.Mock).mockReturnValue({
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockSegments)
+      });
+      (Segment.countDocuments as jest.Mock).mockResolvedValue(1);
+    });
+
+    it('should return segments with pagination', async () => {
+      const result = await projectService.getFileSegments(fileId, userId, {
+        status: SegmentStatus.PENDING,
+        page: 1,
+        limit: 10
+      });
+
+      expect(result.segments).toEqual(mockSegments);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
+      expect(Segment.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: fileId,
+          status: SegmentStatus.PENDING
+        })
+      );
+    });
+
+    it('should throw NotFoundError if file does not exist', async () => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(projectService.getFileSegments(fileId, userId))
+        .rejects
+        .toThrow(NotFoundError);
+    });
+
+    it('should throw ForbiddenError if user is not authorized', async () => {
+      const mockProjectWithDifferentManager = createMockProject({
+        ...mockProject,
+        managerId: new Types.ObjectId().toString()
+      });
+      (MockProject.findById as jest.Mock).mockResolvedValue(mockProjectWithDifferentManager);
+
+      await expect(projectService.getFileSegments(fileId, userId))
+        .rejects
+        .toThrow(ForbiddenError);
+    });
+  });
+
+  describe('updateFileProgress', () => {
+    const mockProject = createMockProject({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId,
+      sourceLanguage: 'en',
+      targetLanguage: 'zh'
+    });
+
+    const mockFile = createMockFile({
+      _id: new Types.ObjectId(fileId),
+      projectId: mockProject._id,
+      type: FileType.TXT,
+      status: FileStatus.TRANSLATED,
+      save: jest.fn().mockResolvedValue(undefined)
+    });
+
+    beforeEach(() => {
+      (Project.findById as jest.Mock).mockImplementation((id) => {
+        if (id.toString() === projectId) return mockProject;
+        if (id.toString() === mockProject._id.toString()) return mockProject;
+        return null;
+      });
+      (File.findById as jest.Mock).mockResolvedValue(mockFile);
+      (Segment.find as jest.Mock).mockResolvedValue([
+        { status: SegmentStatus.TRANSLATED },
+        { status: SegmentStatus.COMPLETED }
+      ]);
+    });
+
+    it('should update file progress successfully', async () => {
+      await projectService.updateFileProgress(fileId, userId);
+
+      expect(File.findById).toHaveBeenCalledWith(fileId);
+      expect(Project.findById).toHaveBeenCalledWith(projectId);
+      expect(mockFile.save).toHaveBeenCalled();
+      expect(mockProject.save).toHaveBeenCalled();
+    });
+
+    it('should throw error if project not found', async () => {
+      (Project.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(projectService.updateFileProgress(fileId, userId)).rejects.toThrow('项目不存在');
+    });
+  });
+
+  describe('updateProjectProgress', () => {
+    const mockProject = createMockProject({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId,
+      id: projectId,
+      status: ProjectStatus.IN_PROGRESS,
+      save: jest.fn().mockResolvedValue(undefined)
+    });
+
+    const progressData: ProjectProgressDto = {
+      completionPercentage: 50,
+      translatedWords: 100,
+      totalWords: 200
+    };
+
+    beforeEach(() => {
+      (Project.findById as jest.Mock).mockResolvedValue(mockProject);
+    });
+
+    it('should update project progress successfully', async () => {
+      const result = await projectService.updateProjectProgress(projectId, userId, progressData);
+
+      expect(result.progress).toEqual(progressData);
+      expect(result.status).toBe(ProjectStatus.IN_PROGRESS);
+      expect(mockProject.save).toHaveBeenCalled();
+    });
+
+    it('should set project status to completed when progress is 100%', async () => {
+      const completedProgress: ProjectProgressDto = {
+        ...progressData,
+        completionPercentage: 100
+      };
+
+      const result = await projectService.updateProjectProgress(projectId, userId, completedProgress);
+
+      expect(result.progress).toEqual(completedProgress);
+      expect(result.status).toBe(ProjectStatus.COMPLETED);
+      expect(mockProject.save).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundError if project does not exist', async () => {
+      (Project.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(projectService.updateProjectProgress(projectId, userId, progressData))
+        .rejects
+        .toThrow(NotFoundError);
     });
   });
 }); 

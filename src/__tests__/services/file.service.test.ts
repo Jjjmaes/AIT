@@ -1,39 +1,55 @@
 import { Types } from 'mongoose';
-import { FileStatus, FileType, File } from '../../models/file.model';
-import { SegmentStatus, Segment } from '../../models/segment.model';
+import { FileService } from '../../services/file.service';
+import { File, FileType, FileStatus } from '../../models/file.model';
+import { Segment, SegmentStatus } from '../../models/segment.model';
 import { NotFoundError, ValidationError } from '../../utils/errors';
-import fileService from '../../services/file.service';
+import * as s3Utils from '../../utils/s3';
 import { processFile } from '../../utils/fileProcessor';
-import { uploadToS3, getFileContent, deleteFromS3 } from '../../utils/s3';
+import { UploadFileDTO } from '../../types/file';
 
-// Mock dependencies
-jest.mock('../../utils/fileProcessor');
-jest.mock('../../utils/s3');
+// Mock the models and utilities
 jest.mock('../../models/file.model');
 jest.mock('../../models/segment.model');
+jest.mock('../../utils/s3');
+jest.mock('../../utils/fileProcessor');
+
+const MockFile = File as jest.MockedClass<typeof File>;
+const MockSegment = Segment as jest.MockedClass<typeof Segment>;
 
 describe('FileService', () => {
-  const mockProjectId = new Types.ObjectId().toString();
-  const mockUserId = new Types.ObjectId().toString();
-  const mockFileId = new Types.ObjectId().toString();
+  let fileService: FileService;
+  const mockFileId = '67e27da644c3afaaa928c8fa';
+  const mockProjectId = '67e27da644c3afaaa928c8fb';
+  const mockUserId = '67e27da644c3afaaa928c8fc';
 
   const mockFile = {
-    _id: new Types.ObjectId(mockFileId),
-    projectId: new Types.ObjectId(mockProjectId),
+    _id: mockFileId,
+    projectId: mockProjectId,
     fileName: 'test.txt',
     originalName: 'test.txt',
     fileSize: 1024,
     mimeType: 'text/plain',
     type: FileType.TXT,
     status: FileStatus.PENDING,
-    uploadedBy: new Types.ObjectId(mockUserId),
+    uploadedBy: mockUserId,
     storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-    path: 'files/test.txt',
+    path: '/uploads/test.txt',
+    metadata: {
+      sourceLanguage: 'en',
+      targetLanguage: 'zh',
+      category: 'test',
+      tags: ['test']
+    },
     error: '',
     errorDetails: '',
-    save: jest.fn(),
-    deleteOne: jest.fn(),
-    toObject: jest.fn().mockReturnValue({
+    segmentCount: 0,
+    translatedCount: 0,
+    reviewedCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    save: jest.fn().mockResolvedValue(this),
+    deleteOne: jest.fn().mockResolvedValue({}),
+    toObject: () => ({
       _id: mockFileId,
       projectId: mockProjectId,
       fileName: 'test.txt',
@@ -44,7 +60,13 @@ describe('FileService', () => {
       status: FileStatus.PENDING,
       uploadedBy: mockUserId,
       storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-      path: 'files/test.txt'
+      path: '/uploads/test.txt',
+      metadata: {
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+        category: 'test',
+        tags: ['test']
+      }
     })
   };
 
@@ -60,54 +82,125 @@ describe('FileService', () => {
   };
 
   beforeEach(() => {
+    fileService = new FileService();
     jest.clearAllMocks();
+    (s3Utils.uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/test.txt');
+    (File.create as jest.Mock).mockResolvedValue(mockFile);
+    (File.findById as jest.Mock).mockResolvedValue(mockFile);
   });
 
   describe('uploadFile', () => {
-    const mockFileData = {
+    const mockFileId = '67e27da644c3afaaa928c8fa';
+    const mockProjectId = '67e27da644c3afaaa928c8fb';
+    const mockUserId = '67e27da644c3afaaa928c8fc';
+
+    const mockFileData: UploadFileDTO = {
       originalName: 'test.txt',
       fileSize: 1024,
       mimeType: 'text/plain',
-      filePath: '/tmp/test.txt',
+      filePath: '/uploads/test.txt',
       sourceLanguage: 'en',
       targetLanguage: 'zh',
       category: 'test',
       tags: ['test']
     };
 
+    const mockFile = {
+      _id: mockFileId,
+      projectId: mockProjectId,
+      fileName: 'test.txt',
+      originalName: 'test.txt',
+      fileSize: 1024,
+      mimeType: 'text/plain',
+      type: FileType.TXT,
+      status: FileStatus.PENDING,
+      uploadedBy: mockUserId,
+      storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+      path: '/uploads/test.txt',
+      metadata: {
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+        category: 'test',
+        tags: ['test']
+      },
+      save: jest.fn().mockResolvedValue(this),
+      toObject: () => ({
+        _id: mockFileId,
+        projectId: mockProjectId,
+        fileName: 'test.txt',
+        originalName: 'test.txt',
+        fileSize: 1024,
+        mimeType: 'text/plain',
+        type: FileType.TXT,
+        status: FileStatus.PENDING,
+        uploadedBy: mockUserId,
+        storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
+        path: '/uploads/test.txt',
+        metadata: {
+          sourceLanguage: 'en',
+          targetLanguage: 'zh',
+          category: 'test',
+          tags: ['test']
+        }
+      })
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (s3Utils.uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/test.txt');
+      (File.create as jest.Mock).mockResolvedValue(mockFile);
+      (File.findById as jest.Mock).mockResolvedValue(mockFile);
+    });
+
     it('should upload file successfully', async () => {
-      // Mock dependencies
-      (uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/test.txt');
-      (File as any).mockImplementation(() => mockFile);
+      const result = await fileService.uploadFile(mockProjectId, mockUserId, mockFileData);
 
-      const result = await fileService.uploadFile(mockFileData, mockProjectId, mockUserId);
-
-      expect(uploadToS3).toHaveBeenCalledWith(
+      expect(s3Utils.uploadToS3).toHaveBeenCalledWith(
         mockFileData.filePath,
-        expect.stringContaining('files/'),
+        expect.stringContaining(mockFileData.originalName),
         mockFileData.mimeType
       );
-      expect(mockFile.save).toHaveBeenCalled();
-      expect(result).toMatchObject({
-        projectId: mockProjectId,
+      expect(File.create).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: new Types.ObjectId(mockProjectId),
         fileName: expect.any(String),
         originalName: mockFileData.originalName,
         fileSize: mockFileData.fileSize,
         mimeType: mockFileData.mimeType,
         type: FileType.TXT,
         status: FileStatus.PENDING,
-        uploadedBy: mockUserId
-      });
+        uploadedBy: new Types.ObjectId(mockUserId),
+        storageUrl: expect.any(String),
+        path: expect.any(String),
+        metadata: {
+          sourceLanguage: mockFileData.sourceLanguage,
+          targetLanguage: mockFileData.targetLanguage,
+          category: mockFileData.category,
+          tags: mockFileData.tags
+        }
+      }));
+      expect(result).toEqual(expect.objectContaining({
+        _id: mockFileId,
+        projectId: mockProjectId,
+        fileName: 'test.txt'
+      }));
+    });
+
+    it('should handle upload errors', async () => {
+      (s3Utils.uploadToS3 as jest.Mock).mockRejectedValue(new Error('Upload failed'));
+
+      await expect(fileService.uploadFile(mockProjectId, mockUserId, mockFileData))
+        .rejects
+        .toThrow('Upload failed');
     });
 
     it('should throw error for unsupported file type', async () => {
-      const invalidFileData = {
+      const unsupportedFileData = {
         ...mockFileData,
         originalName: 'test.xyz'
       };
 
       await expect(
-        fileService.uploadFile(invalidFileData, mockProjectId, mockUserId)
+        fileService.uploadFile(mockProjectId, mockUserId, unsupportedFileData)
       ).rejects.toThrow(ValidationError);
     });
   });
@@ -152,15 +245,14 @@ describe('FileService', () => {
     ];
 
     it('should process file successfully', async () => {
-      // Mock dependencies
       (File.findById as jest.Mock).mockResolvedValue(mockFile);
-      (getFileContent as jest.Mock).mockResolvedValue('Test content');
+      (s3Utils.getFileContent as jest.Mock).mockResolvedValue('Test content');
       (processFile as jest.Mock).mockResolvedValue(mockSegments);
       (Segment.create as jest.Mock).mockResolvedValue(mockSegments);
 
       const result = await fileService.processFile(mockFileId);
 
-      expect(getFileContent).toHaveBeenCalledWith(mockFile.path);
+      expect(s3Utils.getFileContent).toHaveBeenCalledWith(mockFile.path);
       expect(processFile).toHaveBeenCalledWith(
         'Test content',
         FileType.TXT,
@@ -180,34 +272,35 @@ describe('FileService', () => {
     });
 
     it('should handle processing errors', async () => {
-      // Mock dependencies
       const mockFileWithError = {
         ...mockFile,
-        status: FileStatus.PENDING
+        status: FileStatus.PENDING,
+        save: jest.fn()
       };
       (File.findById as jest.Mock).mockResolvedValue(mockFileWithError);
-      (getFileContent as jest.Mock).mockRejectedValue(new Error('Processing failed'));
+      const mockError = new Error('Processing failed');
+      (processFile as jest.Mock).mockRejectedValue(mockError);
 
       await expect(
         fileService.processFile(mockFileId)
-      ).rejects.toThrow('Processing failed');
+      ).rejects.toThrow(mockError);
 
       expect(mockFileWithError.status).toBe(FileStatus.ERROR);
       expect(mockFileWithError.error).toBe('Processing failed');
+      expect(mockFileWithError.errorDetails).toBe(mockError.stack);
       expect(mockFileWithError.save).toHaveBeenCalled();
     });
   });
 
   describe('deleteFile', () => {
     it('should delete file successfully', async () => {
-      // Mock dependencies
       (File.findById as jest.Mock).mockResolvedValue(mockFile);
-      (deleteFromS3 as jest.Mock).mockResolvedValue(undefined);
+      (s3Utils.deleteFromS3 as jest.Mock).mockResolvedValue(undefined);
       (Segment.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 1 });
 
       const result = await fileService.deleteFile(mockFileId);
 
-      expect(deleteFromS3).toHaveBeenCalledWith(mockFile.path);
+      expect(s3Utils.deleteFromS3).toHaveBeenCalledWith(mockFile.path);
       expect(mockFile.deleteOne).toHaveBeenCalled();
       expect(Segment.deleteMany).toHaveBeenCalledWith({ fileId: mockFile._id });
       expect(result).toBe(true);
@@ -237,14 +330,13 @@ describe('FileService', () => {
     ];
 
     it('should export file as text', async () => {
-      // Mock dependencies
       (File.findById as jest.Mock).mockResolvedValue(mockFile);
       const mockQuery = {
         sort: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockSegments)
       };
       (Segment.find as jest.Mock).mockReturnValue(mockQuery);
-      (uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/export.txt');
+      (s3Utils.uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/export.txt');
 
       const result = await fileService.exportFile(mockFileId, {
         format: 'txt',
@@ -255,19 +347,18 @@ describe('FileService', () => {
       expect(Segment.find).toHaveBeenCalledWith({ fileId: mockFileId });
       expect(mockQuery.sort).toHaveBeenCalledWith({ order: 1 });
       expect(mockQuery.exec).toHaveBeenCalled();
-      expect(uploadToS3).toHaveBeenCalled();
+      expect(s3Utils.uploadToS3).toHaveBeenCalled();
       expect(result).toBe('https://test-bucket.s3.amazonaws.com/export.txt');
     });
 
     it('should export file as JSON', async () => {
-      // Mock dependencies
       (File.findById as jest.Mock).mockResolvedValue(mockFile);
       const mockQuery = {
         sort: jest.fn().mockReturnThis(),
         exec: jest.fn().mockResolvedValue(mockSegments)
       };
       (Segment.find as jest.Mock).mockReturnValue(mockQuery);
-      (uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/export.json');
+      (s3Utils.uploadToS3 as jest.Mock).mockResolvedValue('https://test-bucket.s3.amazonaws.com/export.json');
 
       const result = await fileService.exportFile(mockFileId, {
         format: 'json',
@@ -278,8 +369,106 @@ describe('FileService', () => {
       expect(Segment.find).toHaveBeenCalledWith({ fileId: mockFileId });
       expect(mockQuery.sort).toHaveBeenCalledWith({ order: 1 });
       expect(mockQuery.exec).toHaveBeenCalled();
-      expect(uploadToS3).toHaveBeenCalled();
+      expect(s3Utils.uploadToS3).toHaveBeenCalled();
       expect(result).toBe('https://test-bucket.s3.amazonaws.com/export.json');
+    });
+  });
+
+  describe('getFileSegments', () => {
+    const mockFile = {
+      _id: new Types.ObjectId(mockFileId),
+      projectId: new Types.ObjectId(mockProjectId),
+      uploadedBy: mockUserId
+    };
+
+    const mockSegments = [
+      {
+        _id: new Types.ObjectId(),
+        fileId: new Types.ObjectId(mockFileId),
+        sourceText: 'Hello',
+        targetText: '',
+        status: SegmentStatus.PENDING,
+        index: 1
+      }
+    ];
+
+    beforeEach(() => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(mockFile);
+      (MockSegment.find as jest.Mock).mockReturnValue({
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockSegments)
+      });
+      (MockSegment.countDocuments as jest.Mock).mockResolvedValue(1);
+    });
+
+    it('should return segments with pagination', async () => {
+      const result = await fileService.getFileSegments(mockFileId, {
+        status: SegmentStatus.PENDING,
+        page: 1,
+        limit: 10
+      });
+
+      expect(result.segments).toEqual(mockSegments);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
+      expect(MockSegment.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: mockFileId,
+          status: SegmentStatus.PENDING
+        })
+      );
+    });
+
+    it('should throw NotFoundError if file does not exist', async () => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(fileService.getFileSegments(mockFileId))
+        .rejects
+        .toThrow(NotFoundError);
+    });
+  });
+
+  describe('updateFileProgress', () => {
+    const mockFile = {
+      _id: new Types.ObjectId(mockFileId),
+      projectId: new Types.ObjectId(mockProjectId),
+      uploadedBy: mockUserId,
+      save: jest.fn().mockResolvedValue(undefined)
+    };
+
+    const mockSegments = [
+      {
+        _id: new Types.ObjectId(),
+        fileId: new Types.ObjectId(mockFileId),
+        status: SegmentStatus.TRANSLATED
+      },
+      {
+        _id: new Types.ObjectId(),
+        fileId: new Types.ObjectId(mockFileId),
+        status: SegmentStatus.COMPLETED
+      }
+    ];
+
+    beforeEach(() => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(mockFile);
+      (MockSegment.find as jest.Mock).mockResolvedValue(mockSegments);
+    });
+
+    it('should update file progress successfully', async () => {
+      await fileService.updateFileProgress(mockFileId);
+
+      expect(MockSegment.find).toHaveBeenCalledWith({ fileId: mockFileId });
+      expect(mockFile.save).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundError if file does not exist', async () => {
+      (MockFile.findById as jest.Mock).mockResolvedValue(null);
+
+      await expect(fileService.updateFileProgress(mockFileId))
+        .rejects
+        .toThrow(NotFoundError);
     });
   });
 }); 

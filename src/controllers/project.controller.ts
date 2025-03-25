@@ -18,6 +18,8 @@ import {
 } from '../types/project.types';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
+import { UploadFileDTO } from '../services/project.service';
+import { Types } from 'mongoose';
 
 export const upload = multer(fileUploadConfig);
 
@@ -177,26 +179,29 @@ export default class ProjectController {
    */
   async uploadFile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const { projectId } = req.params;
       const userId = req.user?.id;
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
 
-      const { projectId } = req.params;
       const file = req.file;
 
       if (!file) {
-        throw new ValidationError('请上传文件');
+        throw new ValidationError('未提供文件');
       }
 
       logger.info(`User ${userId} uploading file to project ${projectId}`);
 
-      const fileData = {
+      const fileData: UploadFileDTO = {
         originalName: file.originalname,
-        fileName: file.filename,
         fileSize: file.size,
         mimeType: file.mimetype,
-        filePath: file.path
+        filePath: file.path,
+        sourceLanguage: req.body.sourceLanguage,
+        targetLanguage: req.body.targetLanguage,
+        category: req.body.category,
+        tags: req.body.tags ? JSON.parse(req.body.tags) : undefined
       };
 
       const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);

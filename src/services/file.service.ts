@@ -38,11 +38,11 @@ export interface ExportOptions {
   targetLanguage?: string;
 }
 
-class FileService {
+export class FileService {
   /**
    * 上传文件
    */
-  async uploadFile(fileData: UploadFileDTO, projectId: string, userId: string): Promise<any> {
+  async uploadFile(projectId: string, userId: string, fileData: UploadFileDTO): Promise<any> {
     try {
       // 验证文件类型
       const fileType = this.getFileType(fileData.originalName);
@@ -58,7 +58,7 @@ class FileService {
       const s3Url = await uploadToS3(fileData.filePath, key, fileData.mimeType);
 
       // 创建文件记录
-      const file = new File({
+      const file = await File.create({
         projectId: new Types.ObjectId(projectId),
         fileName,
         originalName: fileData.originalName,
@@ -77,12 +77,10 @@ class FileService {
         }
       });
 
-      await file.save();
       logger.info(`File ${file.id} uploaded successfully to project ${projectId}`);
 
       const result = file.toObject();
-      const { toObject, ...cleanResult } = result;
-      return cleanResult;
+      return result;
     } catch (error) {
       logger.error(`Error uploading file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
@@ -248,7 +246,7 @@ class FileService {
       );
 
       // 更新文件状态
-      file.status = FileStatus.READY;
+      file.status = FileStatus.TRANSLATED;
       file.processingCompletedAt = new Date();
       file.segmentCount = segments.length;
       await file.save();
@@ -395,6 +393,73 @@ class FileService {
     };
 
     return JSON.stringify(xliff, null, 2);
+  }
+
+  /**
+   * 获取文件段落列表
+   */
+  async getFileSegments(fileId: string, options: {
+    status?: SegmentStatus;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<{
+    segments: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const file = await File.findById(fileId);
+    if (!file) {
+      throw new NotFoundError('文件不存在');
+    }
+
+    const query: any = { file: fileId };
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [segments, total] = await Promise.all([
+      Segment.find(query)
+        .sort({ order: 1 })
+        .skip(skip)
+        .limit(limit),
+      Segment.countDocuments(query)
+    ]);
+
+    return {
+      segments,
+      total,
+      page,
+      limit
+    };
+  }
+
+  /**
+   * 更新文件进度
+   */
+  async updateFileProgress(fileId: string): Promise<void> {
+    const file = await File.findById(fileId);
+    if (!file) {
+      throw new NotFoundError('文件不存在');
+    }
+
+    const segments = await Segment.find({ fileId });
+    const totalSegments = segments.length;
+    const completedSegments = segments.filter(s => s.status === SegmentStatus.COMPLETED).length;
+    const translatedSegments = segments.filter(s => s.status === SegmentStatus.TRANSLATED).length;
+
+    file.progress = {
+      total: totalSegments,
+      completed: completedSegments,
+      translated: translatedSegments,
+      percentage: totalSegments > 0 ? (completedSegments / totalSegments) * 100 : 0
+    };
+
+    await file.save();
   }
 }
 

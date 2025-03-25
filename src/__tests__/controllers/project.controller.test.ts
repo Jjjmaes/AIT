@@ -6,6 +6,7 @@ import { ProjectStatus, ProjectPriority } from '../../types/project.types';
 import { NotFoundError, ForbiddenError, ValidationError, UnauthorizedError } from '../../utils/errors';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { Multer } from 'multer';
+import { UserRole } from '../../types/user';
 
 // Mock projectService
 jest.mock('../../services/project.service');
@@ -40,6 +41,11 @@ describe('ProjectController', () => {
     mockNext = jest.fn();
     // Reset all mocks
     jest.clearAllMocks();
+    (projectService.uploadProjectFile as jest.Mock).mockResolvedValue({
+      _id: new Types.ObjectId(),
+      originalName: 'test.txt',
+      fileName: 'test-123.txt'
+    });
   });
 
   describe('createProject', () => {
@@ -256,59 +262,112 @@ describe('ProjectController', () => {
   });
 
   describe('uploadFile', () => {
-    const projectId = new Types.ObjectId().toString();
-    const mockFile = {
-      fieldname: 'file',
-      originalname: 'test.txt',
-      encoding: '7bit',
-      mimetype: 'text/plain',
-      destination: '/uploads',
-      filename: 'test-123.txt',
-      path: '/uploads/test-123.txt',
-      size: 1024,
-      buffer: Buffer.from('test')
-    } as Express.Multer.File;
+    const projectId = '67e28162d7784e08596a90d2';
+    const mockUser = {
+      id: '67e28162d7784e08596a90ce',
+      email: 'test@example.com',
+      role: UserRole.MANAGER
+    };
+
+    const mockReq = {
+      user: mockUser,
+      params: { projectId },
+      query: {},
+      body: {
+        sourceLanguage: 'en',
+        targetLanguage: 'zh',
+        category: 'test',
+        tags: JSON.stringify(['test'])
+      },
+      file: {
+        fieldname: 'file',
+        originalname: 'test.txt',
+        encoding: '7bit',
+        mimetype: 'text/plain',
+        size: 1024,
+        destination: '/uploads',
+        filename: 'test-123.txt',
+        path: '/uploads/test-123.txt',
+        buffer: Buffer.from('test content'),
+        stream: null
+      }
+    } as unknown as AuthRequest;
+
+    const mockReqWithoutFile = {
+      ...mockReq,
+      file: undefined,
+      body: {}
+    } as unknown as AuthRequest;
+
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      sendStatus: jest.fn(),
+      links: jest.fn(),
+      send: jest.fn(),
+      jsonp: jest.fn(),
+      sendFile: jest.fn(),
+      download: jest.fn(),
+      contentType: jest.fn(),
+      type: jest.fn(),
+      format: jest.fn(),
+      attachment: jest.fn(),
+      app: {},
+      headersSent: false,
+      locals: {},
+      charset: 'utf-8',
+      statusCode: 200,
+      statusMessage: 'OK'
+    } as unknown as Response;
+
+    const mockNext = jest.fn();
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      (projectService.uploadProjectFile as jest.Mock).mockResolvedValue({
+        _id: 'file123',
+        originalName: 'test.txt',
+        fileName: 'test-123.txt'
+      });
+    });
 
     it('should upload a file successfully', async () => {
-      mockReq.params = { projectId };
-      mockReq.file = mockFile;
-
-      const mockUploadedFile = {
-        _id: new Types.ObjectId(),
-        originalName: mockFile.originalname,
-        fileName: mockFile.filename
-      };
-
-      (projectService.uploadProjectFile as jest.Mock).mockResolvedValue(mockUploadedFile);
-
-      await controller.uploadFile(mockReq as AuthRequest, mockRes as Response, mockNext);
+      await controller.uploadFile(mockReq, mockRes, mockNext);
 
       expect(projectService.uploadProjectFile).toHaveBeenCalledWith(
         projectId,
         mockUser.id,
         {
-          originalName: mockFile.originalname,
-          fileName: mockFile.filename,
-          fileSize: mockFile.size,
-          mimeType: mockFile.mimetype,
-          filePath: mockFile.path
+          originalName: 'test.txt',
+          fileSize: 1024,
+          mimeType: 'text/plain',
+          filePath: '/uploads/test-123.txt',
+          sourceLanguage: 'en',
+          targetLanguage: 'zh',
+          category: 'test',
+          tags: ['test']
         }
       );
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        data: { file: mockUploadedFile }
+        data: {
+          file: {
+            _id: 'file123',
+            originalName: 'test.txt',
+            fileName: 'test-123.txt'
+          }
+        }
       });
     });
 
-    it('should handle missing file error', async () => {
-      mockReq.params = { projectId };
-      mockReq.file = undefined;
-
-      await controller.uploadFile(mockReq as AuthRequest, mockRes as Response, mockNext);
+    it('should return 400 if no file is uploaded', async () => {
+      await controller.uploadFile(mockReqWithoutFile, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
-        expect.any(ValidationError)
+        expect.objectContaining({
+          message: '未提供文件'
+        })
       );
     });
   });
