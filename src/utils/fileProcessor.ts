@@ -1,5 +1,6 @@
 import { FileType } from '../models/file.model';
 import { SegmentStatus } from '../models/segment.model';
+import { ValidationError } from './errors';
 
 interface ProcessOptions {
   maxSegmentLength?: number;
@@ -23,11 +24,19 @@ export async function processFile(
   fileType: FileType,
   options: ProcessOptions = {}
 ): Promise<ProcessedSegment[]> {
+  if (!content) {
+    throw new ValidationError('文件内容不能为空');
+  }
+
   const {
     maxSegmentLength = 1000,
     minSegmentLength = 100,
     preserveFormatting = true
   } = options;
+
+  if (maxSegmentLength < minSegmentLength) {
+    throw new ValidationError('最大段落长度不能小于最小段落长度');
+  }
 
   let segments: ProcessedSegment[] = [];
 
@@ -36,13 +45,21 @@ export async function processFile(
       segments = processTextFile(content, maxSegmentLength, minSegmentLength, preserveFormatting);
       break;
     case FileType.JSON:
-      segments = processJsonFile(content, maxSegmentLength, minSegmentLength);
+      try {
+        segments = processJsonFile(content, maxSegmentLength, minSegmentLength);
+      } catch (error) {
+        throw new ValidationError('JSON格式不正确');
+      }
       break;
     case FileType.MD:
       segments = processMarkdownFile(content, maxSegmentLength, minSegmentLength, preserveFormatting);
       break;
     default:
-      throw new Error(`不支持的文件类型: ${fileType}`);
+      throw new ValidationError(`不支持的文件类型: ${fileType}`);
+  }
+
+  if (segments.length === 0) {
+    throw new ValidationError('未找到可处理的文本段落');
   }
 
   return segments;

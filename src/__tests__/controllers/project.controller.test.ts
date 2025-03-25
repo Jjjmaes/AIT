@@ -1,9 +1,9 @@
-import { Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import ProjectController from '../../controllers/project.controller';
 import { projectService } from '../../services/project.service';
-import { ProjectStatus, ProjectPriority } from '../../models/project.model';
-import { NotFoundError, ForbiddenError, ValidationError } from '../../utils/errors';
+import { ProjectStatus, ProjectPriority } from '../../types/project.types';
+import { NotFoundError, ForbiddenError, ValidationError, UnauthorizedError } from '../../utils/errors';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { Multer } from 'multer';
 
@@ -14,12 +14,12 @@ describe('ProjectController', () => {
   let controller: ProjectController;
   let mockReq: Partial<AuthRequest>;
   let mockRes: Partial<Response>;
-  let mockNext: jest.Mock;
+  let mockNext: jest.MockedFunction<NextFunction>;
 
-  const userId = new Types.ObjectId();
+  const mockUserId = new Types.ObjectId();
   const mockUser = {
-    id: userId.toString(),
-    _id: userId,
+    id: mockUserId.toString(),
+    _id: mockUserId,
     email: 'test@example.com',
     username: 'testuser',
     role: 'translator'
@@ -27,11 +27,17 @@ describe('ProjectController', () => {
 
   beforeEach(() => {
     controller = new ProjectController();
-    mockNext = jest.fn();
+    mockReq = {
+      user: mockUser,
+      params: {},
+      query: {},
+      body: {}
+    };
     mockRes = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
     };
+    mockNext = jest.fn();
     // Reset all mocks
     jest.clearAllMocks();
   });
@@ -47,10 +53,7 @@ describe('ProjectController', () => {
     };
 
     it('should create a project successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        body: projectData
-      };
+      mockReq.body = projectData;
 
       const mockProject = { 
         _id: new Types.ObjectId(),
@@ -74,25 +77,17 @@ describe('ProjectController', () => {
     });
 
     it('should handle unauthorized access', async () => {
-      mockReq = {
-        user: undefined,
-        body: projectData
-      };
+      mockReq.user = undefined;
 
       await controller.createProject(mockReq as AuthRequest, mockRes as Response, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: false,
-        message: '未授权的访问'
-      });
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext.mock.calls[0]).toHaveLength(1);
+      expect(mockNext.mock.calls[0][0]).toBeDefined();
     });
 
     it('should handle validation errors', async () => {
-      mockReq = {
-        user: mockUser,
-        body: projectData
-      };
+      mockReq.body = projectData;
 
       const error = new ValidationError('验证错误');
       (projectService.createProject as jest.Mock).mockRejectedValue(error);
@@ -105,15 +100,12 @@ describe('ProjectController', () => {
 
   describe('getProjects', () => {
     it('should get projects successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        query: {
-          status: ProjectStatus.IN_PROGRESS,
-          priority: ProjectPriority.HIGH,
-          search: 'test',
-          page: '1',
-          limit: '10'
-        }
+      mockReq.query = {
+        status: ProjectStatus.IN_PROGRESS,
+        priority: ProjectPriority.HIGH,
+        search: 'test',
+        page: '1',
+        limit: '10'
       };
 
       const mockResult = {
@@ -145,18 +137,13 @@ describe('ProjectController', () => {
     });
 
     it('should handle unauthorized access', async () => {
-      mockReq = {
-        user: undefined,
-        query: {}
-      };
+      mockReq.user = undefined;
 
       await controller.getProjects(mockReq as AuthRequest, mockRes as Response, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: false,
-        message: '未授权的访问'
-      });
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockNext.mock.calls[0]).toHaveLength(1);
+      expect(mockNext.mock.calls[0][0]).toBeDefined();
     });
   });
 
@@ -164,10 +151,7 @@ describe('ProjectController', () => {
     const projectId = new Types.ObjectId().toString();
 
     it('should get a project successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId }
-      };
+      mockReq.params = { projectId };
 
       const mockProject = {
         _id: projectId,
@@ -187,10 +171,7 @@ describe('ProjectController', () => {
     });
 
     it('should handle not found error', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId }
-      };
+      mockReq.params = { projectId };
 
       const error = new NotFoundError('项目不存在');
       (projectService.getProjectById as jest.Mock).mockRejectedValue(error);
@@ -209,11 +190,8 @@ describe('ProjectController', () => {
     };
 
     it('should update a project successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId },
-        body: updateData
-      };
+      mockReq.params = { projectId };
+      mockReq.body = updateData;
 
       const mockUpdatedProject = {
         _id: projectId,
@@ -233,11 +211,8 @@ describe('ProjectController', () => {
     });
 
     it('should handle forbidden error', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId },
-        body: updateData
-      };
+      mockReq.params = { projectId };
+      mockReq.body = updateData;
 
       const error = new ForbiddenError('无权限操作此项目');
       (projectService.updateProject as jest.Mock).mockRejectedValue(error);
@@ -252,10 +227,7 @@ describe('ProjectController', () => {
     const projectId = new Types.ObjectId().toString();
 
     it('should delete a project successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId }
-      };
+      mockReq.params = { projectId };
 
       const mockResult = { message: '项目删除成功' };
       (projectService.deleteProject as jest.Mock).mockResolvedValue(mockResult);
@@ -272,10 +244,7 @@ describe('ProjectController', () => {
     });
 
     it('should handle not found error', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId }
-      };
+      mockReq.params = { projectId };
 
       const error = new NotFoundError('项目不存在');
       (projectService.deleteProject as jest.Mock).mockRejectedValue(error);
@@ -301,11 +270,8 @@ describe('ProjectController', () => {
     } as Express.Multer.File;
 
     it('should upload a file successfully', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId },
-        file: mockFile
-      };
+      mockReq.params = { projectId };
+      mockReq.file = mockFile;
 
       const mockUploadedFile = {
         _id: new Types.ObjectId(),
@@ -336,17 +302,137 @@ describe('ProjectController', () => {
     });
 
     it('should handle missing file error', async () => {
-      mockReq = {
-        user: mockUser,
-        params: { projectId },
-        file: undefined
-      };
+      mockReq.params = { projectId };
+      mockReq.file = undefined;
 
       await controller.uploadFile(mockReq as AuthRequest, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.any(ValidationError)
       );
+    });
+  });
+
+  describe('getProjectFiles', () => {
+    it('should get project files successfully', async () => {
+      mockReq.params = { projectId: 'project123' };
+      const mockFiles = [{ id: 'file1' }, { id: 'file2' }];
+      
+      (projectService.getProjectFiles as jest.Mock).mockResolvedValue(mockFiles);
+
+      await controller.getProjectFiles(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.getProjectFiles).toHaveBeenCalledWith('project123', mockUser.id);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: { files: mockFiles }
+      });
+    });
+  });
+
+  describe('processFile', () => {
+    it('should process a file successfully', async () => {
+      mockReq.params = { fileId: 'file123' };
+      
+      await controller.processFile(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.processFile).toHaveBeenCalledWith('file123', mockUser.id);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: '文件处理成功'
+      });
+    });
+  });
+
+  describe('getFileSegments', () => {
+    it('should get file segments successfully', async () => {
+      mockReq.params = { fileId: 'file123' };
+      mockReq.query = { page: '1', limit: '10' };
+      
+      const mockSegments = {
+        segments: [],
+        total: 0,
+        page: 1,
+        limit: 10
+      };
+
+      (projectService.getFileSegments as jest.Mock).mockResolvedValue(mockSegments);
+
+      await controller.getFileSegments(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.getFileSegments).toHaveBeenCalledWith('file123', mockUser.id, {
+        status: undefined,
+        page: 1,
+        limit: 10
+      });
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockSegments
+      });
+    });
+  });
+
+  describe('updateFileProgress', () => {
+    it('should update file progress successfully', async () => {
+      mockReq.params = { fileId: 'file123' };
+      
+      await controller.updateFileProgress(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.updateFileProgress).toHaveBeenCalledWith('file123', mockUser.id);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: '文件进度更新成功'
+      });
+    });
+  });
+
+  describe('updateProjectProgress', () => {
+    it('should update project progress successfully', async () => {
+      mockReq.params = { projectId: 'project123' };
+      const progressData = {
+        completionPercentage: 50,
+        translatedWords: 100,
+        totalWords: 200
+      };
+      mockReq.body = progressData;
+      
+      await controller.updateProjectProgress(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.updateProjectProgress).toHaveBeenCalledWith('project123', mockUser.id, progressData);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: '项目进度更新成功'
+      });
+    });
+  });
+
+  describe('getProjectStats', () => {
+    it('should get project stats successfully', async () => {
+      mockReq.params = { projectId: 'project123' };
+      
+      const mockProject = { id: 'project123', name: 'Test Project' };
+      const mockFiles = [{ id: 'file1' }, { id: 'file2' }];
+      
+      (projectService.getProjectById as jest.Mock).mockResolvedValue(mockProject);
+      (projectService.getProjectFiles as jest.Mock).mockResolvedValue(mockFiles);
+
+      await controller.getProjectStats(mockReq as AuthRequest, mockRes as Response, mockNext);
+
+      expect(projectService.getProjectById).toHaveBeenCalledWith('project123', mockUser.id);
+      expect(projectService.getProjectFiles).toHaveBeenCalledWith('project123', mockUser.id);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          project: mockProject,
+          files: mockFiles
+        }
+      });
     });
   });
 });

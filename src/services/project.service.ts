@@ -1,16 +1,25 @@
 // src/services/project.service.ts
 
-import { Project, IProject, ProjectStatus, ProjectPriority } from '../models/project.model';
+import { Types } from 'mongoose';
+import Project, { IProject } from '../models/project.model';
+import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../utils/errors';
+import { 
+  CreateProjectDto, 
+  UpdateProjectDto, 
+  ProjectProgressDto,
+  ProjectStatus,
+  ProjectPriority
+} from '../types/project.types';
+import logger from '../utils/logger';
 import { File, IFile, FileStatus, FileType } from '../models/file.model';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
-import mongoose, { Types } from 'mongoose';
-import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
+import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import mime from 'mime-types';
 import { uploadToS3, deleteFromS3, getFileContent } from '../utils/s3';
-import { processFile } from '../utils/fileProcessor';
+import { processFile as processFileUtil } from '../utils/fileProcessor';
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -56,185 +65,178 @@ export class ProjectService {
   /**
    * 创建新项目
    */
-  async createProject(data: Partial<IProject>): Promise<IProject> {
-    const project = new Project(data);
-    return project.save();
+  async createProject(data: CreateProjectDto): Promise<IProject> {
+    try {
+      const project = new Project({
+        ...data,
+        status: ProjectStatus.PENDING,
+        priority: data.priority || ProjectPriority.MEDIUM,
+        progress: {
+          completionPercentage: 0,
+          translatedWords: 0,
+          totalWords: 0
+        }
+      });
+
+      await project.save();
+      logger.info(`Project created: ${project.id}`);
+      return project;
+    } catch (error) {
+      if ((error as any).code === 11000) {
+        throw new ConflictError('项目名称已存在');
+      }
+      throw error;
+    }
   }
 
   /**
-   * 获取单个项目信息
+   * 获取用户的项目列表
    */
-  async getProjectById(projectId: string, userId: string): Promise<IProject> {
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw new NotFoundError('项目不存在');
-    }
-
-    // 检查用户权限
-    if (project.managerId.toString() !== userId && 
-        !project.reviewers?.some(reviewer => reviewer.toString() === userId)) {
-      throw new ForbiddenError('没有权限访问此项目');
-    }
-
-    return project;
-  }
-
-  /**
-   * 获取用户关联的所有项目
-   */
-  async getUserProjects(
-    userId: string, 
-    filters: { 
-      status?: ProjectStatus, 
-      priority?: ProjectPriority,
-      search?: string,
-      limit?: number,
-      page?: number
-    } = {}
-  ): Promise<{ projects: IProject[], total: number, page: number, limit: number }> {
-    const { status, priority, search, limit = 10, page = 1 } = filters;
+  async getUserProjects(userId: string, options: {
+    status?: ProjectStatus;
+    priority?: ProjectPriority;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const query: any = { managerId: userId };
     
-    // 构建查询条件
-    const query: any = {
-      $or: [
-        { manager: userId },
-        { reviewers: userId }
-      ]
-    };
-
-    if (status) {
-      query.status = status;
+    if (options.status) {
+      query.status = options.status;
+    }
+    
+    if (options.priority) {
+      query.priority = options.priority;
+    }
+    
+    if (options.search) {
+      query.name = { $regex: options.search, $options: 'i' };
     }
 
-    if (priority) {
-      query.priority = priority;
-    }
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const skip = (page - 1) * limit;
 
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // 计算总数
-    const total = await Project.countDocuments(query);
-
-    // 获取项目列表
-    const projects = await Project.find(query)
-      .populate('manager', 'username email displayName')
-      .populate('reviewers', 'username email displayName')
-      .populate('translationPromptTemplate', 'name')
-      .populate('reviewPromptTemplate', 'name')
-      .sort({ updatedAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+    const [projects, total] = await Promise.all([
+      Project.find(query)
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Project.countDocuments(query)
+    ]);
 
     return {
       projects,
-      total,
-      page,
-      limit
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * 获取项目详情
+   */
+  async getProjectById(projectId: string, userId: string): Promise<any> {
+    const project = await Project.findOne({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId
+    });
+
+    if (!project) {
+      throw new NotFoundError('项目不存在或您没有权限访问');
+    }
+
+    const projectObj = project.toObject();
+    const { toObject, save, deleteOne, ...cleanResult } = projectObj;
+    return {
+      ...cleanResult,
+      _id: cleanResult._id.toString(),
+      id: cleanResult.id
     };
   }
 
   /**
    * 更新项目信息
    */
-  async updateProject(projectId: string, userId: string, data: UpdateProjectDTO): Promise<IProject> {
-    const project = await Project.findById(projectId);
+  async updateProject(projectId: string, userId: string, updateData: UpdateProjectDto) {
+    const project = await Project.findOne({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId
+    });
+
     if (!project) {
-      throw new NotFoundError('项目不存在');
+      throw new NotFoundError('项目不存在或无权访问');
     }
-
-    if (project.managerId.toString() !== userId) {
-      throw new ForbiddenError('没有权限更新项目');
-    }
-
-    // 转换字符串ID为ObjectId
-    const updateData: Partial<IProject> = {
-      ...data,
-      managerId: data.manager ? new mongoose.Types.ObjectId(data.manager) : undefined,
-      reviewers: data.reviewers?.map(id => new mongoose.Types.ObjectId(id))
-    };
 
     Object.assign(project, updateData);
-    return project.save();
+    await project.save();
+    logger.info(`Project updated: ${project.id}`);
+
+    const result = project.toObject();
+    const { toObject, save, ...cleanResult } = result;
+    return cleanResult;
   }
 
   /**
    * 删除项目
    */
-  async deleteProject(projectId: string, userId: string): Promise<{ message: string }> {
-    const project = await Project.findById(projectId);
+  async deleteProject(projectId: string, userId: string) {
+    const project = await Project.findOne({
+      _id: new Types.ObjectId(projectId),
+      managerId: userId
+    });
+
     if (!project) {
-      throw new NotFoundError('项目不存在');
+      throw new NotFoundError('项目不存在或无权访问');
     }
 
-    if (project.managerId.toString() !== userId) {
-      throw new ForbiddenError('没有权限删除项目');
-    }
+    await project.deleteOne();
+    await File.deleteMany({ projectId: new Types.ObjectId(projectId) });
+    logger.info(`Project deleted: ${project.id}`);
 
-    // 删除项目相关的文件
-    const files = await File.find({ projectId });
-    for (const file of files) {
-      await deleteFromS3(file.path);
-    }
-
-    // 删除项目相关的段落
-    await Segment.deleteMany({ fileId: { $in: files.map(f => f._id) } });
-    await File.deleteMany({ projectId });
-    await Project.deleteOne({ _id: projectId });
-
-    return { message: '项目删除成功' };
+    return { success: true };
   }
 
   /**
    * 上传项目文件
    */
-  async uploadProjectFile(
-    projectId: string,
-    userId: string,
-    fileData: {
-      originalName: string;
-      fileName: string;
-      fileSize: number;
-      mimeType: string;
-      filePath: string;
-    }
-  ): Promise<IFile> {
+  async uploadProjectFile(projectId: string, userId: string, fileData: any) {
     const project = await Project.findById(projectId);
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
     if (project.managerId.toString() !== userId) {
-      throw new ForbiddenError('没有权限上传文件');
+      throw new ForbiddenError('无权访问此项目');
     }
 
-    // 确定文件类型
     const fileType = fileData.mimeType.split('/')[1] as FileType;
     if (!Object.values(FileType).includes(fileType)) {
-      throw new Error('不支持的文件类型');
+      throw new ValidationError('不支持的文件类型');
     }
 
     // 上传文件到 S3
     const key = `projects/${projectId}/${Date.now()}-${fileData.originalName}`;
-    const fileUrl = await uploadToS3(fileData.filePath, key, fileData.mimeType);
+    const s3Url = await uploadToS3(fileData.filePath, key, fileData.mimeType);
 
-    // 创建文件记录
-    const newFile = new File({
-      projectId,
-      fileName: fileData.fileName,
-      originalName: fileData.originalName,
-      fileSize: fileData.fileSize,
-      mimeType: fileData.mimeType,
-      type: fileType,
+    const file = new File({
+      ...fileData,
+      projectId: new Types.ObjectId(projectId),
+      uploadedBy: userId,
       status: FileStatus.PENDING,
-      path: key
+      type: fileType,
+      s3Url
     });
 
-    return newFile.save();
+    await file.save();
+    logger.info(`File ${file.id} uploaded successfully to project ${projectId}`);
+
+    const result = file.toObject();
+    const { toObject, ...cleanResult } = result;
+    return cleanResult;
   }
 
   /**
@@ -264,7 +266,7 @@ export class ProjectService {
       const fileContent = await getFileContent(file.path);
 
       // 处理文件
-      const segments = await processFile(fileContent, file.type);
+      const segments = await processFileUtil(fileContent, file.type);
 
       // 创建段落记录
       const segmentDocs = segments.map(segment => ({
@@ -281,11 +283,9 @@ export class ProjectService {
 
       // 更新项目进度
       await this.updateProjectProgress(project._id.toString(), userId, {
-        progress: {
-          totalSegments: segments.length,
-          translatedSegments: 0,
-          reviewedSegments: 0
-        }
+        completionPercentage: 0,
+        translatedWords: 0,
+        totalWords: 0
       });
     } catch (error) {
       const err = error as Error;
@@ -300,20 +300,22 @@ export class ProjectService {
   /**
    * 获取项目文件列表
    */
-  async getProjectFiles(
-    projectId: string,
-    userId: string
-  ): Promise<IFile[]> {
+  async getProjectFiles(projectId: string, userId: string) {
     const project = await Project.findById(projectId);
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
     if (project.managerId.toString() !== userId) {
-      throw new ForbiddenError('没有权限查看项目文件');
+      throw new ForbiddenError('无权访问此项目');
     }
 
-    return File.find({ projectId });
+    const files = await File.find({ projectId: new Types.ObjectId(projectId) });
+    return files.map(file => {
+      const result = file.toObject();
+      const { toObject, ...cleanResult } = result;
+      return cleanResult;
+    });
   }
 
   /**
@@ -344,7 +346,7 @@ export class ProjectService {
     }
 
     const isManager = project.managerId.toString() === userId;
-    const isReviewer = project.reviewers?.some((reviewer: Types.ObjectId) => 
+    const isReviewer = project.reviewers?.some(reviewer => 
       reviewer.toString() === userId
     );
 
@@ -401,67 +403,40 @@ export class ProjectService {
 
     // 更新项目进度
     await this.updateProjectProgress(project._id.toString(), userId, {
-      progress: {
-        totalSegments: segments.length,
-        translatedSegments: translatedCount,
-        reviewedSegments: reviewedCount
-      }
+      completionPercentage: 0,
+      translatedWords: translatedCount,
+      totalWords: segments.length
     });
   }
 
   /**
    * 更新项目进度
    */
-  async updateProjectProgress(
-    projectId: string,
-    userId: string,
-    updateData: {
-      status?: ProjectStatus;
-      progress?: {
-        totalSegments?: number;
-        translatedSegments?: number;
-        reviewedSegments?: number;
-      };
-    }
-  ): Promise<void> {
-    const project = await Project.findById(projectId);
+  async updateProjectProgress(projectId: string, userId: string, data: ProjectProgressDto): Promise<IProject> {
+    const project = await Project.findOne({
+      _id: projectId,
+      managerId: userId
+    });
+
     if (!project) {
       throw new NotFoundError('项目不存在');
     }
 
-    // 检查用户权限
-    if (project.managerId.toString() !== userId) {
-      throw new ForbiddenError('没有权限更新项目进度');
-    }
+    project.progress = {
+      completionPercentage: data.completionPercentage,
+      translatedWords: data.translatedWords,
+      totalWords: data.totalWords
+    };
 
-    // 更新项目状态
-    if (updateData.status) {
-      project.status = updateData.status;
-    }
-
-    // 更新进度
-    if (updateData.progress) {
-      const { totalSegments, translatedSegments, reviewedSegments } = updateData.progress;
-      
-      if (totalSegments !== undefined) {
-        project.progress.totalSegments = totalSegments;
-      }
-      if (translatedSegments !== undefined) {
-        project.progress.translatedSegments = translatedSegments;
-      }
-      if (reviewedSegments !== undefined) {
-        project.progress.reviewedSegments = reviewedSegments;
-      }
-
-      // 计算完成百分比
-      if (project.progress.totalSegments > 0) {
-        project.progress.completionPercentage = Math.round(
-          (project.progress.translatedSegments / project.progress.totalSegments) * 100
-        );
-      }
+    if (data.completionPercentage === 100) {
+      project.status = ProjectStatus.COMPLETED;
+    } else if (data.completionPercentage > 0) {
+      project.status = ProjectStatus.IN_PROGRESS;
     }
 
     await project.save();
+    logger.info(`Project progress updated: ${project.id}`);
+    return project;
   }
 }
 

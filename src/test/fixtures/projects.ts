@@ -1,43 +1,40 @@
 import { Types } from 'mongoose';
-import { ProjectStatus, ProjectPriority } from '../../models/project.model';
+import { ProjectStatus, ProjectPriority, CreateProjectDto } from '../../types/project.types';
 
-export const mockProjects = [
+export const mockProjects: CreateProjectDto[] = [
   {
     name: 'Test Project 1',
     description: 'Test Description 1',
     sourceLanguage: 'en',
     targetLanguage: 'zh',
-    managerId: new Types.ObjectId(),
+    managerId: new Types.ObjectId().toString(),
     translationPromptTemplate: 'translation template 1',
     reviewPromptTemplate: 'review template 1',
-    status: ProjectStatus.DRAFT,
     priority: ProjectPriority.MEDIUM,
-    progress: {
-      totalSegments: 100,
-      translatedSegments: 0,
-      reviewedSegments: 0,
-      completionPercentage: 0
-    },
-    createdAt: new Date(),
-    updatedAt: new Date()
+    deadline: new Date('2024-12-31')
   },
   {
     name: 'Test Project 2',
     description: 'Test Description 2',
     sourceLanguage: 'ja',
     targetLanguage: 'en',
-    managerId: new Types.ObjectId(),
+    managerId: new Types.ObjectId().toString(),
     translationPromptTemplate: 'translation template 2',
     reviewPromptTemplate: 'review template 2',
-    status: ProjectStatus.IN_PROGRESS,
     priority: ProjectPriority.HIGH,
-    progress: {
-      totalSegments: 50,
-      translatedSegments: 25,
-      reviewedSegments: 10,
-      completionPercentage: 20
-    },
-    createdAt: new Date(),
-    updatedAt: new Date()
+    deadline: new Date('2024-12-31')
   }
-]; 
+];
+
+export const mockProjectsWithStatus = mockProjects.map(project => ({
+  ...project,
+  status: ProjectStatus.PENDING,
+  progress: {
+    totalWords: 1000,
+    translatedWords: 0,
+    completionPercentage: 0
+  },
+  reviewers: [new Types.ObjectId().toString()],
+  createdAt: new Date(),
+  updatedAt: new Date()
+})); 
