@@ -25,9 +25,7 @@ export interface TranslationOptions {
 // 翻译任务
 export interface TranslationTask {
   id: string;
-  projectId: Types.ObjectId;
-  fileId: Types.ObjectId;
-  segmentId: Types.ObjectId;
+  taskId: string;
   status: TranslationStatus;
   options: TranslationOptions;
   createdAt: Date;
@@ -36,6 +34,7 @@ export interface TranslationTask {
   completedAt?: Date;
   error?: string;
   progress: number;
+  originalText?: string;
 }
 
 // 翻译结果
@@ -55,6 +54,11 @@ export interface TranslationResult {
     processingTime: number;
     wordCount: number;
     characterCount: number;
+    tokens: {
+      input: number;
+      output: number;
+    };
+    cost: number;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -147,4 +151,58 @@ export interface TranslationEvent {
   fileId: Types.ObjectId;
   data: any;
   timestamp: Date;
+}
+
+export interface ProjectTranslationTask {
+  id: string;
+  name: string;
+  description?: string;
+  status: TranslationStatus;
+  files: TranslationTask[];
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+  error?: string;
+  progress: {
+    totalFiles: number;
+    completedFiles: number;
+    totalSegments: number;
+    completedSegments: number;
+    failedSegments: number;
+    percentage: number;
+  };
+}
+
+export interface ProjectTranslationOptions {
+  sourceLanguage: string;
+  targetLanguage: string;
+  preserveFormatting?: boolean;
+  batchSize?: number;
+  maxConcurrentFiles?: number;
+  retryCount?: number;
+  retryDelay?: number;
+  timeout?: number;
+}
+
+export interface ProjectTranslationResult {
+  projectId: string;
+  status: TranslationStatus;
+  files: {
+    fileId: string;
+    status: TranslationStatus;
+    segments: TranslationResult[];
+  }[];
+  summary: {
+    totalFiles: number;
+    completedFiles: number;
+    failedFiles: number;
+    totalSegments: number;
+    completedSegments: number;
+    failedSegments: number;
+    totalTokens: number;
+    totalCost: number;
+    averageQuality: number;
+    processingTime: number;
+  };
+  error?: string;
 } 
