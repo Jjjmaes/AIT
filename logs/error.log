@@ -154,3 +154,50 @@
 {"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:04:20.622Z"}
 {"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:04:20.634Z"}
 {"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:04:20.650Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:31.643Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:29:31.662Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:29:31.668Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:29:31.671Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:31.675Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:31.677Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:29:32.676Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:29:32.701Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:29:32.732Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:47.255Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:29:47.276Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:29:47.282Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:29:47.285Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:47.290Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:29:47.294Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:29:48.569Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:29:48.587Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:29:48.609Z"}
+{"error":"Translation failed","fileId":"67e377ab23cffc443c3ba359","level":"error","message":"Translation task failed","projectId":"67e377ab23cffc443c3ba35a","taskId":"67e377ab23cffc443c3ba359-1","timestamp":"2025-03-26T03:42:35.185Z"}
+{"error":"Translation failed","fileId":"67e377ab23cffc443c3ba359","level":"error","message":"File translation failed","projectId":"67e377ab23cffc443c3ba35a","timestamp":"2025-03-26T03:42:35.187Z"}
+{"error":"Cannot read properties of null (reading 'map')","fileId":"67e377eae5605b3fd5c4e613","level":"error","message":"Failed to initialize file translation","projectId":"67e377eae5605b3fd5c4e614","timestamp":"2025-03-26T03:43:38.727Z"}
+{"error":"Translation failed","fileId":"67e377eae5605b3fd5c4e619","level":"error","message":"Translation task failed","projectId":"67e377eae5605b3fd5c4e61a","taskId":"67e377eae5605b3fd5c4e619-1","timestamp":"2025-03-26T03:43:38.751Z"}
+{"error":"Translation failed","fileId":"67e377eae5605b3fd5c4e619","level":"error","message":"File translation failed","projectId":"67e377eae5605b3fd5c4e61a","timestamp":"2025-03-26T03:43:38.752Z"}
+{"error":"Cannot read properties of null (reading 'map')","fileId":"67e37813d41b7cd912e78239","level":"error","message":"Failed to initialize file translation","projectId":"67e37813d41b7cd912e7823a","timestamp":"2025-03-26T03:44:19.138Z"}
+{"error":"Translation failed","fileId":"67e37813d41b7cd912e7823f","level":"error","message":"Translation task failed","projectId":"67e37813d41b7cd912e78240","taskId":"67e37813d41b7cd912e7823f-1","timestamp":"2025-03-26T03:44:19.180Z"}
+{"error":"Translation failed","fileId":"67e37813d41b7cd912e7823f","level":"error","message":"File translation failed","projectId":"67e37813d41b7cd912e78240","timestamp":"2025-03-26T03:44:19.181Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:44:20.144Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:44:20.164Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:44:20.195Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:26.727Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:48:26.740Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:48:26.743Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:48:26.746Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:26.748Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:26.751Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:48.342Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:48:48.365Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:48:48.369Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:48:48.372Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:48.376Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:48:48.379Z"}
+{"error":"Cannot read properties of null (reading 'map')","fileId":"67e379202e53979bd7497c18","level":"error","message":"Failed to initialize file translation","projectId":"67e379202e53979bd7497c19","timestamp":"2025-03-26T03:48:48.704Z"}
+{"error":"Translation failed","fileId":"67e379202e53979bd7497c1e","level":"error","message":"Translation task failed","projectId":"67e379202e53979bd7497c1f","taskId":"67e379202e53979bd7497c1e-1","timestamp":"2025-03-26T03:48:48.733Z"}
+{"error":"Translation failed","fileId":"67e379202e53979bd7497c1e","level":"error","message":"File translation failed","projectId":"67e379202e53979bd7497c1f","timestamp":"2025-03-26T03:48:48.734Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:48:49.437Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:48:49.456Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:48:49.475Z"}

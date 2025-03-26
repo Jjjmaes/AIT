@@ -83,6 +83,10 @@ export interface AIServiceResponse {
     confidence: number;
     wordCount: number;
     characterCount: number;
+    tokens: {
+      input: number;
+      output: number;
+    };
   };
 }
 

@@ -59,7 +59,11 @@ describe('TranslationService', () => {
           processingTime: 100,
           confidence: 0.95,
           wordCount: 2,
-          characterCount: 5
+          characterCount: 5,
+          tokens: {
+            input: 2,
+            output: 2
+          }
         }
       };
 
@@ -105,7 +109,11 @@ describe('TranslationService', () => {
             processingTime: 50,
             confidence: 0.95,
             wordCount: 1,
-            characterCount: 2
+            characterCount: 2,
+            tokens: {
+              input: 1,
+              output: 1
+            }
           }
         },
         {
@@ -116,7 +124,11 @@ describe('TranslationService', () => {
             processingTime: 50,
             confidence: 0.95,
             wordCount: 1,
-            characterCount: 2
+            characterCount: 2,
+            tokens: {
+              input: 1,
+              output: 1
+            }
           }
         }
       ];
