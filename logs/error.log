@@ -136,3 +136,21 @@
 {"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T02:52:23.010Z"}
 {"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T02:52:23.022Z"}
 {"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T02:52:23.035Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:02:51.638Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:02:51.658Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:02:51.678Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.834Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:03:40.847Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:03:40.851Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:03:40.853Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.857Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.861Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.845Z"}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:04:19.858Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:04:19.860Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:04:19.861Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.868Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.869Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:04:20.622Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:04:20.634Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:04:20.650Z"}

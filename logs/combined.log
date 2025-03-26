@@ -1970,3 +1970,83 @@
 {"level":"info","message":"Project progress updated: 67e36be733a4a7a99afd98e0","timestamp":"2025-03-26T02:52:23.120Z"}
 {"level":"info","message":"Project progress updated: 67e36be733a4a7a99afd98d3","timestamp":"2025-03-26T02:52:23.121Z"}
 {"level":"info","message":"Project progress updated: 67e36be733a4a7a99afd98d3","timestamp":"2025-03-26T02:52:23.121Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf creating new project","timestamp":"2025-03-26T03:02:51.449Z"}
+{"level":"info","message":"Project undefined created successfully by user 67e36e5bafc72b58a9e470cf","timestamp":"2025-03-26T03:02:51.452Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf creating new project","timestamp":"2025-03-26T03:02:51.459Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf updating project 67e36e5bafc72b58a9e470d1","timestamp":"2025-03-26T03:02:51.467Z"}
+{"level":"info","message":"Project 67e36e5bafc72b58a9e470d1 updated successfully by user 67e36e5bafc72b58a9e470cf","timestamp":"2025-03-26T03:02:51.467Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf updating project 67e36e5bafc72b58a9e470d1","timestamp":"2025-03-26T03:02:51.468Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf deleting project 67e36e5bafc72b58a9e470d2","timestamp":"2025-03-26T03:02:51.474Z"}
+{"level":"info","message":"Project 67e36e5bafc72b58a9e470d2 deleted successfully by user 67e36e5bafc72b58a9e470cf","timestamp":"2025-03-26T03:02:51.475Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf deleting project 67e36e5bafc72b58a9e470d2","timestamp":"2025-03-26T03:02:51.476Z"}
+{"level":"info","message":"User 67e28162d7784e08596a90ce uploading file to project 67e28162d7784e08596a90d2","timestamp":"2025-03-26T03:02:51.477Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e28162d7784e08596a90d2","timestamp":"2025-03-26T03:02:51.477Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf processing file file123","timestamp":"2025-03-26T03:02:51.481Z"}
+{"level":"info","message":"File file123 processed successfully","timestamp":"2025-03-26T03:02:51.481Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf updating file progress for file file123","timestamp":"2025-03-26T03:02:51.485Z"}
+{"level":"info","message":"File file123 progress updated successfully","timestamp":"2025-03-26T03:02:51.485Z"}
+{"level":"info","message":"User 67e36e5bafc72b58a9e470cf updating progress for project project123","timestamp":"2025-03-26T03:02:51.486Z"}
+{"level":"info","message":"Project project123 progress updated successfully","timestamp":"2025-03-26T03:02:51.486Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e27da644c3afaaa928c8fb","timestamp":"2025-03-26T03:02:51.630Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:02:51.638Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:02:51.658Z"}
+{"level":"info","message":"File undefined processed successfully with 2 segments","timestamp":"2025-03-26T03:02:51.675Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:02:51.678Z"}
+{"level":"info","message":"File 67e27da644c3afaaa928c8fa deleted successfully","timestamp":"2025-03-26T03:02:51.680Z"}
+{"level":"info","message":"Project created: 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.725Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.780Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.783Z"}
+{"level":"info","message":"Project updated: 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.789Z"}
+{"level":"info","message":"Project deleted: 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.792Z"}
+{"level":"info","message":"Project progress updated: 67e36e5b8eb2d4a8d5d6f688","timestamp":"2025-03-26T03:02:51.797Z"}
+{"level":"info","message":"Project progress updated: 67e36e5b8eb2d4a8d5d6f691","timestamp":"2025-03-26T03:02:51.802Z"}
+{"level":"info","message":"Project progress updated: 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.803Z"}
+{"level":"info","message":"Project progress updated: 67e36e5b8eb2d4a8d5d6f684","timestamp":"2025-03-26T03:02:51.805Z"}
+{"level":"info","message":"Translation completed","model":"gpt-3.5-turbo","processingTime":100,"provider":"openai","sourceLength":13,"targetLength":6,"timestamp":"2025-03-26T03:03:40.827Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.834Z"}
+{"level":"info","message":"Multiple segments translation completed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:03:40.844Z","totalProcessingTime":100}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:03:40.847Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:03:40.851Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:03:40.853Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.857Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:03:40.861Z"}
+{"level":"info","message":"Translation completed","model":"gpt-3.5-turbo","processingTime":100,"provider":"openai","sourceLength":13,"targetLength":6,"timestamp":"2025-03-26T03:04:19.840Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.845Z"}
+{"level":"info","message":"Multiple segments translation completed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:04:19.856Z","totalProcessingTime":100}
+{"error":"Translation failed","level":"error","message":"Multiple segments translation failed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-26T03:04:19.858Z"}
+{"error":"Validation failed","level":"error","message":"API key validation failed","provider":"openai","timestamp":"2025-03-26T03:04:19.860Z"}
+{"error":"Failed to get models","level":"error","message":"Failed to get available models","provider":"openai","timestamp":"2025-03-26T03:04:19.861Z"}
+{"error":"Failed to get model info","level":"error","message":"Failed to get model info","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.868Z"}
+{"error":"Failed to get pricing","level":"error","message":"Failed to get pricing","modelId":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-26T03:04:19.869Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 creating new project","timestamp":"2025-03-26T03:04:20.485Z"}
+{"level":"info","message":"Project undefined created successfully by user 67e36eb478d57ec04c7d9e77","timestamp":"2025-03-26T03:04:20.487Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 creating new project","timestamp":"2025-03-26T03:04:20.492Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 updating project 67e36eb478d57ec04c7d9e79","timestamp":"2025-03-26T03:04:20.495Z"}
+{"level":"info","message":"Project 67e36eb478d57ec04c7d9e79 updated successfully by user 67e36eb478d57ec04c7d9e77","timestamp":"2025-03-26T03:04:20.495Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 updating project 67e36eb478d57ec04c7d9e79","timestamp":"2025-03-26T03:04:20.496Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 deleting project 67e36eb478d57ec04c7d9e7a","timestamp":"2025-03-26T03:04:20.497Z"}
+{"level":"info","message":"Project 67e36eb478d57ec04c7d9e7a deleted successfully by user 67e36eb478d57ec04c7d9e77","timestamp":"2025-03-26T03:04:20.498Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 deleting project 67e36eb478d57ec04c7d9e7a","timestamp":"2025-03-26T03:04:20.499Z"}
+{"level":"info","message":"User 67e28162d7784e08596a90ce uploading file to project 67e28162d7784e08596a90d2","timestamp":"2025-03-26T03:04:20.500Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e28162d7784e08596a90d2","timestamp":"2025-03-26T03:04:20.501Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 processing file file123","timestamp":"2025-03-26T03:04:20.508Z"}
+{"level":"info","message":"File file123 processed successfully","timestamp":"2025-03-26T03:04:20.509Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 updating file progress for file file123","timestamp":"2025-03-26T03:04:20.510Z"}
+{"level":"info","message":"File file123 progress updated successfully","timestamp":"2025-03-26T03:04:20.510Z"}
+{"level":"info","message":"User 67e36eb478d57ec04c7d9e77 updating progress for project project123","timestamp":"2025-03-26T03:04:20.511Z"}
+{"level":"info","message":"Project project123 progress updated successfully","timestamp":"2025-03-26T03:04:20.511Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e27da644c3afaaa928c8fb","timestamp":"2025-03-26T03:04:20.617Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-26T03:04:20.622Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-26T03:04:20.634Z"}
+{"level":"info","message":"File undefined processed successfully with 2 segments","timestamp":"2025-03-26T03:04:20.647Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-26T03:04:20.650Z"}
+{"level":"info","message":"File 67e27da644c3afaaa928c8fa deleted successfully","timestamp":"2025-03-26T03:04:20.651Z"}
+{"level":"info","message":"Project created: 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.641Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.688Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.690Z"}
+{"level":"info","message":"Project updated: 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.694Z"}
+{"level":"info","message":"Project deleted: 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.695Z"}
+{"level":"info","message":"Project progress updated: 67e36eb4f704c1cc3527d285","timestamp":"2025-03-26T03:04:20.700Z"}
+{"level":"info","message":"Project progress updated: 67e36eb4f704c1cc3527d28e","timestamp":"2025-03-26T03:04:20.703Z"}
+{"level":"info","message":"Project progress updated: 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.703Z"}
+{"level":"info","message":"Project progress updated: 67e36eb4f704c1cc3527d281","timestamp":"2025-03-26T03:04:20.704Z"}
