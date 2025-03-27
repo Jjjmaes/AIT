@@ -4,7 +4,8 @@ import { File } from '../../models/file.model';
 import Project from '../../models/project.model';
 import { NotFoundError, ForbiddenError, ValidationError, AppError } from '../../utils/errors';
 import { AIServiceFactory } from '../../services/translation/ai-adapters';
-import reviewService, { ReviewService } from '../../services/review.service';
+import reviewService from '../../services/review.service';
+import { ReviewService } from '../../services/review.service';
 import logger from '../../utils/logger';
 import { AIReviewService } from '../../services/ai-review.service';
 
@@ -190,12 +191,12 @@ describe('Review Service', () => {
     });
 
     // 确保reviewService的方法被正确模拟
-    reviewService.startAIReview = jest.fn();
-    reviewService.completeSegmentReview = jest.fn();
-    reviewService.getSegmentReviewResult = jest.fn();
-    reviewService.addSegmentIssue = jest.fn();
-    reviewService.resolveSegmentIssue = jest.fn();
-    reviewService.batchUpdateSegmentStatus = jest.fn();
+    reviewService.startAIReview = jest.fn() as any;
+    reviewService.completeSegmentReview = jest.fn() as any;
+    reviewService.getSegmentReviewResult = jest.fn() as any;
+    reviewService.addSegmentIssue = jest.fn() as any;
+    reviewService.resolveSegmentIssue = jest.fn() as any;
+    reviewService.batchUpdateSegmentStatus = jest.fn() as any;
   });
   
   afterEach(() => {
@@ -247,8 +248,8 @@ describe('Review Service', () => {
         }
       };
       
-      // Mock the entire implementation
-      (reviewService.startAIReview as jest.Mock) = jest.fn().mockResolvedValueOnce(expectedSegment);
+      // Mock the implementation
+      (reviewService.startAIReview as jest.Mock).mockResolvedValueOnce(expectedSegment);
       
       // Act
       const result = await reviewService.startAIReview(
@@ -316,8 +317,8 @@ describe('Review Service', () => {
         }
       };
       
-      // Mock the entire implementation
-      (reviewService.completeSegmentReview as jest.Mock) = jest.fn().mockResolvedValueOnce(expectedSegment);
+      // Mock the implementation
+      (reviewService.completeSegmentReview as jest.Mock).mockResolvedValueOnce(expectedSegment);
       
       // Act
       const result = await reviewService.completeSegmentReview(
@@ -354,8 +355,8 @@ describe('Review Service', () => {
         _id: 'issue123'
       };
       
-      // Mock the entire implementation
-      (reviewService.addSegmentIssue as jest.Mock) = jest.fn().mockResolvedValueOnce(expectedIssue);
+      // Mock the implementation
+      (reviewService.addSegmentIssue as jest.Mock).mockResolvedValueOnce(expectedIssue);
       
       // Act
       const result = await reviewService.addSegmentIssue(
@@ -379,8 +380,8 @@ describe('Review Service', () => {
         resolvedBy: mockUserId
       };
       
-      // Mock the entire implementation
-      (reviewService.resolveSegmentIssue as jest.Mock) = jest.fn().mockResolvedValueOnce(resolvedIssue);
+      // Mock the implementation
+      (reviewService.resolveSegmentIssue as jest.Mock).mockResolvedValueOnce(resolvedIssue);
       
       // Act
       const result = await reviewService.resolveSegmentIssue(
@@ -408,8 +409,8 @@ describe('Review Service', () => {
         acknowledged: true
       };
       
-      // Mock the entire implementation
-      (reviewService.batchUpdateSegmentStatus as jest.Mock) = jest.fn().mockResolvedValueOnce(expectedResult);
+      // Mock the implementation
+      (reviewService.batchUpdateSegmentStatus as jest.Mock).mockResolvedValueOnce(expectedResult);
       
       // Act
       const result = await reviewService.batchUpdateSegmentStatus(
@@ -488,8 +489,8 @@ describe('Review Service', () => {
         reviewHistory: mockHistory
       };
       
-      // Mock the entire implementation
-      (reviewService.getSegmentReviewResult as jest.Mock) = jest.fn().mockResolvedValueOnce(expectedResult);
+      // Mock the implementation
+      (reviewService.getSegmentReviewResult as jest.Mock).mockResolvedValueOnce(expectedResult);
       
       // Act
       const result = await reviewService.getSegmentReviewResult(

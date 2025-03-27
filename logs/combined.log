@@ -5641,3 +5641,78 @@
 {"level":"info","message":"Project progress updated: 67e4ed73ef313c9e703f8e6e","timestamp":"2025-03-27T06:17:23.806Z"}
 {"level":"info","message":"Project progress updated: 67e4ed73ef313c9e703f8e61","timestamp":"2025-03-27T06:17:23.807Z"}
 {"level":"info","message":"Project progress updated: 67e4ed73ef313c9e703f8e61","timestamp":"2025-03-27T06:17:23.808Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-27T06:29:50.826Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-27T06:43:29.498Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-27T06:44:14.864Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-27T06:49:55.556Z"}
+{"level":"info","message":"Created new AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.542Z"}
+{"level":"info","message":"Created new AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.547Z"}
+{"level":"info","message":"Using existing AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.547Z"}
+{"level":"info","message":"Created new AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.565Z"}
+{"level":"info","message":"Removed AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.566Z"}
+{"level":"info","message":"Created new AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.570Z"}
+{"level":"info","message":"Created new AI adapter for provider: openai","timestamp":"2025-03-27T06:51:18.575Z"}
+{"level":"error","message":"Failed to initialize file translation: Cannot read properties of null (reading 'map')","stack":"TypeError: Cannot read properties of null (reading 'map')\n    at FileTranslationService.map [as initialize] (D:\\project\\translation-platform\\src\\services\\translation\\file-translation.service.ts:47:29)\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\file-translation.service.test.ts:69:43)\n    at Promise.then.completed (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at _runTest (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\runTest.js:444:34)\n    at Object.worker (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\testWorker.js:106:12)","timestamp":"2025-03-27T06:51:18.841Z"}
+{"level":"error","message":"Failed to translate segment 67e4f566e9adf5a9ace4fb4f-1: Translation failed","stack":"Error: Translation failed\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\file-translation.service.test.ts:144:32)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-03-27T06:51:18.853Z"}
+{"level":"error","message":"Failed to translate file: Translation failed","stack":"Error: Translation failed\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\file-translation.service.test.ts:144:32)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-03-27T06:51:18.854Z"}
+{"level":"info","message":"Added new task: cb9fc007-4761-4646-a77f-75538f89069c","timestamp":"2025-03-27T06:51:19.079Z"}
+{"level":"info","message":"Added new task: a64143dd-716b-4a6e-aa4b-8d6de5af5550","timestamp":"2025-03-27T06:51:19.086Z"}
+{"level":"info","message":"Cancelled task: a64143dd-716b-4a6e-aa4b-8d6de5af5550","timestamp":"2025-03-27T06:51:19.087Z"}
+{"level":"info","message":"Added new task: bd6c28bd-0295-48e8-94c2-7adc14755fab","timestamp":"2025-03-27T06:51:19.111Z"}
+{"level":"info","message":"Added new task: 1cbbdd3d-60df-4eca-9b8e-e576530567cb","timestamp":"2025-03-27T06:51:19.113Z"}
+{"level":"info","message":"Added new task: 68eed68a-13f5-495e-9bbf-aaf71c0d49e9","timestamp":"2025-03-27T06:51:19.114Z"}
+{"error":"Queue processing failed","level":"error","message":"Translation failed","model":"test-model","provider":"openai","timestamp":"2025-03-27T06:51:19.193Z"}
+{"level":"info","message":"Multiple segments translation completed","model":"test-model","provider":"openai","segmentCount":2,"timestamp":"2025-03-27T06:51:19.244Z","totalProcessingTime":0}
+{"level":"info","message":"Added new task: 835d6fa5-4624-4943-a4c3-bcd395b3adc2","timestamp":"2025-03-27T06:51:19.421Z"}
+{"level":"info","message":"Added new task: bd4541ef-0e13-4331-ad10-21acff32decc","timestamp":"2025-03-27T06:51:19.422Z"}
+{"level":"info","message":"Added new task: f3e43d80-fc69-493b-be9d-b8238826071c","timestamp":"2025-03-27T06:51:19.422Z"}
+{"level":"info","message":"Added new task: 76995f9e-677f-4f77-8980-25bc66e90df5","timestamp":"2025-03-27T06:51:19.425Z"}
+{"level":"info","message":"Added new task: 27ab78a2-89bd-4fcb-8950-7aabecd47d88","timestamp":"2025-03-27T06:51:19.425Z"}
+{"level":"info","message":"Translation completed","model":"gpt-3.5-turbo","processingTime":100,"provider":"openai","sourceLength":4,"targetLength":5,"timestamp":"2025-03-27T06:51:19.343Z"}
+{"error":"Translation failed","level":"error","message":"Translation failed","model":"gpt-3.5-turbo","provider":"openai","timestamp":"2025-03-27T06:51:19.352Z"}
+{"level":"info","message":"Multiple segments translation completed","model":"gpt-3.5-turbo","provider":"openai","segmentCount":2,"timestamp":"2025-03-27T06:51:19.373Z","totalProcessingTime":200}
+{"level":"info","message":"Processing translation task: 835d6fa5-4624-4943-a4c3-bcd395b3adc2","timestamp":"2025-03-27T06:51:19.528Z"}
+{"level":"info","message":"Processing translation task: bd4541ef-0e13-4331-ad10-21acff32decc","timestamp":"2025-03-27T06:51:19.528Z"}
+{"level":"info","message":"Project translation task initialized: 34a0716d-e461-48f2-ab8f-49ab415fa5c6","timestamp":"2025-03-27T06:51:19.517Z"}
+{"level":"error","message":"Failed to initialize project translation: Initialization failed","stack":"Error: Initialization failed\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\project-translation.service.test.ts:78:67)\n    at Promise.then.completed (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\utils.js:298:28)\n    at new Promise (<anonymous>)\n    at callAsyncCircusFn (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\utils.js:231:10)\n    at _callCircusTest (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:316:40)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at _runTest (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:252:3)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:126:9)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at _runTestsForDescribeBlock (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:121:9)\n    at run (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\run.js:71:3)\n    at runAndTransformResultsToJestFormat (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapterInit.js:122:21)\n    at jestAdapter (D:\\project\\translation-platform\\node_modules\\jest-circus\\build\\legacy-code-todo-rewrite\\jestAdapter.js:79:19)\n    at runTestInternal (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\runTest.js:367:16)\n    at runTest (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\runTest.js:444:34)\n    at Object.worker (D:\\project\\translation-platform\\node_modules\\jest-runner\\build\\testWorker.js:106:12)","timestamp":"2025-03-27T06:51:19.544Z"}
+{"level":"info","message":"Project translation task initialized: 705513e4-0f02-4be0-88b2-626972cdbb63","timestamp":"2025-03-27T06:51:19.547Z"}
+{"level":"info","message":"Project translation task initialized: b42e389c-a4c4-4a7c-9f93-bca160d8b0a5","timestamp":"2025-03-27T06:51:19.550Z"}
+{"level":"error","message":"Failed to translate file file1: Translation failed","stack":"Error: Translation failed\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\project-translation.service.test.ts:127:66)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-03-27T06:51:19.551Z"}
+{"level":"info","message":"Project translation task initialized: a07ee21f-6aa7-4097-bc4b-b48b44090ca5","timestamp":"2025-03-27T06:51:19.554Z"}
+{"level":"info","message":"Project translation cancelled: a07ee21f-6aa7-4097-bc4b-b48b44090ca5","timestamp":"2025-03-27T06:51:19.554Z"}
+{"level":"info","message":"Project translation task initialized: 5939bc85-d559-4281-958b-bc531c0e2fb1","timestamp":"2025-03-27T06:51:19.556Z"}
+{"level":"error","message":"Failed to cancel project translation: Cancellation failed","stack":"Error: Cancellation failed\n    at Object.<anonymous> (D:\\project\\translation-platform\\src\\services\\translation\\__tests__\\project-translation.service.test.ts:193:63)\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-03-27T06:51:19.557Z"}
+{"level":"info","message":"Project translation task initialized: aae4edfe-f95a-42b9-8e02-d91b3ac4b482","timestamp":"2025-03-27T06:51:19.561Z"}
+{"level":"info","message":"Project translation task initialized: 70f92f7e-8cf1-4f94-b824-88c6eebcfb40","timestamp":"2025-03-27T06:51:19.562Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e27da644c3afaaa928c8fb","timestamp":"2025-03-27T06:51:19.834Z"}
+{"level":"error","message":"Error uploading file: Upload failed","timestamp":"2025-03-27T06:51:19.839Z"}
+{"level":"error","message":"Error uploading file: 不支持的文件类型","timestamp":"2025-03-27T06:51:19.855Z"}
+{"level":"info","message":"File undefined processed successfully with 2 segments","timestamp":"2025-03-27T06:51:19.872Z"}
+{"level":"error","message":"Error processing file undefined: Processing failed","timestamp":"2025-03-27T06:51:19.874Z"}
+{"level":"info","message":"File 67e27da644c3afaaa928c8fa deleted successfully","timestamp":"2025-03-27T06:51:19.876Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 creating new project","timestamp":"2025-03-27T06:51:19.851Z"}
+{"level":"info","message":"Project undefined created successfully by user 67e4f567f4104743390c2ad7","timestamp":"2025-03-27T06:51:19.854Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 creating new project","timestamp":"2025-03-27T06:51:19.862Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 updating project 67e4f567f4104743390c2ad9","timestamp":"2025-03-27T06:51:19.872Z"}
+{"level":"info","message":"Project 67e4f567f4104743390c2ad9 updated successfully by user 67e4f567f4104743390c2ad7","timestamp":"2025-03-27T06:51:19.873Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 updating project 67e4f567f4104743390c2ad9","timestamp":"2025-03-27T06:51:19.874Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 deleting project 67e4f567f4104743390c2ada","timestamp":"2025-03-27T06:51:19.876Z"}
+{"level":"info","message":"Project 67e4f567f4104743390c2ada deleted successfully by user 67e4f567f4104743390c2ad7","timestamp":"2025-03-27T06:51:19.877Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 deleting project 67e4f567f4104743390c2ada","timestamp":"2025-03-27T06:51:19.878Z"}
+{"level":"info","message":"User 67e28162d7784e08596a90ce uploading file to project 67e28162d7784e08596a90d2","timestamp":"2025-03-27T06:51:19.879Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e28162d7784e08596a90d2","timestamp":"2025-03-27T06:51:19.879Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 processing file file123","timestamp":"2025-03-27T06:51:19.883Z"}
+{"level":"info","message":"File file123 processed successfully","timestamp":"2025-03-27T06:51:19.883Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 updating file progress for file file123","timestamp":"2025-03-27T06:51:19.886Z"}
+{"level":"info","message":"File file123 progress updated successfully","timestamp":"2025-03-27T06:51:19.886Z"}
+{"level":"info","message":"User 67e4f567f4104743390c2ad7 updating progress for project project123","timestamp":"2025-03-27T06:51:19.888Z"}
+{"level":"info","message":"Project project123 progress updated successfully","timestamp":"2025-03-27T06:51:19.888Z"}
+{"level":"info","message":"Project created: 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.070Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.124Z"}
+{"level":"info","message":"File undefined uploaded successfully to project 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.127Z"}
+{"level":"info","message":"Project updated: 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.131Z"}
+{"level":"info","message":"Project deleted: 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.138Z"}
+{"level":"info","message":"Project progress updated: 67e4f56889da1cfcf23ad85f","timestamp":"2025-03-27T06:51:20.144Z"}
+{"level":"info","message":"Project progress updated: 67e4f56889da1cfcf23ad868","timestamp":"2025-03-27T06:51:20.148Z"}
+{"level":"info","message":"Project progress updated: 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.150Z"}
+{"level":"info","message":"Project progress updated: 67e4f56889da1cfcf23ad85b","timestamp":"2025-03-27T06:51:20.151Z"}
