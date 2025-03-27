@@ -24,6 +24,7 @@ export interface IUser extends Document {
   password: string;
   role: UserRole;
   status: UserStatus;
+  refreshToken?: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -57,6 +58,10 @@ const userSchema = new mongoose.Schema<IUser>({
     type: String,
     enum: Object.values(UserStatus),
     default: UserStatus.ACTIVE
+  },
+  refreshToken: {
+    type: String,
+    default: undefined
   }
 }, {
   timestamps: true
