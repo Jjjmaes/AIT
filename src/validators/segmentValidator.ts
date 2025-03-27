@@ -1,7 +1,7 @@
 // src/validators/segmentValidator.ts
 
 import { z } from 'zod';
-import { SegmentStatus, IssueType } from '../models/segment.model';
+import { SegmentStatus, IssueType, ReviewScoreType } from '../models/segment.model';
 import { mongoIdSchema, createEnumValidator } from './common';
 
 // 翻译段落验证
@@ -98,5 +98,89 @@ export const validateBatchUpdateSegmentStatus = z.object({
     segmentIds: z.array(mongoIdSchema)
       .min(1, '段落ID列表不能为空'),
     status: createEnumValidator(SegmentStatus)
+  })
+});
+
+// 直接审校文本验证
+export const validateDirectTextReview = z.object({
+  body: z.object({
+    original: z.string()
+      .min(1, '原文不能为空'),
+    translation: z.string()
+      .min(1, '翻译不能为空'),
+    sourceLanguage: z.string()
+      .min(1, '源语言不能为空'),
+    targetLanguage: z.string()
+      .min(1, '目标语言不能为空'),
+    model: z.string()
+      .optional(),
+    customPrompt: z.string()
+      .optional(),
+    requestedScores: z.array(createEnumValidator(ReviewScoreType))
+      .optional(),
+    checkIssueTypes: z.array(createEnumValidator(IssueType))
+      .optional(),
+    contextSegments: z.array(
+      z.object({
+        original: z.string(),
+        translation: z.string()
+      })
+    )
+      .optional()
+  })
+});
+
+/**
+ * 验证文件审校请求
+ */
+export const validateFileReview = z.object({
+  body: z.object({
+    fileId: z.string().regex(/^[0-9a-fA-F]{24}$/, '文件ID必须是有效的MongoDB ID'),
+    options: z.object({
+      sourceLanguage: z.string().min(2).max(10).optional(),
+      targetLanguage: z.string().min(2).max(10).optional(),
+      model: z.string().optional(),
+      aiProvider: z.string().optional(),
+      provider: z.string().optional(),
+      customPrompt: z.string().max(1000).optional(),
+      onlyNew: z.boolean().optional(),
+      includeStatuses: z.array(z.string()).optional(),
+      excludeStatuses: z.array(z.string()).optional(),
+      batchSize: z.number().int().min(1).max(100).optional(),
+      concurrentLimit: z.number().int().min(1).max(10).optional(),
+      stopOnError: z.boolean().optional(),
+      priority: z.number().int().min(1).max(5).optional()
+    }).optional()
+  })
+});
+
+/**
+ * 验证批量段落审校请求
+ */
+export const validateBatchSegmentReview = z.object({
+  body: z.object({
+    segmentIds: z.array(
+      z.string().regex(/^[0-9a-fA-F]{24}$/, '段落ID必须是有效的MongoDB ID')
+    ).min(1, '至少需要一个段落ID').max(100, '一次最多可以提交100个段落'),
+    options: z.object({
+      sourceLanguage: z.string().min(2).max(10).optional(),
+      targetLanguage: z.string().min(2).max(10).optional(),
+      model: z.string().optional(),
+      aiProvider: z.string().optional(),
+      provider: z.string().optional(),
+      customPrompt: z.string().max(1000).optional(),
+      contextSegments: z.array(z.object({
+        sourceContent: z.string(),
+        targetContent: z.string().optional(),
+        position: z.enum(['before', 'after'])
+      })).max(10).optional(),
+      batchSize: z.number().int().min(1).max(50).optional(),
+      concurrentLimit: z.number().int().min(1).max(10).optional(),
+      stopOnError: z.boolean().optional(),
+      onlyNew: z.boolean().optional(),
+      includeStatuses: z.array(z.string()).optional(),
+      excludeStatuses: z.array(z.string()).optional(),
+      priority: z.number().int().min(1).max(5).optional()
+    }).optional()
   })
 });

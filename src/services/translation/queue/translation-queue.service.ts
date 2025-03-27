@@ -4,6 +4,7 @@ import { QueueTask, QueueTaskStatus, QueueTaskType } from './queue-task.interfac
 import logger from '../../../utils/logger';
 import fs from 'fs';
 import path from 'path';
+import { ReviewTaskProcessor } from './processors/review-processor';
 
 export class TranslationQueueService {
   private queue: QueueTask[] = [];
@@ -11,6 +12,7 @@ export class TranslationQueueService {
   private config: QueueConfig;
   private isProcessing: boolean = false;
   private processInterval: NodeJS.Timeout | null = null;
+  private reviewProcessor: ReviewTaskProcessor;
 
   constructor(config: QueueConfig) {
     this.config = {
@@ -18,6 +20,7 @@ export class TranslationQueueService {
       enablePersistence: false,
       ...config
     };
+    this.reviewProcessor = new ReviewTaskProcessor();
     this.initialize();
   }
 
@@ -77,6 +80,9 @@ export class TranslationQueueService {
         case QueueTaskType.QUALITY_CHECK:
           await this.handleQualityCheckTask(task);
           break;
+        case QueueTaskType.REVIEW:
+          await this.handleReviewTask(task);
+          break;
       }
 
       task.status = QueueTaskStatus.COMPLETED;
@@ -114,6 +120,11 @@ export class TranslationQueueService {
   private async handleQualityCheckTask(task: QueueTask): Promise<void> {
     // TODO: 实现质量检查任务处理逻辑
     logger.info(`Processing quality check task: ${task.id}`);
+  }
+
+  private async handleReviewTask(task: QueueTask): Promise<void> {
+    logger.info(`Processing review task: ${task.id}`);
+    await this.reviewProcessor.process(task);
   }
 
   async addTask(task: Omit<QueueTask, 'id' | 'status' | 'retryCount' | 'createdAt' | 'updatedAt'>): Promise<string> {

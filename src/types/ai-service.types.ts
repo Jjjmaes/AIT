@@ -4,7 +4,9 @@ import { TranslationOptions } from './translation.types';
 export enum AIProvider {
   OPENAI = 'openai',
   GROK = 'grok',
-  DEEPSEEK = 'deepseek'
+  DEEPSEEK = 'deepseek',
+  BAIDU = 'baidu',
+  ALIYUN = 'aliyun'
 }
 
 // AI 模型信息

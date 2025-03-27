@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import fileController from '../controllers/file.controller';
 import { authenticateJwt } from '../middleware/auth.middleware';
-import { validate } from '../middleware/validate.middleware';
+import { validateRequest } from '../middleware/validate.middleware';
 import { validateProcessFile, validateUpdateFileProgress } from '../validators/fileValidator';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
 router.post(
   '/:fileId/process',
   authenticateJwt,
-  validate(validateProcessFile),
+  validateRequest(validateProcessFile),
   fileController.processFile
 );
 router.get(
@@ -23,7 +23,7 @@ router.get(
 router.put(
   '/:fileId/progress',
   authenticateJwt,
-  validate(validateUpdateFileProgress),
+  validateRequest(validateUpdateFileProgress),
   fileController.updateFileProgress
 );
 
