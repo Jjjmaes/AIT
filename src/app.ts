@@ -9,6 +9,7 @@ import userRoutes from './routes/user.routes';
 import projectRoutes from './routes/project.routes';
 import fileRoutes from './routes/file.routes';
 import reviewRoutes from './routes/review.routes';
+import notificationRoutes from './routes/notification.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 // 创建Express应用
@@ -27,6 +28,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/review', reviewRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 404处理
 app.use('*', (req, res) => {
