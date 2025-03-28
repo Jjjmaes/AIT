@@ -1,7 +1,7 @@
 "use strict";
 // src/validators/segmentValidator.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateBatchUpdateSegmentStatus = exports.validateCompleteSegmentReview = exports.validateResolveSegmentIssue = exports.validateAddSegmentIssue = exports.validateUpdateSegmentTranslation = exports.validateReviewSegment = exports.validateTranslateSegment = void 0;
+exports.validateBatchSegmentReview = exports.validateFileReview = exports.validateDirectTextReview = exports.validateBatchUpdateSegmentStatus = exports.validateCompleteSegmentReview = exports.validateResolveSegmentIssue = exports.validateAddSegmentIssue = exports.validateUpdateSegmentTranslation = exports.validateReviewSegment = exports.validateTranslateSegment = void 0;
 const zod_1 = require("zod");
 const segment_model_1 = require("../models/segment.model");
 const common_1 = require("./common");
@@ -93,5 +93,82 @@ exports.validateBatchUpdateSegmentStatus = zod_1.z.object({
         segmentIds: zod_1.z.array(common_1.mongoIdSchema)
             .min(1, '段落ID列表不能为空'),
         status: (0, common_1.createEnumValidator)(segment_model_1.SegmentStatus)
+    })
+});
+// 直接审校文本验证
+exports.validateDirectTextReview = zod_1.z.object({
+    body: zod_1.z.object({
+        original: zod_1.z.string()
+            .min(1, '原文不能为空'),
+        translation: zod_1.z.string()
+            .min(1, '翻译不能为空'),
+        sourceLanguage: zod_1.z.string()
+            .min(1, '源语言不能为空'),
+        targetLanguage: zod_1.z.string()
+            .min(1, '目标语言不能为空'),
+        model: zod_1.z.string()
+            .optional(),
+        customPrompt: zod_1.z.string()
+            .optional(),
+        requestedScores: zod_1.z.array((0, common_1.createEnumValidator)(segment_model_1.ReviewScoreType))
+            .optional(),
+        checkIssueTypes: zod_1.z.array((0, common_1.createEnumValidator)(segment_model_1.IssueType))
+            .optional(),
+        contextSegments: zod_1.z.array(zod_1.z.object({
+            original: zod_1.z.string(),
+            translation: zod_1.z.string()
+        }))
+            .optional()
+    })
+});
+/**
+ * 验证文件审校请求
+ */
+exports.validateFileReview = zod_1.z.object({
+    body: zod_1.z.object({
+        fileId: zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, '文件ID必须是有效的MongoDB ID'),
+        options: zod_1.z.object({
+            sourceLanguage: zod_1.z.string().min(2).max(10).optional(),
+            targetLanguage: zod_1.z.string().min(2).max(10).optional(),
+            model: zod_1.z.string().optional(),
+            aiProvider: zod_1.z.string().optional(),
+            provider: zod_1.z.string().optional(),
+            customPrompt: zod_1.z.string().max(1000).optional(),
+            onlyNew: zod_1.z.boolean().optional(),
+            includeStatuses: zod_1.z.array(zod_1.z.string()).optional(),
+            excludeStatuses: zod_1.z.array(zod_1.z.string()).optional(),
+            batchSize: zod_1.z.number().int().min(1).max(100).optional(),
+            concurrentLimit: zod_1.z.number().int().min(1).max(10).optional(),
+            stopOnError: zod_1.z.boolean().optional(),
+            priority: zod_1.z.number().int().min(1).max(5).optional()
+        }).optional()
+    })
+});
+/**
+ * 验证批量段落审校请求
+ */
+exports.validateBatchSegmentReview = zod_1.z.object({
+    body: zod_1.z.object({
+        segmentIds: zod_1.z.array(zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, '段落ID必须是有效的MongoDB ID')).min(1, '至少需要一个段落ID').max(100, '一次最多可以提交100个段落'),
+        options: zod_1.z.object({
+            sourceLanguage: zod_1.z.string().min(2).max(10).optional(),
+            targetLanguage: zod_1.z.string().min(2).max(10).optional(),
+            model: zod_1.z.string().optional(),
+            aiProvider: zod_1.z.string().optional(),
+            provider: zod_1.z.string().optional(),
+            customPrompt: zod_1.z.string().max(1000).optional(),
+            contextSegments: zod_1.z.array(zod_1.z.object({
+                sourceContent: zod_1.z.string(),
+                targetContent: zod_1.z.string().optional(),
+                position: zod_1.z.enum(['before', 'after'])
+            })).max(10).optional(),
+            batchSize: zod_1.z.number().int().min(1).max(50).optional(),
+            concurrentLimit: zod_1.z.number().int().min(1).max(10).optional(),
+            stopOnError: zod_1.z.boolean().optional(),
+            onlyNew: zod_1.z.boolean().optional(),
+            includeStatuses: zod_1.z.array(zod_1.z.string()).optional(),
+            excludeStatuses: zod_1.z.array(zod_1.z.string()).optional(),
+            priority: zod_1.z.number().int().min(1).max(5).optional()
+        }).optional()
     })
 });

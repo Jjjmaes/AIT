@@ -13,6 +13,7 @@ const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const project_routes_1 = __importDefault(require("./routes/project.routes"));
 const file_routes_1 = __importDefault(require("./routes/file.routes"));
 const review_routes_1 = __importDefault(require("./routes/review.routes"));
+const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const error_middleware_1 = require("./middleware/error.middleware");
 // 创建Express应用
 const app = (0, express_1.default)();
@@ -28,6 +29,7 @@ app.use('/api/users', user_routes_1.default);
 app.use('/api/projects', project_routes_1.default);
 app.use('/api/files', file_routes_1.default);
 app.use('/api/review', review_routes_1.default);
+app.use('/api/notifications', notification_routes_1.default);
 // 404处理
 app.use('*', (req, res) => {
     res.status(404).json({

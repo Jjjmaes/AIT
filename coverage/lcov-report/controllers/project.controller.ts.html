@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.02% </span>
+                <span class="strong">85.18% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>117/136</span>
+                <span class='fraction'>115/135</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">30.76% </span>
+                <span class="strong">29.16% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/26</span>
+                <span class='fraction'>7/24</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.02% </span>
+                <span class="strong">85.18% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>117/136</span>
+                <span class='fraction'>115/135</span>
             </div>
         
             
@@ -444,9 +444,7 @@
 <a name='L379'></a><a href='#L379'>379</a>
 <a name='L380'></a><a href='#L380'>380</a>
 <a name='L381'></a><a href='#L381'>381</a>
-<a name='L382'></a><a href='#L382'>382</a>
-<a name='L383'></a><a href='#L383'>383</a>
-<a name='L384'></a><a href='#L384'>384</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L382'></a><a href='#L382'>382</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -629,19 +627,21 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -649,10 +649,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -661,7 +657,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -849,7 +845,7 @@ import {
 } from '../types/project.types';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
-import { UploadFileDTO } from '../services/project.service';
+import { UploadFileDto } from '../services/project.service';
 import { Types } from 'mongoose';
 &nbsp;
 export const upload = multer(fileUploadConfig);
@@ -1012,39 +1008,37 @@ export default class ProjectController {
     try {
       const { projectId } = req.params;
       const userId = req.user?.id;
+&nbsp;
       <span class="missing-if-branch" title="if path not taken" >I</span>if (!userId) {
-<span class="cstat-no" title="statement not covered" >        throw new UnauthorizedError('未授权的访问');</span>
+<span class="cstat-no" title="statement not covered" >        return next(new UnauthorizedError('请先登录'));</span>
       }
 &nbsp;
-      const file = req.file;
-&nbsp;
-      if (!file) {
-        throw new ValidationError('未提供文件');
+      if (!req.file) {
+        return next(new ValidationError('请选择要上传的文件'));
       }
 &nbsp;
-      logger.info(`User ${userId} uploading file to project ${projectId}`);
+      const { originalname, path, size, mimetype } = req.file;
+      const { sourceLanguage, targetLanguage, category, tags } = req.body;
 &nbsp;
-      const fileData: UploadFileDTO = {
-        originalName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        filePath: file.path,
-        sourceLanguage: req.body.sourceLanguage,
-        targetLanguage: req.body.targetLanguage,
-        category: req.body.category,
-        tags: req.body.tags ? JSON.parse(req.body.tags) : <span class="branch-1 cbranch-no" title="branch not covered" >undefined</span>
+      // 转换文件数据为DTO
+      const fileData: UploadFileDto = {
+        originalName: originalname,
+        filePath: path,
+        fileSize: size,
+        mimeType: mimetype,
+        sourceLanguage,
+        targetLanguage,
+        fileType: category
       };
 &nbsp;
       const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);
 &nbsp;
-      logger.info(`File ${uploadedFile.id} uploaded successfully to project ${projectId}`);
-&nbsp;
       res.status(201).json({
         success: true,
-        data: { file: uploadedFile }
+        data: uploadedFile
       });
     } catch (error) {
-      next(error);
+<span class="cstat-no" title="statement not covered" >      next(error);</span>
     }
   }
 &nbsp;
@@ -1219,7 +1213,7 @@ export default class ProjectController {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-03-27T10:37:02.307Z
+                at 2025-03-28T08:39:16.487Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -63,7 +63,7 @@ describe('FileService', () => {
         status: file_model_1.FileStatus.PENDING,
         uploadedBy: mockUserId,
         storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-        path: '/uploads/test.txt',
+        path: `files/${mockProjectId}/12345-test.txt`,
         metadata: {
             sourceLanguage: 'en',
             targetLanguage: 'zh',
@@ -90,7 +90,7 @@ describe('FileService', () => {
             status: file_model_1.FileStatus.PENDING,
             uploadedBy: mockUserId,
             storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-            path: '/uploads/test.txt',
+            path: `files/${mockProjectId}/12345-test.txt`,
             metadata: {
                 sourceLanguage: 'en',
                 targetLanguage: 'zh',
@@ -141,7 +141,7 @@ describe('FileService', () => {
             status: file_model_1.FileStatus.PENDING,
             uploadedBy: mockUserId,
             storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-            path: '/uploads/test.txt',
+            path: `files/${mockProjectId}/12345-test.txt`,
             metadata: {
                 sourceLanguage: 'en',
                 targetLanguage: 'zh',
@@ -160,7 +160,7 @@ describe('FileService', () => {
                 status: file_model_1.FileStatus.PENDING,
                 uploadedBy: mockUserId,
                 storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-                path: '/uploads/test.txt',
+                path: `files/${mockProjectId}/12345-test.txt`,
                 metadata: {
                     sourceLanguage: 'en',
                     targetLanguage: 'zh',
@@ -385,7 +385,7 @@ describe('FileService', () => {
             expect(result.page).toBe(1);
             expect(result.limit).toBe(10);
             expect(MockSegment.find).toHaveBeenCalledWith(expect.objectContaining({
-                file: mockFileId,
+                fileId: mockFileId,
                 status: segment_model_1.SegmentStatus.PENDING
             }));
         });

@@ -142,8 +142,32 @@ class ProjectService {
         if (project.managerId.toString() !== userId) {
             throw new errors_1.ForbiddenError('无权访问此项目');
         }
-        const fileType = fileData.mimeType.split('/')[1];
-        if (!Object.values(file_model_1.FileType).includes(fileType)) {
+        // 使用文件扩展名判断文件类型
+        const ext = fileData.originalName.split('.').pop()?.toLowerCase();
+        let fileType = null;
+        switch (ext) {
+            case 'txt':
+                fileType = file_model_1.FileType.TXT;
+                break;
+            case 'json':
+                fileType = file_model_1.FileType.JSON;
+                break;
+            case 'md':
+                fileType = file_model_1.FileType.MD;
+                break;
+            case 'docx':
+                fileType = file_model_1.FileType.DOCX;
+                break;
+            case 'mqxliff':
+                fileType = file_model_1.FileType.MEMOQ_XLIFF;
+                break;
+            case 'xliff':
+                fileType = file_model_1.FileType.XLIFF;
+                break;
+            default:
+                fileType = null;
+        }
+        if (!fileType) {
             throw new errors_1.ValidationError('不支持的文件类型');
         }
         // 上传文件到 S3
@@ -159,7 +183,7 @@ class ProjectService {
             status: file_model_1.FileStatus.PENDING,
             uploadedBy: new mongoose_1.Types.ObjectId(userId),
             storageUrl: s3Url,
-            path: fileData.filePath,
+            path: key, // 修正: 存储S3的路径而不是本地路径
             metadata: {
                 sourceLanguage: fileData.sourceLanguage || project.sourceLanguage,
                 targetLanguage: fileData.targetLanguage || project.targetLanguage,
@@ -255,7 +279,7 @@ class ProjectService {
             throw new errors_1.ForbiddenError('无权访问此文件的段落');
         }
         // 构建查询条件
-        const query = { file: fileId };
+        const query = { fileId };
         if (status) {
             query.status = status;
         }
@@ -263,7 +287,7 @@ class ProjectService {
         const total = await segment_model_1.Segment.countDocuments(query);
         // 获取段落列表
         const segments = await segment_model_1.Segment.find(query)
-            .sort({ index: 1 })
+            .sort({ order: 1 })
             .skip((page - 1) * limit)
             .limit(limit);
         return {

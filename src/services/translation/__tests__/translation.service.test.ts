@@ -287,79 +287,128 @@ describe('TranslationService', () => {
       expect(result.translatedText).toBe('你好，世界！');
     });
 
-    test.skip('should handle translation errors', async () => {
-      // 替换模拟实现
-      (translationService as any).aiServiceAdapter = {
-        translateText: jest.fn().mockImplementation(() => {
-          throw new Error('Translation failed');
+    it('should handle translation errors', async () => {
+      const errorAdapter = {
+        translateText: jest.fn().mockRejectedValue(new Error('Translation failed')),
+        validateApiKey: jest.fn().mockResolvedValue(true),
+        getAvailableModels: jest.fn().mockResolvedValue([]),
+        getModelInfo: jest.fn().mockResolvedValue({}),
+        getPricing: jest.fn().mockResolvedValue({})
+      };
+
+      (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+        createAdapter: jest.fn().mockReturnValue(errorAdapter)
+      });
+
+      // 创建模拟的performance monitor
+      const mockPerformanceMonitor = {
+        recordRequest: jest.fn(),
+        recordCacheAccess: jest.fn(),
+        recordQueueMetrics: jest.fn(),
+        recordTaskCompletion: jest.fn(),
+        getMetrics: jest.fn(),
+        getTaskMetrics: jest.fn()
+      };
+
+      // 创建一个带有适当缓存配置的服务实例
+      const errorService = new TranslationService({
+        provider: AIProvider.OPENAI,
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        enableCache: true,
+        cacheConfig: {
+          ttl: 3600,
+          maxSize: 100,
+          cleanupInterval: 300
+        }
+      });
+
+      // 替换performanceMonitor，防止调用undefined的cacheService
+      (errorService as any).performanceMonitor = mockPerformanceMonitor;
+
+      await expect(errorService.translateText('Hola', {
+        sourceLanguage: 'es',
+        targetLanguage: 'en'
+      })).rejects.toThrow('Translation failed');
+    });
+  });
+
+  describe('translateMultipleSegments', () => {
+    let testTranslationService: TranslationService;
+    
+    beforeEach(() => {
+      // 创建专用的Mock对象用于这个测试套件
+      const mockTranslateAdapter = {
+        translateText: jest.fn((text) => {
+          if (text === 'Hello') {
+            return Promise.resolve({
+              translatedText: '你好',
+              metadata: {
+                processingTime: 100,
+                model: 'gpt-3.5-turbo',
+                provider: AIProvider.OPENAI,
+                confidence: 0.95,
+                sourceLanguage: 'en',
+                targetLanguage: 'zh'
+              }
+            });
+          } else if (text === 'World') {
+            return Promise.resolve({
+              translatedText: '世界',
+              metadata: {
+                processingTime: 100,
+                model: 'gpt-3.5-turbo',
+                provider: AIProvider.OPENAI,
+                confidence: 0.95,
+                sourceLanguage: 'en',
+                targetLanguage: 'zh'
+              }
+            });
+          }
+          return Promise.resolve(null);
         }),
         validateApiKey: jest.fn().mockResolvedValue(true),
         getAvailableModels: jest.fn().mockResolvedValue([]),
         getModelInfo: jest.fn().mockResolvedValue({}),
         getPricing: jest.fn().mockResolvedValue({})
       };
-
-      await expect(translationService.translateText('Hola', {
-        sourceLanguage: 'es',
-        targetLanguage: 'en'
-      })).rejects.toThrow('Translation failed');
-
-      // 恢复原始模拟
-      (translationService as any).aiServiceAdapter = mockAIService;
-    });
-  });
-
-  describe('translateMultipleSegments', () => {
-    beforeEach(() => {
-      // 配置模拟响应
-      (translationService as any).aiServiceAdapter = {
-        translateText: jest.fn()
-          .mockResolvedValueOnce({
-            translatedText: '你好',
-            metadata: {
-              processingTime: 100,
-              model: 'gpt-3.5-turbo',
-              provider: AIProvider.OPENAI,
-              confidence: 0.95,
-              sourceLanguage: 'en',
-              targetLanguage: 'zh'
-            }
-          })
-          .mockResolvedValueOnce({
-            translatedText: '世界',
-            metadata: {
-              processingTime: 100,
-              model: 'gpt-3.5-turbo',
-              provider: AIProvider.OPENAI,
-              confidence: 0.95,
-              sourceLanguage: 'en',
-              targetLanguage: 'zh'
-            }
-          }),
-        validateApiKey: jest.fn().mockResolvedValue(true),
-        getAvailableModels: jest.fn().mockResolvedValue([]),
-        getModelInfo: jest.fn().mockResolvedValue({}),
-        getPricing: jest.fn().mockResolvedValue({})
+      
+      const mockFactory = {
+        createAdapter: jest.fn().mockReturnValue(mockTranslateAdapter)
       };
       
-      // 设置配置，确保正确的模型信息
-      (translationService as any).config.model = 'gpt-3.5-turbo';
-      (translationService as any).config.provider = AIProvider.OPENAI;
+      (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockFactory);
+      
+      // 创建一个干净的实例用于此测试套件
+      testTranslationService = new TranslationService({
+        provider: AIProvider.OPENAI,
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        enableCache: false,
+        enableQueue: false
+      });
+      
+      // 替换performanceMonitor，防止调用undefined的cacheService
+      (testTranslationService as any).performanceMonitor = {
+        recordRequest: jest.fn(),
+        recordCacheAccess: jest.fn(),
+        recordQueueMetrics: jest.fn(),
+        recordTaskCompletion: jest.fn()
+      };
     });
 
     afterEach(() => {
-      // 恢复原始模拟
-      (translationService as any).aiServiceAdapter = mockAIService;
+      jest.clearAllMocks();
     });
 
-    test.skip('should translate multiple segments', async () => {
+    it('should translate multiple segments', async () => {
       const segments = ['Hello', 'World'];
       const options = {
         sourceLanguage: 'en',
         targetLanguage: 'zh'
       };
 
-      const results = await translationService.translateMultipleSegments(segments, options);
+      const results = await testTranslationService.translateMultipleSegments(segments, options);
 
       // 检查关键属性
       expect(results.translations[0].originalText).toBe('Hello');
@@ -367,28 +416,56 @@ describe('TranslationService', () => {
       expect(results.translations[1].originalText).toBe('World');
       expect(results.translations[1].translatedText).toBe('世界');
       expect(results.metadata.totalSegments).toBe(2);
+      expect(results.metadata.sourceLanguage).toBe('en');
+      expect(results.metadata.targetLanguage).toBe('zh');
     });
 
-    test.skip('should handle null translation results', async () => {
-      // 替换模拟实现，让第二个调用返回null
-      (translationService as any).aiServiceAdapter = {
-        translateText: jest.fn()
-          .mockResolvedValueOnce({
-            translatedText: '你好',
-            metadata: {
-              processingTime: 100,
-              model: 'gpt-3.5-turbo',
-              provider: AIProvider.OPENAI,
-              confidence: 0.95,
-              sourceLanguage: 'en',
-              targetLanguage: 'zh'
-            }
-          })
-          .mockResolvedValueOnce(null),
+    it('should handle null translation results', async () => {
+      // 创建一个新的mock用于此测试
+      const mockNullAdapter = {
+        translateText: jest.fn((text) => {
+          if (text === 'Hello') {
+            return Promise.resolve({
+              translatedText: '你好',
+              metadata: {
+                processingTime: 100,
+                model: 'gpt-3.5-turbo',
+                provider: AIProvider.OPENAI,
+                confidence: 0.95,
+                sourceLanguage: 'en',
+                targetLanguage: 'zh'
+              }
+            });
+          }
+          return Promise.resolve(null);
+        }),
         validateApiKey: jest.fn().mockResolvedValue(true),
         getAvailableModels: jest.fn().mockResolvedValue([]),
         getModelInfo: jest.fn().mockResolvedValue({}),
         getPricing: jest.fn().mockResolvedValue({})
+      };
+      
+      const mockNullFactory = {
+        createAdapter: jest.fn().mockReturnValue(mockNullAdapter)
+      };
+      
+      (AIServiceFactory.getInstance as jest.Mock).mockReturnValue(mockNullFactory);
+      
+      // 创建一个新的服务实例
+      const nullTestService = new TranslationService({
+        provider: AIProvider.OPENAI,
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        enableCache: false,
+        enableQueue: false
+      });
+      
+      // 替换performanceMonitor，防止调用undefined的cacheService
+      (nullTestService as any).performanceMonitor = {
+        recordRequest: jest.fn(),
+        recordCacheAccess: jest.fn(),
+        recordQueueMetrics: jest.fn(),
+        recordTaskCompletion: jest.fn()
       };
 
       const segments = ['Hello', 'World'];
@@ -397,12 +474,13 @@ describe('TranslationService', () => {
         targetLanguage: 'zh'
       };
 
-      const results = await translationService.translateMultipleSegments(segments, options);
+      const results = await nullTestService.translateMultipleSegments(segments, options);
 
       // 检查关键属性
       expect(results.translations[0].originalText).toBe('Hello');
       expect(results.translations[0].translatedText).toBe('你好');
       expect(results.translations[1].originalText).toBe('World');
+      // 确保测试与代码行为一致，如果代码将null转换为空字符串，这里应该断言为空字符串
       expect(results.translations[1].translatedText).toBe('');
       expect(results.metadata.totalSegments).toBe(2);
     });
@@ -424,21 +502,40 @@ describe('TranslationService', () => {
       expect(result1).toBe(result2);
     });
 
-    test.skip('should handle invalid API key', async () => {
+    it('should handle invalid API key', async () => {
+      // 清除缓存，确保不使用缓存的结果
+      await mockCacheService.clear();
+      mockCacheService.get.mockResolvedValue(null);
+      
       // 替换模拟实现
-      (translationService as any).aiServiceAdapter = {
+      const invalidApiAdapter = {
         translateText: jest.fn().mockResolvedValue({}),
-        validateApiKey: jest.fn().mockResolvedValue(false),
+        validateApiKey: jest.fn().mockRejectedValue(new Error('Invalid API key')),
         getAvailableModels: jest.fn().mockResolvedValue([]),
         getModelInfo: jest.fn().mockResolvedValue({}),
         getPricing: jest.fn().mockResolvedValue({})
       };
+      
+      (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
+        createAdapter: jest.fn().mockReturnValue(invalidApiAdapter)
+      });
+      
+      // 创建一个新的服务实例，以便使用新的模拟
+      const invalidApiService = new TranslationService({
+        provider: AIProvider.OPENAI,
+        model: 'test-model',
+        apiKey: 'invalid-api-key',
+        enableCache: false
+      });
+      
+      // 替换performanceMonitor，防止调用undefined的cacheService
+      (invalidApiService as any).performanceMonitor = {
+        recordRequest: jest.fn(),
+        recordCacheAccess: jest.fn()
+      };
 
-      const result = await translationService.validateApiKey();
+      const result = await invalidApiService.validateApiKey();
       expect(result).toBe(false);
-
-      // 恢复原始模拟
-      (translationService as any).aiServiceAdapter = mockAIService;
     });
   });
 

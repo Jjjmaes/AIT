@@ -18,7 +18,7 @@ import {
 } from '../types/project.types';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
-import { UploadFileDTO } from '../services/project.service';
+import { UploadFileDto } from '../services/project.service';
 import { Types } from 'mongoose';
 
 export const upload = multer(fileUploadConfig);
@@ -181,36 +181,34 @@ export default class ProjectController {
     try {
       const { projectId } = req.params;
       const userId = req.user?.id;
+
       if (!userId) {
-        throw new UnauthorizedError('未授权的访问');
+        return next(new UnauthorizedError('请先登录'));
       }
 
-      const file = req.file;
-
-      if (!file) {
-        throw new ValidationError('未提供文件');
+      if (!req.file) {
+        return next(new ValidationError('请选择要上传的文件'));
       }
 
-      logger.info(`User ${userId} uploading file to project ${projectId}`);
+      const { originalname, path, size, mimetype } = req.file;
+      const { sourceLanguage, targetLanguage, category, tags } = req.body;
 
-      const fileData: UploadFileDTO = {
-        originalName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        filePath: file.path,
-        sourceLanguage: req.body.sourceLanguage,
-        targetLanguage: req.body.targetLanguage,
-        category: req.body.category,
-        tags: req.body.tags ? JSON.parse(req.body.tags) : undefined
+      // 转换文件数据为DTO
+      const fileData: UploadFileDto = {
+        originalName: originalname,
+        filePath: path,
+        fileSize: size,
+        mimeType: mimetype,
+        sourceLanguage,
+        targetLanguage,
+        fileType: category
       };
 
       const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);
 
-      logger.info(`File ${uploadedFile.id} uploaded successfully to project ${projectId}`);
-
       res.status(201).json({
         success: true,
-        data: { file: uploadedFile }
+        data: uploadedFile
       });
     } catch (error) {
       next(error);

@@ -7,4 +7,6 @@ var AIProvider;
     AIProvider["OPENAI"] = "openai";
     AIProvider["GROK"] = "grok";
     AIProvider["DEEPSEEK"] = "deepseek";
+    AIProvider["BAIDU"] = "baidu";
+    AIProvider["ALIYUN"] = "aliyun";
 })(AIProvider || (exports.AIProvider = AIProvider = {}));

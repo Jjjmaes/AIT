@@ -324,7 +324,7 @@ class FileService {
         if (!file) {
             throw new errors_1.NotFoundError('文件不存在');
         }
-        const query = { file: fileId };
+        const query = { fileId };
         if (options.status) {
             query.status = options.status;
         }

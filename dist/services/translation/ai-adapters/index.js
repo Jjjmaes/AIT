@@ -16,4 +16,5 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./base.adapter"), exports);
 __exportStar(require("./openai.adapter"), exports);
+__exportStar(require("./review.adapter"), exports);
 __exportStar(require("./ai-service.factory"), exports);

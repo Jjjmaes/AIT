@@ -51,6 +51,10 @@ const userSchema = new mongoose_1.default.Schema({
         type: String,
         enum: Object.values(UserStatus),
         default: UserStatus.ACTIVE
+    },
+    refreshToken: {
+        type: String,
+        default: undefined
     }
 }, {
     timestamps: true

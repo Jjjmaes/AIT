@@ -2,48 +2,21 @@
 // src/controllers/auth.controller.ts
 
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
-import User from '../models/user.model';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { ConflictError, UnauthorizedError, NotFoundError } from '../utils/errors';
+import { userService } from '../services/user.service';
+import { RegisterUserDto, LoginUserDto } from '../types/user';
+import { UnauthorizedError } from '../utils/errors';
 
 // 注册新用户
 const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { username, email, password } = req.body;
-    
-    // 检查用户名和邮箱是否已被注册
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser) {
-      return next(new ConflictError('用户名或邮箱已被注册'));
-    }
-    
-    // 创建新用户
-    const user = await User.create({
-      username,
-      email,
-      password, // 密码会在模型的pre-save钩子中自动加密
-    });
-    
-    // 生成JWT令牌
-    const token = jwt.sign(
-      { sub: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1d' }
-    );
-    
-    // 移除密码后返回用户数据
-    const userData = {
-      id: user._id,
-      email: user.email,
-      username: user.username
-    };
+    const registerData: RegisterUserDto = req.body;
+    const result = await userService.register(registerData);
     
     res.status(201).json({
       success: true,
-      token,
-      user: userData
+      token: result.token,
+      user: result.user
     });
   } catch (error) {
     next(error);
@@ -53,38 +26,13 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
 // 用户登录
 const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
-    
-    // 查找用户
-    const user = await User.findOne({ email });
-    if (!user) {
-      return next(new UnauthorizedError('邮箱或密码不正确'));
-    }
-    
-    // 验证密码
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return next(new UnauthorizedError('邮箱或密码不正确'));
-    }
-    
-    // 生成JWT令牌
-    const token = jwt.sign(
-      { sub: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1d' }
-    );
-    
-    // 移除密码后返回用户数据
-    const userData = {
-      id: user._id,
-      email: user.email,
-      username: user.username
-    };
+    const loginData: LoginUserDto = req.body;
+    const result = await userService.login(loginData);
     
     res.status(200).json({
       success: true,
-      token,
-      user: userData
+      token: result.token,
+      user: result.user
     });
   } catch (error) {
     next(error);
@@ -98,17 +46,7 @@ const getCurrentUser = async (req: AuthRequest, res: Response, next: NextFunctio
       return next(new UnauthorizedError('请先登录'));
     }
 
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) {
-      return next(new NotFoundError('用户不存在'));
-    }
-
-    const userData = {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-      role: user.role
-    };
+    const userData = await userService.getUserById(req.user.id);
 
     res.status(200).json({
       success: true,
@@ -135,35 +73,11 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
     }
 
     const userId = req.user.id;
-    const { username, email, role } = req.body;
-
-    // 检查邮箱是否已被其他用户使用
-    if (email) {
-      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
-      if (existingUser) {
-        return next(new ConflictError('该邮箱已被其他用户使用'));
-      }
-    }
-
-    // 更新用户信息
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { username, email, role },
-      { new: true, runValidators: true }
-    );
-
-    if (!user) {
-      return next(new NotFoundError('用户不存在'));
-    }
+    const userData = await userService.updateUser(userId, req.body);
 
     res.status(200).json({
       success: true,
-      data: {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        role: user.role
-      }
+      data: userData
     });
   } catch (error) {
     next(error);
@@ -177,19 +91,7 @@ const changePassword = async (req: AuthRequest, res: Response, next: NextFunctio
       return next(new UnauthorizedError('请先登录'));
     }
 
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return next(new NotFoundError('用户不存在'));
-    }
-
-    const { currentPassword, newPassword } = req.body;
-    const isPasswordValid = await user.comparePassword(currentPassword);
-    if (!isPasswordValid) {
-      return next(new UnauthorizedError('当前密码不正确'));
-    }
-
-    user.password = newPassword;
-    await user.save();
+    const result = await userService.changePassword(req.user.id, req.body);
 
     res.status(200).json({
       success: true,

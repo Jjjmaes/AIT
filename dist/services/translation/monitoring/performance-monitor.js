@@ -57,7 +57,7 @@ class PerformanceMonitor {
             this.metrics.failedRequests++;
         }
         this.metrics.totalProcessingTime += time;
-        // 如果是失败的请求，也要计算到平均处理时间中
+        // 如果是失败的请求，也要计算到平均处理时间�?
         this.metrics.averageProcessingTime = this.metrics.totalRequests > 0
             ? this.metrics.totalProcessingTime / this.metrics.totalRequests
             : 0;
@@ -90,7 +90,7 @@ class PerformanceMonitor {
             else {
                 this.metrics.failedTasks++;
             }
-            // 计算成功率和失败率，并保留两位小数
+            // 计算成功率和失败率，并保留两位小�?
             const total = this.metrics.completedTasks + this.metrics.failedTasks;
             if (total > 0) {
                 metrics.successRate = parseFloat((this.metrics.completedTasks / total).toFixed(2));

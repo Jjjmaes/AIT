@@ -28,9 +28,7 @@
     "@aws-sdk/client-s3": "^3.774.0",
     "@aws-sdk/s3-request-presigner": "^3.774.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/mongoose": "^5.11.96",
-    "bcrypt": "^5.1.1",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "2.4.3",
     "bull": "^4.11.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -50,7 +48,6 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/axios": "^0.9.36",
     "@types/bcrypt": "^5.0.0",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.17",

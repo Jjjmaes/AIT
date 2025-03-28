@@ -287,7 +287,7 @@ describe('ProjectService', () => {
             status: file_model_1.FileStatus.PENDING,
             uploadedBy: new mongoose_1.Types.ObjectId(userId),
             storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-            path: '/uploads/test.txt',
+            path: `projects/${projectId}/12345-test.txt`,
             metadata: {
                 sourceLanguage: 'en',
                 targetLanguage: 'zh',
@@ -327,7 +327,7 @@ describe('ProjectService', () => {
                 status: file_model_1.FileStatus.PENDING,
                 uploadedBy: new mongoose_1.Types.ObjectId(userId),
                 storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-                path: mockFileData.filePath,
+                path: expect.stringContaining(`projects/${projectId}/`),
                 metadata: {
                     sourceLanguage: mockFileData.sourceLanguage,
                     targetLanguage: mockFileData.targetLanguage,
@@ -346,7 +346,7 @@ describe('ProjectService', () => {
                 status: file_model_1.FileStatus.PENDING,
                 uploadedBy: new mongoose_1.Types.ObjectId(userId),
                 storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-                path: mockFileData.filePath,
+                path: expect.stringContaining(`projects/${projectId}/`),
                 metadata: {
                     sourceLanguage: mockFileData.sourceLanguage,
                     targetLanguage: mockFileData.targetLanguage,
@@ -375,7 +375,7 @@ describe('ProjectService', () => {
                 status: file_model_1.FileStatus.PENDING,
                 uploadedBy: new mongoose_1.Types.ObjectId(userId),
                 storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-                path: fileDataWithoutLanguages.filePath,
+                path: expect.stringContaining(`projects/${projectId}/`),
                 metadata: {
                     sourceLanguage: mockProject.sourceLanguage,
                     targetLanguage: mockProject.targetLanguage,
@@ -394,7 +394,7 @@ describe('ProjectService', () => {
                 status: file_model_1.FileStatus.PENDING,
                 uploadedBy: new mongoose_1.Types.ObjectId(userId),
                 storageUrl: 'https://test-bucket.s3.amazonaws.com/test.txt',
-                path: fileDataWithoutLanguages.filePath,
+                path: expect.stringContaining(`projects/${projectId}/`),
                 metadata: {
                     sourceLanguage: mockProject.sourceLanguage,
                     targetLanguage: mockProject.targetLanguage,
@@ -409,7 +409,8 @@ describe('ProjectService', () => {
         it('should throw error for unsupported file type', async () => {
             const fileDataWithUnsupportedType = {
                 ...mockFileData,
-                mimeType: 'application/pdf'
+                originalName: 'test.unsupported',
+                mimeType: 'application/unsupported'
             };
             await expect(projectService.uploadProjectFile(projectId, userId, fileDataWithUnsupportedType))
                 .rejects
@@ -725,7 +726,7 @@ describe('ProjectService', () => {
             expect(result.page).toBe(1);
             expect(result.limit).toBe(10);
             expect(segment_model_1.Segment.find).toHaveBeenCalledWith(expect.objectContaining({
-                file: fileId,
+                fileId: fileId,
                 status: segment_model_1.SegmentStatus.PENDING
             }));
         });

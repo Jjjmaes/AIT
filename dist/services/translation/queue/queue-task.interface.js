@@ -11,6 +11,8 @@ var QueueTaskType;
     QueueTaskType["FILE_TRANSLATION"] = "file_translation";
     /** 翻译质量评估任务 */
     QueueTaskType["QUALITY_ASSESSMENT"] = "quality_assessment";
+    /** 审校任务 */
+    QueueTaskType["REVIEW"] = "REVIEW";
     /** 术语提取任务 */
     QueueTaskType["TERMINOLOGY_EXTRACTION"] = "terminology_extraction";
     /** 翻译记忆库更新任务 */

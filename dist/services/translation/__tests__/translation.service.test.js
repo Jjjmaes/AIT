@@ -262,23 +262,28 @@ describe('TranslationService', () => {
             const result = await translationService.translateText(sourceText, options);
             expect(result.translatedText).toBe('你好，世界！');
         });
-        test.skip('should handle translation errors', async () => {
-            // 替换模拟实现
-            translationService.aiServiceAdapter = {
-                translateText: jest.fn().mockImplementation(() => {
-                    throw new Error('Translation failed');
-                }),
+        it('should handle translation errors', async () => {
+            const errorAdapter = {
+                translateText: jest.fn().mockRejectedValue(new Error('Translation failed')),
                 validateApiKey: jest.fn().mockResolvedValue(true),
                 getAvailableModels: jest.fn().mockResolvedValue([]),
                 getModelInfo: jest.fn().mockResolvedValue({}),
                 getPricing: jest.fn().mockResolvedValue({})
             };
-            await expect(translationService.translateText('Hola', {
+            ai_service_factory_1.AIServiceFactory.getInstance.mockReturnValue({
+                createAdapter: jest.fn().mockReturnValue(errorAdapter)
+            });
+            const errorService = new translation_service_1.TranslationService({
+                provider: ai_service_types_1.AIProvider.OPENAI,
+                model: 'test-model',
+                apiKey: 'test-api-key',
+                enableCache: false,
+                enableQueue: false
+            });
+            await expect(errorService.translateText('Hola', {
                 sourceLanguage: 'es',
                 targetLanguage: 'en'
             })).rejects.toThrow('Translation failed');
-            // 恢复原始模拟
-            translationService.aiServiceAdapter = mockAIService;
         });
     });
     describe('translateMultipleSegments', () => {
@@ -321,7 +326,7 @@ describe('TranslationService', () => {
             // 恢复原始模拟
             translationService.aiServiceAdapter = mockAIService;
         });
-        test.skip('should translate multiple segments', async () => {
+        it('should translate multiple segments', async () => {
             const segments = ['Hello', 'World'];
             const options = {
                 sourceLanguage: 'en',
@@ -334,8 +339,10 @@ describe('TranslationService', () => {
             expect(results.translations[1].originalText).toBe('World');
             expect(results.translations[1].translatedText).toBe('世界');
             expect(results.metadata.totalSegments).toBe(2);
+            expect(results.metadata.sourceLanguage).toBe('en');
+            expect(results.metadata.targetLanguage).toBe('zh');
         });
-        test.skip('should handle null translation results', async () => {
+        it('should handle null translation results', async () => {
             // 替换模拟实现，让第二个调用返回null
             translationService.aiServiceAdapter = {
                 translateText: jest.fn()
@@ -382,7 +389,7 @@ describe('TranslationService', () => {
             const result2 = await translationService.validateApiKey();
             expect(result1).toBe(result2);
         });
-        test.skip('should handle invalid API key', async () => {
+        it('should handle invalid API key', async () => {
             // 替换模拟实现
             translationService.aiServiceAdapter = {
                 translateText: jest.fn().mockResolvedValue({}),

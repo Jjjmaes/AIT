@@ -1,7 +1,7 @@
 import User, { IUser } from '../models/user.model';
 import { AppError } from '../utils/errors';
 import { sign, verify } from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 export interface RegisterDTO {
   username: string;

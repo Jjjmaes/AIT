@@ -38,25 +38,64 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const reviewController = __importStar(require("../controllers/review.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
-const validate_middleware_1 = require("../middleware/validate.middleware");
 const segmentValidator = __importStar(require("../validators/segmentValidator"));
+const validate_middleware_1 = require("../middleware/validate.middleware");
+const review_controller_1 = require("../controllers/review.controller");
 const logger_1 = __importDefault(require("../utils/logger"));
+// 创建路由器实例
 const router = (0, express_1.Router)();
-// 请求段落AI审校
-router.post('/segments/:segmentId/review', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateReviewSegment), reviewController.requestSegmentReview);
-// 完成段落审校
-router.put('/segments/:segmentId/review', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateCompleteSegmentReview), reviewController.completeSegmentReview);
-// 获取段落审校结果
-router.get('/segments/:segmentId/review', auth_middleware_1.authenticateJwt, reviewController.getSegmentReviewResult);
-// 确认段落审校
-router.post('/segments/:segmentId/approve', auth_middleware_1.authenticateJwt, reviewController.finalizeSegmentReview);
-// 添加段落问题
-router.post('/segments/:segmentId/issues', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateAddSegmentIssue), reviewController.addSegmentIssue);
-// 解决段落问题
-router.put('/segments/:segmentId/issues/:issueId/resolve', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateResolveSegmentIssue), reviewController.resolveSegmentIssue);
+// Placeholder functions for routes not yet implemented
+const requestSegmentReview = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const completeSegmentReview = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const getSegmentReviewResult = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const finalizeSegmentReview = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const addSegmentIssue = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const resolveSegmentIssue = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const batchUpdateSegmentStatus = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const reviewTextDirectly = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+const getSupportedReviewModels = async (req, res) => {
+    res.json({ message: 'This functionality is still being developed' });
+};
+// 审校路由
+// 段落审校相关路由
+router.post('/segment', auth_middleware_1.authenticateJwt, requestSegmentReview);
+router.post('/segment/complete', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateCompleteSegmentReview), completeSegmentReview);
+router.get('/segment/:segmentId', auth_middleware_1.authenticateJwt, getSegmentReviewResult);
+router.post('/segment/:segmentId/finalize', auth_middleware_1.authenticateJwt, finalizeSegmentReview);
+// 段落问题相关路由
+router.post('/segment/issue', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateAddSegmentIssue), addSegmentIssue);
+router.put('/segment/issue/:issueId/resolve', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateResolveSegmentIssue), resolveSegmentIssue);
 // 批量更新段落状态
-router.put('/segments/batch/status', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateBatchUpdateSegmentStatus), reviewController.batchUpdateSegmentStatus);
+router.post('/segment/batch-status', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateBatchUpdateSegmentStatus), batchUpdateSegmentStatus);
+// 直接审校文本
+router.post('/text', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateDirectTextReview), reviewTextDirectly);
+// 队列相关路由
+router.post('/queue/segment', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateReviewSegment), review_controller_1.queueSegmentReview);
+router.post('/queue/text', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateDirectTextReview), review_controller_1.queueTextReview);
+router.post('/queue/batch', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateBatchSegmentReview), review_controller_1.queueBatchSegmentReview);
+router.post('/queue/file', auth_middleware_1.authenticateJwt, (0, validate_middleware_1.validateRequest)(segmentValidator.validateFileReview), review_controller_1.queueFileReview);
+router.get('/queue/status/:taskId', auth_middleware_1.authenticateJwt, review_controller_1.getReviewTaskStatus);
+router.delete('/queue/:taskId', auth_middleware_1.authenticateJwt, review_controller_1.cancelReviewTask);
+// 获取支持的审校模型
+router.get('/models', auth_middleware_1.authenticateJwt, getSupportedReviewModels);
+// 记录路由注册
 logger_1.default.info('Review routes registered');
+// 导出路由器
 exports.default = router;

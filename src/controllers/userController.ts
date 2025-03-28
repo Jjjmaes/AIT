@@ -1,24 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import User from '../models/user.model';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { userService } from '../services/user.service';
+import { UnauthorizedError } from '../utils/errors';
 
 export default class UserController {
   async getProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const user = await User.findById(req.user?.id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+      if (!req.user) {
+        return next(new UnauthorizedError('请先登录'));
       }
       
-      const userData = {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        role: user.role
-      };
+      const userData = await userService.getUserById(req.user.id);
       
       res.json({
         success: true,
@@ -31,27 +23,11 @@ export default class UserController {
   
   async updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const user = await User.findById(req.user?.id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+      if (!req.user) {
+        return next(new UnauthorizedError('请先登录'));
       }
       
-      const { username, email } = req.body;
-      
-      if (username) user.username = username;
-      if (email) user.email = email;
-      
-      await user.save();
-      
-      const userData = {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        role: user.role
-      };
+      const userData = await userService.updateUser(req.user.id, req.body);
       
       res.json({
         success: true,
@@ -64,26 +40,11 @@ export default class UserController {
   
   async changePassword(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const user = await User.findById(req.user?.id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+      if (!req.user) {
+        return next(new UnauthorizedError('请先登录'));
       }
       
-      const { currentPassword, newPassword } = req.body;
-      
-      const isMatch = await user.comparePassword(currentPassword);
-      if (!isMatch) {
-        return res.status(400).json({
-          success: false,
-          message: '当前密码错误'
-        });
-      }
-      
-      user.password = newPassword;
-      await user.save();
+      const result = await userService.changePassword(req.user.id, req.body);
       
       res.json({
         success: true,

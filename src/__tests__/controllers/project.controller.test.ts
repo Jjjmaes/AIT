@@ -344,19 +344,16 @@ describe('ProjectController', () => {
           filePath: '/uploads/test-123.txt',
           sourceLanguage: 'en',
           targetLanguage: 'zh',
-          category: 'test',
-          tags: ['test']
+          fileType: 'test'
         }
       );
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
         data: {
-          file: {
-            _id: 'file123',
-            originalName: 'test.txt',
-            fileName: 'test-123.txt'
-          }
+          _id: 'file123',
+          originalName: 'test.txt',
+          fileName: 'test-123.txt'
         }
       });
     });
@@ -366,7 +363,7 @@ describe('ProjectController', () => {
 
       expect(mockNext).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '未提供文件'
+          message: '请选择要上传的文件'
         })
       );
     });

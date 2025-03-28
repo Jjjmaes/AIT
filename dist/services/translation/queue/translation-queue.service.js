@@ -9,6 +9,7 @@ const queue_task_interface_1 = require("./queue-task.interface");
 const logger_1 = __importDefault(require("../../../utils/logger"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const review_processor_1 = require("./processors/review-processor");
 class TranslationQueueService {
     constructor(config) {
         this.queue = [];
@@ -20,6 +21,7 @@ class TranslationQueueService {
             enablePersistence: false,
             ...config
         };
+        this.reviewProcessor = new review_processor_1.ReviewTaskProcessor();
         this.initialize();
     }
     initialize() {
@@ -70,6 +72,9 @@ class TranslationQueueService {
                 case queue_task_interface_1.QueueTaskType.QUALITY_CHECK:
                     await this.handleQualityCheckTask(task);
                     break;
+                case queue_task_interface_1.QueueTaskType.REVIEW:
+                    await this.handleReviewTask(task);
+                    break;
             }
             task.status = queue_task_interface_1.QueueTaskStatus.COMPLETED;
             task.completedAt = new Date();
@@ -104,6 +109,10 @@ class TranslationQueueService {
     async handleQualityCheckTask(task) {
         // TODO: 实现质量检查任务处理逻辑
         logger_1.default.info(`Processing quality check task: ${task.id}`);
+    }
+    async handleReviewTask(task) {
+        logger_1.default.info(`Processing review task: ${task.id}`);
+        await this.reviewProcessor.process(task);
     }
     async addTask(task) {
         const newTask = {

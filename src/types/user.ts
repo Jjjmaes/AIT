@@ -9,8 +9,32 @@ export interface IUser {
   id: string;
   email: string;
   role: UserRole;
-  name?: string;
+  username: string;
   avatar?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface RegisterUserDto {
+  username: string;
+  email: string;
+  password: string;
+  role?: UserRole;
+}
+
+export interface LoginUserDto {
+  email: string;
+  password: string;
+}
+
+export interface UpdateUserDto {
+  username?: string;
+  email?: string;
+  role?: UserRole;
+  avatar?: string;
+}
+
+export interface ChangePasswordDto {
+  currentPassword: string;
+  newPassword: string;
 } 
