@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 // 用户角色枚举
 export enum UserRole {
   ADMIN = 'admin',
+  MANAGER = 'manager',
   TRANSLATOR = 'translator',
   REVIEWER = 'reviewer'
 }
