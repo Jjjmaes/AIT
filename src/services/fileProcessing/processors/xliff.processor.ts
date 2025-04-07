@@ -107,6 +107,21 @@ export class XliffProcessor implements IFileProcessor {
     }
   }
 
+  // Maps internal SegmentStatus back to MemoQ m:state attributes
+  private mapStatusToMemoQState(status: SegmentStatus): string {
+    switch (status) {
+      case SegmentStatus.COMPLETED:
+      case SegmentStatus.REVIEW_COMPLETED: // Both map to Confirmed in MemoQ
+        return 'Confirmed';
+      case SegmentStatus.TRANSLATED:
+        return 'Translated';
+      case SegmentStatus.PENDING:
+      case SegmentStatus.ERROR:
+      default:
+        return 'NeedsTranslation';
+    }
+  }
+
   async extractSegments(filePath: string, ...options: any[]): Promise<FileProcessingResult> {
     const isMemoQ = options.some(opt => opt && opt.isMemoQ === true);
     logger.info(`Starting XLIFF segment extraction from file: ${filePath} (MemoQ: ${isMemoQ})`);
@@ -212,11 +227,10 @@ export class XliffProcessor implements IFileProcessor {
     segments: ISegment[],
     originalFilePath: string,
     targetFilePath: string,
-    ...options: any[]
+    options?: { isMemoQ?: boolean }
   ): Promise<void> {
-    console.log('[writeTranslations] Starting...');
     logger.info(`Starting XLIFF translation writing for ${segments.length} segments to ${targetFilePath}.`);
-    const isMemoQ = options.some(opt => opt && opt.isMemoQ === true);
+    const isMemoQ = options?.isMemoQ ?? false;
     try {
       const originalFileContent = await readFile(originalFilePath, 'utf-8');
       const doc = this.parser.parseFromString(originalFileContent, 'text/xml');
@@ -228,17 +242,13 @@ export class XliffProcessor implements IFileProcessor {
       const fragmentParser = new DOMParser(); 
 
       for (const [index, segment] of segments.entries()) {
-          console.log(`[writeTranslations] Processing segment index: ${index}`);
-          // Get the unitId, don't assign a default value here
           const unitId = segment.metadata?.xliffId;
 
-          // Check if unitId is a valid non-empty string and doesn't contain quotes (potential XPath injection)
           if (!unitId || typeof unitId !== 'string' || unitId.trim() === '' || unitId.includes("'") || unitId.includes('"')) {
                logger.warn(`Skipping segment with invalid, missing, or potentially unsafe xliffId in metadata: segment index ${index}, xliffId: ${unitId}`);
                continue;
           }
 
-          // Now we know unitId is a valid string, proceed with finding the node
           const transUnitSelector = isMemoQ ? `//m:trans-unit[@id='${unitId}']` : `//xliff:trans-unit[@id='${unitId}']`;
           const transUnitNode = select(transUnitSelector, doc, true) as Node | null;
 
@@ -252,21 +262,19 @@ export class XliffProcessor implements IFileProcessor {
           let targetNode = select(targetSelector, transUnitElement, true) as Element | null;
 
           if (!targetNode) {
-            // Find and remove existing comment sibling of source, if any
             const sourceSelector = isMemoQ ? 'm:source' : 'xliff:source';
             const sourceNode = select(sourceSelector, transUnitElement, true) as Node | null;
             if (sourceNode) {
               let sibling = sourceNode.nextSibling;
               while (sibling) {
-                if (sibling.nodeType === 8 /* COMMENT_NODE */) {
+                if (sibling.nodeType === 8) { 
                   transUnitElement.removeChild(sibling);
-                  break; // Assume only one relevant comment to remove
+                  break; 
                 }
                 sibling = sibling.nextSibling;
               }
             }
             
-            // Create and append the new target node
             const namespaceURI = isMemoQ ? 'http://www.memoq.com/memoq/xliff' : 'urn:oasis:names:tc:xliff:document:1.2';
             targetNode = doc.createElementNS(namespaceURI, 'target');
             if (sourceNode && sourceNode.nextSibling) {
@@ -283,29 +291,17 @@ export class XliffProcessor implements IFileProcessor {
           const textToWrite = segment.finalText ?? segment.translation ?? '';
 
           if (textToWrite) {
-            console.log(`[writeTranslations] Attempting to parse fragment for unit ${unitId}`);
             try {
               const fragmentDoc = fragmentParser.parseFromString(`<dummy>${textToWrite}</dummy>`, 'text/xml');
-              console.log(`[writeTranslations] Parsed fragment for unit ${unitId}`);
               const dummyRoot = fragmentDoc.documentElement;
               const nodesToAppend = Array.from(dummyRoot.childNodes);
-              console.log(`[writeTranslations] Found ${nodesToAppend.length} nodes in fragment for unit ${unitId}`);
               
-              // Iterate through the copied array
               for (const node of nodesToAppend) {
-                 console.log(`[writeTranslations] Importing node type ${node.nodeType} for unit ${unitId}`);
                  const importedNode = doc.importNode(node, true);
-                 console.log(`[writeTranslations] Appending imported node type ${importedNode.nodeType} for unit ${unitId}`);
                  targetNode.appendChild(importedNode);
-                 console.log(`[writeTranslations] Successfully appended node for unit ${unitId}`);
-              }
-              
-              if (nodesToAppend.length > 0) {
-                  console.log(`[writeTranslations] Appended fragment children for unit ${unitId}`); 
               }
 
             } catch (parseError) {
-              console.log(`[writeTranslations] Fragment parse FAILED for unit ${unitId}`, parseError);
               logger.warn(`Could not parse target text fragment for unit ${unitId}. Inserting as plain text. Error: ${parseError}`);
               targetNode.appendChild(doc.createTextNode(textToWrite));
             }
@@ -313,30 +309,21 @@ export class XliffProcessor implements IFileProcessor {
              targetNode.appendChild(doc.createTextNode(''));
           }
 
-          // Update state attributes
-          const xliffState = this.mapStatusToXliffState(segment.status);
-          
-          // Remove old state attribute first, then set new one
+          const targetState = this.mapStatusToXliffState(segment.status);
           targetNode.removeAttribute('state');
-          targetNode.setAttribute('state', xliffState);
+          targetNode.setAttribute('state', targetState); 
           
-          // Do the same for the parent trans-unit element
           const transUnitStateAttrName = isMemoQ ? 'm:state' : 'state';
+          const transUnitStateValue = isMemoQ 
+            ? this.mapStatusToMemoQState(segment.status) 
+            : targetState;
           transUnitElement.removeAttribute(transUnitStateAttrName);
-          transUnitElement.setAttribute(transUnitStateAttrName, xliffState);
+          transUnitElement.setAttribute(transUnitStateAttrName, transUnitStateValue);
       }
 
-      // Finished processing all segments in the loop
-      console.log('[writeTranslations] Finished loop, preparing to serialize...');
-
-      // Serialize the modified document
       const updatedContent = this.serializer.serializeToString(doc);
       
-      console.log('[writeTranslations] Serialization complete, preparing to write file...');
-
-      // Write the updated content to the target file
       await writeFile(targetFilePath, updatedContent, 'utf-8');
-      console.log('[writeTranslations] Finished writing file.');
       logger.info(`Finished writing translations to XLIFF file: ${targetFilePath}.`);
 
     } catch (error) {

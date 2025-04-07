@@ -398,11 +398,124 @@ describe('XliffProcessor', () => {
       expect(warnMock.mock.calls[0][0]).toEqual(expect.stringContaining('Skipping segment with invalid, missing, or potentially unsafe xliffId'));
     });
 
-    // TODO: Add test for writing MemoQ XLIFF
-    // TODO: Add test for readFile error during write
-    // TODO: Add test for writeFile error
+    test('should correctly write translations to a MemoQ XLIFF file', async () => {
+      const mockSegments: ISegment[] = [
+        // Segment 1: Status COMPLETED -> m:state="Confirmed", state="final"
+        { 
+          _id: new Types.ObjectId(), index: 0, sourceText: 'Source text 1', 
+          finalText: 'Zieltext 1 Final', status: SegmentStatus.COMPLETED, 
+          metadata: { xliffId: '1' } 
+        } as unknown as ISegment,
+        // Segment 2: Status REVIEW_COMPLETED -> m:state="Confirmed", state="reviewed"
+        { 
+          _id: new Types.ObjectId(), index: 1, sourceText: 'Source text 2', 
+          finalText: 'Zieltext 2 Reviewed', status: SegmentStatus.REVIEW_COMPLETED, 
+          metadata: { xliffId: '2' } 
+        } as unknown as ISegment,
+        // Segment 3: Status TRANSLATED -> m:state="Translated", state="translated" (New target)
+        { 
+          _id: new Types.ObjectId(), index: 2, sourceText: 'Source text 3', 
+          finalText: 'Zieltext 3 Translated', status: SegmentStatus.TRANSLATED, 
+          metadata: { xliffId: '3' } 
+        } as unknown as ISegment,
+         // Segment with missing xliffId (should be skipped)
+         { 
+          _id: new Types.ObjectId(), index: 3, sourceText: 'Skipped', 
+          finalText: 'Skipped', status: SegmentStatus.COMPLETED, 
+          metadata: {} 
+        } as unknown as ISegment,
+      ];
 
-  });
+      // Expected MemoQ XLIFF output (whitespace-free for comparison)
+      const expectedOutputXml = `<?xml version="1.0" encoding="UTF-8"?><xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:m="http://www.memoq.com/memoq/xliff"><file m:original="memoq_test.docx" m:source-language="en-US" m:target-language="de-DE" datatype="plaintext"><body><m:trans-unit id="1" m:state="Confirmed"><m:source>Source text 1</m:source><m:target state="final">Zieltext 1 Final</m:target></m:trans-unit><m:trans-unit id="2" m:state="Confirmed"><m:source>Source text 2</m:source><m:target state="reviewed">Zieltext 2 Reviewed</m:target></m:trans-unit><m:trans-unit id="3" m:state="Translated"><m:source>Source text 3</m:source><m:target state="translated">Zieltext 3 Translated</m:target></m:trans-unit></body></file></xliff>`;
+
+      mockReadFile.mockResolvedValue(sampleMemoQXliff); // Use MemoQ sample as input
+      const originalFilePath = 'dummy/memoq.mqxliff';
+      const targetFilePath = 'dummy/output.mqxliff';
+
+      // Call writeTranslations with isMemoQ: true
+      await processor.writeTranslations(mockSegments as any, originalFilePath, targetFilePath, { isMemoQ: true });
+
+      expect(mockReadFile).toHaveBeenCalledWith(originalFilePath, 'utf-8');
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+
+      // Get written content
+      expect(mockWriteFile.mock.calls.length).toBeGreaterThan(0);
+      const writeArgs = mockWriteFile.mock.calls[0];
+      expect(writeArgs.length).toBeGreaterThanOrEqual(3);
+      const writtenPath = writeArgs[0];
+      const writtenContent = (writeArgs[1] as string | undefined) ?? ''; 
+      const writtenEncoding = writeArgs[2];
+
+      // Assert path and encoding
+      expect(writtenPath).toBe(targetFilePath);
+      expect(writtenEncoding).toBe('utf-8');
+      
+      // Parse, clean, re-serialize, compare
+      const parser = new DOMParser();
+      const expectedDoc = parser.parseFromString(expectedOutputXml, 'text/xml');
+      const actualDoc = parser.parseFromString(writtenContent, 'text/xml');
+
+      removeWhitespaceNodes(expectedDoc);
+      removeWhitespaceNodes(actualDoc);
+
+      const serializer = new XMLSerializer();
+      const finalExpectedString = serializer.serializeToString(expectedDoc);
+      const finalActualString = serializer.serializeToString(actualDoc);
+      
+      expect(finalActualString).toBe(finalExpectedString);
+
+      // Check skip warning
+      const warnMock = logger.warn as jest.Mock;
+      expect(warnMock).toHaveBeenCalled(); 
+      expect(warnMock.mock.calls.length).toBeGreaterThan(0); 
+      expect(warnMock.mock.calls[0][0]).toEqual(expect.stringContaining('Skipping segment with invalid, missing, or potentially unsafe xliffId'));
+    });
+
+    test('should throw an error if readFile fails', async () => {
+      const readError = new Error('Simulated read error');
+      mockReadFile.mockRejectedValue(readError);
+      const originalFilePath = 'dummy/read_error.xliff';
+      const targetFilePath = 'dummy/output_read_error.xliff';
+      const mockSegments: ISegment[] = [
+         // Use unknown cast for minimal data
+        { _id: new Types.ObjectId(), index: 0, metadata: { xliffId: '1'} } as unknown as ISegment
+      ];
+
+      await expect(processor.writeTranslations(mockSegments, originalFilePath, targetFilePath))
+        .rejects
+        .toThrow(`Failed to process XLIFF file ${originalFilePath}: ${readError.message}`);
+
+      expect(logger.error).toHaveBeenCalledWith(`Error processing XLIFF file ${originalFilePath}:`, readError);
+      expect(mockWriteFile).not.toHaveBeenCalled(); // writeFile should not be called
+    });
+
+    test('should throw an error if writeFile fails', async () => {
+      const writeError = new Error('Simulated write error');
+      mockReadFile.mockResolvedValue(sampleStandardXliff); // readFile succeeds
+       // Use unknown cast for minimal data
+      mockWriteFile.mockRejectedValue(writeError as never);       // Cast to never to satisfy mock
+
+      const originalFilePath = 'dummy/write_error_input.xliff';
+      const targetFilePath = 'dummy/write_error_output.xliff';
+      const mockSegments: ISegment[] = [
+        // Minimal segment data needed to pass initial checks
+        { 
+          _id: new Types.ObjectId(), index: 0, sourceText: 'Hello World', 
+          finalText: 'Bonjour Final', status: SegmentStatus.COMPLETED, 
+          metadata: { xliffId: '1' } 
+        } as unknown as ISegment,
+      ];
+
+      await expect(processor.writeTranslations(mockSegments, originalFilePath, targetFilePath))
+        .rejects
+        .toThrow(`Failed to process XLIFF file ${originalFilePath}: ${writeError.message}`);
+      
+      expect(mockReadFile).toHaveBeenCalledWith(originalFilePath, 'utf-8'); // Ensure read was attempted
+      expect(logger.error).toHaveBeenCalledWith(`Error processing XLIFF file ${originalFilePath}:`, writeError);
+    });
+
+  }); // End of describe('writeTranslations')
 
   // Maybe add tests for private helper methods if needed,
   // though often it's better to test them via the public methods.
