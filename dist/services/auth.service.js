@@ -8,6 +8,7 @@ const user_model_1 = __importDefault(require("../models/user.model"));
 const errors_1 = require("../utils/errors");
 const jsonwebtoken_1 = require("jsonwebtoken");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const errors_2 = require("../utils/errors");
 class AuthService {
     constructor() {
         this.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -28,6 +29,10 @@ class AuthService {
         const user = await user_model_1.default.findOne({ email });
         if (!user) {
             throw new errors_1.AppError('邮箱或密码错误', 401);
+        }
+        // Ensure user and password exist before comparing
+        if (!user || typeof user.password !== 'string') {
+            throw new errors_2.UnauthorizedError('用户不存在或密码格式错误');
         }
         const isPasswordValid = await bcryptjs_1.default.compare(password, user.password);
         if (!isPasswordValid) {

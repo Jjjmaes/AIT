@@ -1,25 +1,36 @@
 import { z } from 'zod';
-import { ProjectStatus, ProjectPriority } from '../types/project.types';
+import { ProjectStatus, ILanguagePair } from '../models/project.model';
+import { ProjectPriority } from '../types/project.types';
+
+const languagePairSchema = z.object({
+  source: z.string(),
+  target: z.string()
+});
 
 export const createProjectSchema = z.object({
   name: z.string().min(1, '项目名称不能为空'),
-  description: z.string().min(1, '项目描述不能为空'),
-  sourceLanguage: z.string().min(1, '源语言不能为空'),
-  targetLanguage: z.string().min(1, '目标语言不能为空'),
-  translationPromptTemplate: z.string().min(1, '翻译提示模板不能为空'),
-  reviewPromptTemplate: z.string().min(1, '审核提示模板不能为空'),
-  deadline: z.string().datetime().optional().transform(val => val ? new Date(val) : undefined),
-  priority: z.nativeEnum(ProjectPriority).optional()
+  description: z.string().optional(),
+  languagePairs: z.array(languagePairSchema).min(1, '至少需要一个语言对'),
+  manager: z.string(),
+  members: z.array(z.string()).optional(),
+  defaultPromptTemplateId: z.string().optional(),
+  domain: z.string().optional(),
+  terminologyId: z.string().optional(),
+  status: z.nativeEnum(ProjectStatus).optional(),
+  priority: z.number().optional()
 });
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1, '项目名称不能为空').optional(),
-  description: z.string().min(1, '项目描述不能为空').optional(),
+  description: z.string().optional(),
+  languagePairs: z.array(languagePairSchema).optional(),
+  manager: z.string().optional(),
+  members: z.array(z.string()).optional(),
+  defaultPromptTemplateId: z.string().optional(),
+  domain: z.string().optional(),
+  terminologyId: z.string().optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
-  priority: z.nativeEnum(ProjectPriority).optional(),
-  deadline: z.string().datetime().optional().transform(val => val ? new Date(val) : undefined),
-  translationPromptTemplate: z.string().min(1, '翻译提示模板不能为空').optional(),
-  reviewPromptTemplate: z.string().min(1, '审核提示模板不能为空').optional()
+  priority: z.number().optional()
 });
 
 export const projectProgressSchema = z.object({

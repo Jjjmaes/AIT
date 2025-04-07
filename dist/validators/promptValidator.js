@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateTestPrompt = exports.validateUpdatePrompt = exports.validateCreatePrompt = void 0;
 const zod_1 = require("zod");
-const prompt_template_model_1 = require("../models/prompt-template.model");
+const promptTemplate_model_1 = require("../models/promptTemplate.model");
 const common_1 = require("./common");
 // 创建提示词模板验证
 exports.validateCreatePrompt = zod_1.z.object({
@@ -11,7 +11,7 @@ exports.validateCreatePrompt = zod_1.z.object({
         name: zod_1.z.string()
             .min(3, '提示词模板名称长度必须在3-100个字符之间')
             .max(100, '提示词模板名称长度必须在3-100个字符之间'),
-        type: (0, common_1.createEnumValidator)(prompt_template_model_1.PromptType),
+        type: (0, common_1.createEnumValidator)(promptTemplate_model_1.PromptTaskType),
         systemInstruction: zod_1.z.string()
             .min(10, '系统指令长度不能少于10个字符'),
         userInputTemplate: zod_1.z.string()
@@ -30,8 +30,6 @@ exports.validateCreatePrompt = zod_1.z.object({
             .min(1, 'AI模型不能为空'),
         parentTemplate: common_1.mongoIdSchema
             .optional(),
-        status: (0, common_1.createEnumValidator)(prompt_template_model_1.PromptStatus)
-            .optional()
     })
 });
 // 更新提示词模板验证
@@ -62,8 +60,6 @@ exports.validateUpdatePrompt = zod_1.z.object({
         aiProvider: zod_1.z.string()
             .optional(),
         aiModel: zod_1.z.string()
-            .optional(),
-        status: (0, common_1.createEnumValidator)(prompt_template_model_1.PromptStatus)
             .optional(),
         version: zod_1.z.number()
             .int('版本必须是整数')

@@ -5,6 +5,7 @@ import { ProjectTranslationTask, ProjectTranslationOptions, ProjectTranslationRe
 import logger from '../../utils/logger';
 import { Types } from 'mongoose';
 import { AIProvider } from '../../types/ai-service.types';
+import { SegmentStatus, ISegment } from '../../models/segment.model';
 
 export class ProjectTranslationService {
   private tasks: Map<string, ProjectTranslationTask> = new Map();
@@ -234,7 +235,7 @@ export class ProjectTranslationService {
   }
 
   private calculateProjectSummary(files: ProjectTranslationResult['files']): ProjectTranslationResult['summary'] {
-    const summary = {
+    const summary: ProjectTranslationResult['summary'] = {
       totalFiles: files.length,
       completedFiles: files.filter(f => f.status === TranslationStatus.COMPLETED).length,
       failedFiles: files.filter(f => f.status === TranslationStatus.FAILED).length,
@@ -248,14 +249,14 @@ export class ProjectTranslationService {
     };
 
     files.forEach(file => {
-      file.segments.forEach(segment => {
+      file.segments.forEach((segment: Partial<ISegment>) => {
         summary.totalSegments++;
-        if (segment.status === TranslationStatus.COMPLETED) {
+        if (segment.status === SegmentStatus.TRANSLATED) {
           summary.completedSegments++;
-          summary.totalTokens += segment.metadata.tokens.input + segment.metadata.tokens.output;
-          summary.totalCost += segment.metadata.cost || 0;
-          summary.processingTime += segment.metadata.processingTime || 0;
-        } else if (segment.status === TranslationStatus.FAILED) {
+          summary.totalTokens += segment.translationMetadata?.tokenCount ?? 0;
+          summary.totalCost += segment.metadata?.cost ?? 0;
+          summary.processingTime += segment.metadata?.processingTime ?? 0;
+        } else if (segment.status === SegmentStatus.ERROR) {
           summary.failedSegments++;
         }
       });

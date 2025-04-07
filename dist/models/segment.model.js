@@ -33,11 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Issue = exports.Segment = exports.ReviewScoreType = exports.IssueType = exports.SegmentStatus = void 0;
+exports.Issue = exports.Segment = exports.ReviewScoreType = exports.IssueStatus = exports.IssueSeverity = exports.IssueType = exports.SegmentStatus = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 var SegmentStatus;
 (function (SegmentStatus) {
     SegmentStatus["PENDING"] = "pending";
+    SegmentStatus["TRANSLATING"] = "translating";
     SegmentStatus["TRANSLATED"] = "translated";
     SegmentStatus["REVIEWING"] = "reviewing";
     SegmentStatus["REVIEW_PENDING"] = "review_pending";
@@ -55,8 +56,25 @@ var IssueType;
     IssueType["ACCURACY"] = "accuracy";
     IssueType["FORMATTING"] = "formatting";
     IssueType["CONSISTENCY"] = "consistency";
+    IssueType["OMISSION"] = "omission";
+    IssueType["ADDITION"] = "addition";
     IssueType["OTHER"] = "other";
 })(IssueType || (exports.IssueType = IssueType = {}));
+var IssueSeverity;
+(function (IssueSeverity) {
+    IssueSeverity["LOW"] = "low";
+    IssueSeverity["MEDIUM"] = "medium";
+    IssueSeverity["HIGH"] = "high";
+    IssueSeverity["CRITICAL"] = "critical";
+})(IssueSeverity || (exports.IssueSeverity = IssueSeverity = {}));
+var IssueStatus;
+(function (IssueStatus) {
+    IssueStatus["OPEN"] = "open";
+    IssueStatus["IN_PROGRESS"] = "in_progress";
+    IssueStatus["RESOLVED"] = "resolved";
+    IssueStatus["REJECTED"] = "rejected";
+    IssueStatus["DEFERRED"] = "deferred";
+})(IssueStatus || (exports.IssueStatus = IssueStatus = {}));
 var ReviewScoreType;
 (function (ReviewScoreType) {
     ReviewScoreType["OVERALL"] = "overall";
@@ -66,43 +84,24 @@ var ReviewScoreType;
     ReviewScoreType["STYLE"] = "style";
     ReviewScoreType["LOCALE"] = "locale"; // 本地化适配
 })(ReviewScoreType || (exports.ReviewScoreType = ReviewScoreType = {}));
+// Define IssueSchema for embedding
 const IssueSchema = new mongoose_1.Schema({
-    type: {
-        type: String,
-        enum: Object.values(IssueType),
-        required: true
+    type: { type: String, enum: Object.values(IssueType), required: true },
+    severity: { type: String, enum: Object.values(IssueSeverity), required: true },
+    description: { type: String, required: true },
+    position: { start: { type: Number }, end: { type: Number } },
+    suggestion: { type: String },
+    status: { type: String, enum: Object.values(IssueStatus), required: true, default: IssueStatus.OPEN },
+    resolution: {
+        action: { type: String, enum: ['accept', 'modify', 'reject'] },
+        modifiedText: String,
+        comment: String
     },
-    description: {
-        type: String,
-        required: true
-    },
-    position: {
-        start: { type: Number },
-        end: { type: Number }
-    },
-    suggestion: {
-        type: String
-    },
-    resolved: {
-        type: Boolean,
-        default: false
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
+    createdAt: { type: Date, default: Date.now },
     resolvedAt: Date,
-    createdBy: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    resolvedBy: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'User'
-    }
-}, {
-    _id: true
-});
+    createdBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' },
+    resolvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }
+}, { _id: true }); // Enable _id for subdocuments if needed
 const ReviewScoreSchema = new mongoose_1.Schema({
     type: {
         type: String,
@@ -181,49 +180,81 @@ const segmentSchema = new mongoose_1.Schema({
     fileId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'File',
-        required: true
+        required: true,
+        index: true
     },
-    content: {
+    index: { type: Number, required: true },
+    sourceText: {
         type: String,
         required: true
     },
-    translation: String,
-    originalLength: {
+    sourceLength: {
         type: Number,
         required: true
     },
+    translation: {
+        type: String
+    },
     translatedLength: {
-        type: Number,
-        default: 0
+        type: Number
+    },
+    review: {
+        type: String
+    },
+    finalText: {
+        type: String
     },
     status: {
         type: String,
         enum: Object.values(SegmentStatus),
-        default: SegmentStatus.PENDING
+        default: SegmentStatus.PENDING,
+        index: true
     },
-    translator: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'User'
-    },
+    issues: [IssueSchema],
     reviewer: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'User'
     },
+    translationMetadata: {
+        aiModel: String,
+        promptTemplateId: {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: 'PromptTemplate'
+        },
+        tokenCount: Number,
+        processingTime: Number
+    },
+    reviewMetadata: {
+        aiModel: String,
+        promptTemplateId: {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: 'PromptTemplate'
+        },
+        tokenCount: Number,
+        processingTime: Number,
+        acceptedChanges: Boolean,
+        modificationDegree: Number
+    },
     metadata: {
         type: mongoose_1.Schema.Types.Mixed
     },
-    error: String,
-    issues: [IssueSchema],
-    reviewResult: ReviewResultSchema,
-    reviewHistory: [ReviewChangeSchema]
+    translationCompletedAt: {
+        type: Date
+    },
+    reviewCompletedAt: {
+        type: Date
+    },
+    error: {
+        type: String
+    }
 }, {
     timestamps: true
 });
-// 创建索引
+// Compound index for efficient querying within a file
+segmentSchema.index({ fileId: 1, index: 1 });
+// Existing indexes
 segmentSchema.index({ fileId: 1 });
 segmentSchema.index({ status: 1 });
-segmentSchema.index({ translator: 1 });
 segmentSchema.index({ reviewer: 1 });
 exports.Segment = mongoose_1.default.model('Segment', segmentSchema);
-// 导出问题模型，用于独立查询
 exports.Issue = mongoose_1.default.model('Issue', IssueSchema);

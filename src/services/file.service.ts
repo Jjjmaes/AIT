@@ -311,10 +311,10 @@ export class FileService {
       await Segment.create(
         segments.map((segment: any, index: number) => ({
           fileId: file._id,
-          content: segment.content,
+          content: segment.sourceText,
           order: index + 1,
           status: SegmentStatus.PENDING,
-          originalLength: segment.originalLength || segment.content.length,
+          originalLength: segment.originalLength || segment.sourceText.length,
           translatedLength: segment.translatedLength || 0,
           metadata: segment.metadata || {}
         }))
@@ -376,7 +376,7 @@ export class FileService {
             exportedAt: new Date().toISOString()
           },
           segments: segments.map(segment => ({
-            content: segment.content,
+            content: segment.sourceText,
             translation: segment.translation || '',
             ...(includeReview ? { 
               reviewer: segment.reviewer,
@@ -410,7 +410,7 @@ export class FileService {
 
         segments.forEach((segment, index) => {
           textContent += `# ${index + 1}\n`;
-          textContent += `原文: ${segment.content}\n`;
+          textContent += `原文: ${segment.sourceText}\n`;
           textContent += `译文: ${segment.translation || ''}\n`;
           
           if (includeReview && segment.reviewer) {

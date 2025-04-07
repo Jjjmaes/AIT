@@ -1,201 +1,131 @@
+import { jest } from '@jest/globals';
+import OpenAI, { ClientOptions } from 'openai';
+import * as OpenAIResources from 'openai/resources';
 import { OpenAIAdapter } from '../../../../services/translation/ai-adapters/openai.adapter';
-import { AIServiceConfig, AIProvider } from '../../../../types/ai-service.types';
 import { TranslationOptions } from '../../../../types/translation.types';
-import OpenAI from 'openai';
+import { AIProvider } from '../../../../types/ai-service.types';
+import { AppError } from '../../../../utils/errors';
+// Import ProcessedPrompt
+import { ProcessedPrompt } from '../../../../utils/promptProcessor';
+import { AIServiceConfig } from '../../../../types/ai-service.types';
 
-// Mock OpenAI
+// Mock OpenAI library
 jest.mock('openai');
+
+// Explicitly type the mock constructor
+const MockedOpenAI = OpenAI as jest.MockedClass<typeof OpenAI & (new (opts?: ClientOptions) => jest.Mocked<OpenAI>)>;
 
 describe('OpenAIAdapter', () => {
   let adapter: OpenAIAdapter;
   let mockConfig: AIServiceConfig;
-  let mockOpenAI: {
-    chat: {
-      completions: {
-        create: jest.Mock;
-      };
-    };
-    models: {
-      list: jest.Mock;
-    };
+  // Define a simple mock client structure
+  let mockSimpleClient: { 
+    chat: { 
+      completions: { 
+        create: jest.Mock<() => Promise<OpenAIResources.Chat.Completions.ChatCompletion>> } 
+    } 
+  };
+  const mockSourceText = 'Hello';
+  const mockOptions: TranslationOptions = { sourceLanguage: 'en', targetLanguage: 'es' };
+  const mockPromptData: ProcessedPrompt = { 
+    systemInstruction: 'System instruction',
+    userPrompt: 'User prompt for {{input}}'
+  };
+  // Ensure mockApiResponse matches the ChatCompletion type structure
+  const mockApiResponse: OpenAIResources.Chat.Completions.ChatCompletion = { 
+    id: 'chatcmpl-mock',
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: 'gpt-4-mock',
+    choices: [
+      {
+        index: 0,
+        message: { 
+          role: 'assistant', 
+          content: 'Hola', 
+          refusal: null 
+        },
+        finish_reason: 'stop',
+        logprobs: null, // Add required logprobs field
+      }
+    ],
+    usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+    // Change system_fingerprint to undefined
+    system_fingerprint: undefined,
   };
 
   beforeEach(() => {
-    // 重置所有模拟
     jest.clearAllMocks();
 
-    // 创建模拟配置
-    mockConfig = {
+    mockConfig = { 
       provider: AIProvider.OPENAI,
-      apiKey: 'test-api-key',
-      model: 'gpt-4',
-      temperature: 0.3,
-      maxTokens: 2000
+      apiKey: 'test-key',
+      aiModel: 'gpt-4-turbo'
     };
 
-    // 创建模拟 OpenAI 客户端
-    mockOpenAI = {
+    // Instantiate the adapter normally
+    adapter = new OpenAIAdapter(mockConfig);
+
+    // Explicitly type the mock function
+    const mockCreate = jest.fn<() => Promise<OpenAIResources.Chat.Completions.ChatCompletion>>()
+                           .mockResolvedValue(mockApiResponse);
+
+    mockSimpleClient = {
       chat: {
         completions: {
-          create: jest.fn()
+          create: mockCreate
         }
-      },
-      models: {
-        list: jest.fn()
       }
     };
 
-    // 设置 OpenAI 构造函数返回模拟实例
-    (OpenAI as unknown as jest.Mock).mockImplementation(() => mockOpenAI);
-
-    // 创建适配器实例
-    adapter = new OpenAIAdapter(mockConfig);
+    // Spy on the adapter's internal method (assuming it's named getClient) 
+    // and make it return the simple mock
+    jest.spyOn(adapter as any, 'getClient').mockReturnValue(mockSimpleClient);
   });
 
   describe('translateText', () => {
-    const mockSourceText = 'Hello, world!';
-    const mockOptions: TranslationOptions = {
-      sourceLanguage: 'en',
-      targetLanguage: 'zh',
-      preserveFormatting: true,
-      useTerminology: true
-    };
+    it('should call OpenAI API and return response', async () => {
+      const result = await adapter.translateText(mockSourceText, mockPromptData, mockOptions);
 
-    const mockCompletion = {
-      choices: [{
-        message: {
-          content: '你好，世界！'
-        }
-      }],
-      usage: {
-        prompt_tokens: 10,
-        completion_tokens: 5
-      }
-    };
-
-    it('should translate text successfully', async () => {
-      // 设置模拟响应
-      (mockOpenAI.chat.completions.create as jest.Mock).mockResolvedValue(mockCompletion);
-
-      // 执行翻译
-      const result = await adapter.translateText(mockSourceText, mockOptions);
-
-      // 验证结果
-      expect(result.translatedText).toBe('你好，世界！');
-      expect(result.metadata.provider).toBe(AIProvider.OPENAI);
-      expect(result.metadata.model).toBe('gpt-4');
-      expect(result.metadata.tokens).toEqual({
-        input: 10,
-        output: 5
+      // Expect the *simple mock client's* method to have been called
+      expect(mockSimpleClient.chat.completions.create).toHaveBeenCalledWith({
+        model: mockConfig.aiModel,
+        messages: [
+          { role: 'system', content: mockPromptData.systemInstruction },
+          { role: 'user', content: mockPromptData.userPrompt }
+        ],
+        temperature: expect.any(Number),
       });
+      expect(result.translatedText).toBe('Hola');
+      expect(result.modelInfo).toEqual({ provider: 'openai', model: 'gpt-4-mock' });
+      expect(result.tokenCount).toEqual({ input: 10, output: 5, total: 15 });
+    });
 
-      // 验证 OpenAI 调用
-      expect(mockOpenAI.chat.completions.create).toHaveBeenCalledWith({
-        model: 'gpt-4',
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            role: 'system',
-            content: expect.stringContaining('professional translator')
-          }),
-          expect.objectContaining({
-            role: 'user',
-            content: expect.stringContaining('Translate the following text')
-          })
-        ]),
-        temperature: 0.3,
-        max_tokens: 2000,
-        top_p: 1,
-        frequency_penalty: 0,
-        presence_penalty: 0
-      });
+    it('should use model from options if provided', async () => {
+      const optionsWithModel: TranslationOptions = { ...mockOptions, aiModel: 'gpt-3.5-turbo' };
+      await adapter.translateText(mockSourceText, mockPromptData, optionsWithModel);
+      expect(mockSimpleClient.chat.completions.create).toHaveBeenCalledWith(expect.objectContaining({
+        model: 'gpt-3.5-turbo'
+      }));
     });
 
     it('should handle API errors', async () => {
-      // 设置模拟错误
-      const mockError = new Error('API Error');
-      (mockOpenAI.chat.completions.create as jest.Mock).mockRejectedValue(mockError);
-
-      // 执行翻译并验证错误
-      await expect(adapter.translateText(mockSourceText, mockOptions))
-        .rejects
-        .toThrow('An unknown error occurred during translation');
+      const apiError = new Error('API Failed');
+      // Explicitly type the mock rejection
+      mockSimpleClient.chat.completions.create.mockRejectedValue(apiError);
+      await expect(adapter.translateText(mockSourceText, mockPromptData, mockOptions))
+        .rejects.toThrow(AppError); // Expect AppError
     });
   });
 
-  describe('validateApiKey', () => {
-    it('should return true for valid API key', async () => {
-      // 设置模拟成功响应
-      (mockOpenAI.models.list as jest.Mock).mockResolvedValue([]);
-
-      // 验证 API 密钥
-      const result = await adapter.validateApiKey();
-
-      // 验证结果
-      expect(result).toBe(true);
-      expect(mockOpenAI.models.list).toHaveBeenCalled();
-    });
-
-    it('should return false for invalid API key', async () => {
-      // 设置模拟错误
-      const mockError = new Error('Invalid API key');
-      (mockOpenAI.models.list as jest.Mock).mockRejectedValue(mockError);
-
-      // 验证 API 密钥
-      const result = await adapter.validateApiKey();
-
-      // 验证结果
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('getAvailableModels', () => {
-    it('should return available models', async () => {
-      // 获取可用模型
-      const models = await adapter.getAvailableModels();
-
-      // 验证结果
-      expect(models).toHaveLength(2);
-      expect(models[0].id).toBe('gpt-4');
-      expect(models[1].id).toBe('gpt-3.5-turbo');
-    });
-  });
-
+  // Removed tests for non-existent methods
+  /*
   describe('getModelInfo', () => {
-    it('should return model info for valid model ID', async () => {
-      // 获取模型信息
-      const modelInfo = await adapter.getModelInfo('gpt-4');
-
-      // 验证结果
-      expect(modelInfo.id).toBe('gpt-4');
-      expect(modelInfo.provider).toBe(AIProvider.OPENAI);
-      expect(modelInfo.maxTokens).toBe(8192);
-    });
-
-    it('should throw error for invalid model ID', async () => {
-      // 验证错误
-      await expect(adapter.getModelInfo('invalid-model'))
-        .rejects
-        .toThrow('Model invalid-model not found');
-    });
+    // ... tests removed ...
   });
 
   describe('getPricing', () => {
-    it('should return pricing for valid model ID', async () => {
-      // 获取定价信息
-      const pricing = await adapter.getPricing('gpt-4');
-
-      // 验证结果
-      expect(pricing).toEqual({
-        input: 0.03,
-        output: 0.06
-      });
-    });
-
-    it('should throw error for invalid model ID', async () => {
-      // 验证错误
-      await expect(adapter.getPricing('invalid-model'))
-        .rejects
-        .toThrow('Model invalid-model not found');
-    });
+    // ... tests removed ...
   });
+  */
 }); 

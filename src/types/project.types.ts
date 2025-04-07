@@ -1,16 +1,12 @@
 import { Types } from 'mongoose';
-
-export enum ProjectStatus {
-  PENDING = 'pending',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled'
-}
+import { FileStatus, FileType } from '../models/file.model';
+import { ILanguagePair, ProjectStatus } from '../models/project.model'; // Assuming this interface exists
 
 export enum ProjectPriority {
   LOW = 'low',
   MEDIUM = 'medium',
-  HIGH = 'high'
+  HIGH = 'high',
+  URGENT = 'urgent'
 }
 
 export interface FileStats {
@@ -42,6 +38,7 @@ export interface ProjectStats {
     priority: ProjectPriority;
     sourceLanguage: string;
     targetLanguage: string;
+    industry: string;
   };
   files: FileStats;
   progress: ProgressStats;
@@ -50,27 +47,31 @@ export interface ProjectStats {
 
 export interface CreateProjectDto {
   name: string;
-  description: string;
-  sourceLanguage: string;
-  targetLanguage: string;
-  translationPromptTemplate: string;
-  reviewPromptTemplate: string;
-  deadline?: Date;
-  priority?: ProjectPriority;
-  managerId: string;
+  description?: string;
+  languagePairs: ILanguagePair[];
+  manager: string;
+  members?: string[];
+  defaultPromptTemplateId?: string | Types.ObjectId;
+  domain?: string;
+  terminologyId?: string | Types.ObjectId;
+  status?: ProjectStatus;
+  priority?: number;
 }
 
 export interface UpdateProjectDto {
   name?: string;
   description?: string;
+  languagePairs?: ILanguagePair[];
+  manager?: string;
+  members?: string[];
+  defaultPromptTemplateId?: string | Types.ObjectId | null;
+  domain?: string;
+  terminologyId?: string | Types.ObjectId | null;
   status?: ProjectStatus;
-  priority?: ProjectPriority;
-  deadline?: Date;
-  translationPromptTemplate?: string;
-  reviewPromptTemplate?: string;
+  priority?: number;
 }
 
-export interface ProjectProgressDto {
+export interface IProjectProgress {
   completionPercentage: number;
   translatedWords: number;
   totalWords: number;

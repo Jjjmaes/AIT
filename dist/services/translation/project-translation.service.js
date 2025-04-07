@@ -11,6 +11,7 @@ const translation_types_1 = require("../../types/translation.types");
 const logger_1 = __importDefault(require("../../utils/logger"));
 const mongoose_1 = require("mongoose");
 const ai_service_types_1 = require("../../types/ai-service.types");
+const segment_model_1 = require("../../models/segment.model");
 class ProjectTranslationService {
     constructor(config = {}) {
         this.config = config;
@@ -206,15 +207,15 @@ class ProjectTranslationService {
             processingTime: 0
         };
         files.forEach(file => {
-            file.segments.forEach(segment => {
+            file.segments.forEach((segment) => {
                 summary.totalSegments++;
-                if (segment.status === translation_types_1.TranslationStatus.COMPLETED) {
+                if (segment.status === segment_model_1.SegmentStatus.TRANSLATED) {
                     summary.completedSegments++;
-                    summary.totalTokens += segment.metadata.tokens.input + segment.metadata.tokens.output;
-                    summary.totalCost += segment.metadata.cost || 0;
-                    summary.processingTime += segment.metadata.processingTime || 0;
+                    summary.totalTokens += segment.translationMetadata?.tokenCount ?? 0;
+                    summary.totalCost += segment.metadata?.cost ?? 0;
+                    summary.processingTime += segment.metadata?.processingTime ?? 0;
                 }
-                else if (segment.status === translation_types_1.TranslationStatus.FAILED) {
+                else if (segment.status === segment_model_1.SegmentStatus.ERROR) {
                     summary.failedSegments++;
                 }
             });

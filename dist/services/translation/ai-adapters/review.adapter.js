@@ -228,8 +228,39 @@ ${context}
     /**
      * 实现基类的必需方法（为审校服务提供转换）
      */
-    async translateText(sourceText, options) {
-        throw this.createError('UNSUPPORTED_OPERATION', 'This adapter is for review only. Use translate adapter for translation.');
+    async translateText(sourceText, promptData, // Use promptData from base
+    options) {
+        logger_1.default.warn('translateText called on ReviewAdapter. This might indicate a design issue.');
+        const modelToUse = options?.model || this.config.defaultModel || 'gpt-3.5-turbo';
+        const temp = options?.temperature ?? 0.3;
+        const startTime = Date.now();
+        try {
+            const completion = await this.client.chat.completions.create({
+                model: modelToUse,
+                messages: [
+                    { role: 'system', content: promptData?.systemInstruction || 'Translate the following text.' },
+                    { role: 'user', content: promptData?.userPrompt || sourceText }
+                ],
+                temperature: temp,
+            });
+            const translatedText = completion.choices[0]?.message?.content || '';
+            const processingTime = Date.now() - startTime;
+            const tokenCount = completion.usage ? {
+                input: completion.usage.prompt_tokens,
+                output: completion.usage.completion_tokens,
+                total: completion.usage.total_tokens
+            } : undefined;
+            return {
+                translatedText,
+                tokenCount,
+                processingTime,
+                modelInfo: { provider: this.provider.toString(), model: modelToUse }
+            };
+        }
+        catch (error) {
+            logger_1.default.error('Error during translateText in ReviewAdapter:', error);
+            throw this.createError('TRANSLATION_FAILED', 'translateText failed in ReviewAdapter', error);
+        }
     }
     /**
      * 验证API密钥

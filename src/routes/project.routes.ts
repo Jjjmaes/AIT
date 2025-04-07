@@ -5,7 +5,7 @@ import { authenticateJwt } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
 import ProjectController from '../controllers/project.controller';
 import { validateCreateProject, validateUpdateProject, validateUpdateProjectProgress } from '../validators/projectValidator';
-import multer from 'multer';
+import projectFilesRoutes from './projectFiles.routes'; // Import the project file routes
 
 const router = Router();
 const projectController = new ProjectController();
@@ -31,17 +31,10 @@ router.delete('/:projectId', projectController.deleteProject.bind(projectControl
 // 获取项目统计信息
 router.get('/:projectId/stats', projectController.getProjectStats.bind(projectController));
 
-// 上传项目文件
-const upload = multer({ dest: 'uploads/' });
-router.post('/:projectId/files', upload.single('file'), projectController.uploadFile.bind(projectController));
-
-// 获取项目文件列表
-router.get('/:projectId/files', projectController.getProjectFiles.bind(projectController));
-
-// 获取文件段落列表
-router.get('/files/:fileId/segments', projectController.getFileSegments.bind(projectController));
-
 // 更新项目进度
 router.put('/:projectId/progress', validateRequest(validateUpdateProjectProgress), projectController.updateProjectProgress.bind(projectController));
+
+// Mount project file routes (handles /:projectId/files/...)
+router.use('/', projectFilesRoutes); 
 
 export default router;

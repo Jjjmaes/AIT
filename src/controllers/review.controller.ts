@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { SegmentStatus } from '../models/segment.model';
-import reviewService from '../services/review.service';
+import { reviewService } from '../services/review.service';
 import aiReviewService from '../services/ai-review.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UnauthorizedError, NotFoundError, AppError } from '../utils/errors';
@@ -8,6 +8,8 @@ import { QueueTaskType } from '../services/translation/queue/queue-task.interfac
 import { TranslationQueueService } from '../services/translation/queue/translation-queue.service';
 import { AIProvider } from '../types/ai-service.types';
 import logger from '../utils/logger';
+import { IIssue, IssueSeverity, IssueStatus } from '../models/segment.model';
+import { Types } from 'mongoose';
 
 // 自定义错误类
 class BadRequestError extends AppError {
@@ -248,10 +250,10 @@ export async function finalizeSegmentReview(req: Request, res: Response): Promis
  */
 export async function addSegmentIssue(req: Request, res: Response): Promise<void> {
   try {
-    const { segmentId, type, description, position, suggestion } = req.body;
+    const { segmentId, type, description, position, suggestion, severity } = req.body;
     
-    if (!segmentId || !type || !description) {
-      res.status(400).json({ error: '缺少必要参数' });
+    if (!segmentId || !type || !description || !severity) {
+      res.status(400).json({ error: '缺少必要参数 (segmentId, type, description, severity)' });
       return;
     }
     
@@ -260,20 +262,24 @@ export async function addSegmentIssue(req: Request, res: Response): Promise<void
       throw new UnauthorizedError('未授权的访问');
     }
     
-    const issueData = {
+    const issueData: IIssue = {
       type,
       description,
       position,
-      suggestion
+      suggestion,
+      severity: severity as IssueSeverity,
+      status: IssueStatus.OPEN,
+      createdBy: new Types.ObjectId(userId),
+      createdAt: new Date()
     };
     
     logger.info(`Adding issue to segment ${segmentId}`);
-    const segment = await reviewService.addSegmentIssue(segmentId, userId, issueData);
+    const issue = await reviewService.addSegmentIssue(segmentId, userId, issueData);
     
     res.status(200).json({
       success: true,
       message: '问题已添加',
-      data: segment
+      data: issue
     });
   } catch (error: any) {
     logger.error('添加段落问题失败', { error });
@@ -295,9 +301,10 @@ export async function addSegmentIssue(req: Request, res: Response): Promise<void
 export async function resolveSegmentIssue(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, issueId } = req.params;
+    const { resolution } = req.body;
     
-    if (!segmentId || !issueId) {
-      res.status(400).json({ error: '缺少必要参数' });
+    if (!segmentId || !issueId || !resolution) {
+      res.status(400).json({ error: '缺少必要参数 (segmentId, issueId, resolution)' });
       return;
     }
     
@@ -306,8 +313,14 @@ export async function resolveSegmentIssue(req: Request, res: Response): Promise<
       throw new UnauthorizedError('未授权的访问');
     }
     
-    logger.info(`Resolving issue ${issueId} for segment ${segmentId}`);
-    const segment = await reviewService.resolveSegmentIssue(segmentId, issueId, userId);
+    const issueIndex = parseInt(issueId, 10);
+    if (isNaN(issueIndex)) {
+        res.status(400).json({ error: '无效的 Issue ID (应为数字索引)' });
+        return;
+    }
+
+    logger.info(`Resolving issue index ${issueIndex} for segment ${segmentId}`);
+    const segment = await reviewService.resolveSegmentIssue(segmentId, issueIndex, userId, resolution);
     
     res.status(200).json({
       success: true,
@@ -328,9 +341,10 @@ export async function resolveSegmentIssue(req: Request, res: Response): Promise<
 }
 
 /**
- * 批量更新段落状态
+ * 批量更新段落状态 - Method commented out as service implementation is missing
  * POST /api/review/segment/batch-status
  */
+/*
 export async function batchUpdateSegmentStatus(req: Request, res: Response): Promise<void> {
   try {
     const { segmentIds, status } = req.body;
@@ -346,7 +360,8 @@ export async function batchUpdateSegmentStatus(req: Request, res: Response): Pro
     }
     
     logger.info(`Batch updating status for ${segmentIds.length} segments to ${status}`);
-    const result = await reviewService.batchUpdateSegmentStatus(segmentIds, userId, status);
+    // const result = await reviewService.batchUpdateSegmentStatus(segmentIds, userId, status);
+    const result = { modifiedCount: 0 }; // Placeholder
     
     res.status(200).json({
       success: true,
@@ -366,6 +381,7 @@ export async function batchUpdateSegmentStatus(req: Request, res: Response): Pro
     }
   }
 }
+*/
 
 /**
  * 直接审校文本

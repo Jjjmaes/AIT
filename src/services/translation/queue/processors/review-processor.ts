@@ -1,11 +1,12 @@
 import { QueueTask, QueueTaskStatus, QueueTaskType } from '../queue-task.interface';
 import logger from '../../../../utils/logger';
 import aiReviewService from '../../../../services/ai-review.service';
-import { ISegment, Segment, SegmentStatus, IIssue } from '../../../../models/segment.model';
+import { ISegment, Segment, SegmentStatus, IIssue, IssueType, IssueSeverity, IssueStatus } from '../../../../models/segment.model';
 import { AIProvider } from '../../../../types/ai-service.types';
 import { ReviewOptions } from '../../../../services/translation/ai-adapters/review.adapter';
 import mongoose from 'mongoose';
 import { File, FileStatus, IFile } from '../../../../models/file.model';
+import { promptProcessor } from '../../../../utils/promptProcessor';
 
 /**
  * 队列任务处理器接口
@@ -129,9 +130,10 @@ export class ReviewTaskProcessor implements TaskProcessor {
     logger.debug(`Starting review for segment: ${segmentId}`, { segmentId, options: reviewOptions });
 
     // 查找段落
-    const segment = await Segment.findById(segmentId);
+    const segment = await Segment.findById(segmentId).exec();
     if (!segment) {
-      throw new Error(`Segment not found: ${segmentId}`);
+      logger.error(`Review Task: Segment ${segmentId} not found.`);
+      throw new Error(`Segment ${segmentId} not found`);
     }
 
     // 确保段落状态正确
@@ -140,8 +142,9 @@ export class ReviewTaskProcessor implements TaskProcessor {
     }
 
     // 确保段落有内容和翻译
-    if (!segment.content) {
-      throw new Error(`Segment ${segmentId} has no content`);
+    if (!segment.sourceText) { 
+      logger.error(`Review Task: Segment ${segmentId} has no source text.`);
+      throw new Error(`Segment ${segmentId} has no source text`);
     }
     
     if (!segment.translation) {
@@ -157,7 +160,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
       // 执行AI审校
       logger.info(`Starting AI review for segment ${segmentId} using model ${reviewOptions.model || 'default'}`);
       const reviewResult = await aiReviewService.reviewTranslation(
-        segment.content,
+        segment.sourceText,
         segment.translation || '',
         {
           sourceLanguage: reviewOptions.sourceLanguage || '',
@@ -177,12 +180,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
       return {
         segmentId: segment._id,
         status: segment.status,
-        reviewResult: {
-          scores: segment.reviewResult?.scores || [],
-          suggestedTranslation: segment.reviewResult?.suggestedTranslation || '',
-          issuesCount: segment.issues?.length || 0,
-          modificationDegree: segment.reviewResult?.modificationDegree || 0
-        }
+        issuesCount: segment.issues?.length || 0
       };
     } catch (error: any) {
       // 发生错误时更新段落状态
@@ -451,48 +449,51 @@ export class ReviewTaskProcessor implements TaskProcessor {
    * 保存审校结果到段落
    */
   private async saveReviewResult(segment: ISegment, reviewResult: any): Promise<void> {
-    // 保存建议的翻译
-    if (!segment.reviewResult) {
-      segment.reviewResult = {
-        originalTranslation: segment.translation || '',
-        reviewDate: new Date(),
-        issues: [],
-        scores: []
-      };
-    }
+    // 保存建议的翻译到 segment.review
+    segment.review = reviewResult.suggestedTranslation;
 
-    segment.reviewResult.suggestedTranslation = reviewResult.suggestedTranslation;
-    segment.reviewResult.aiReviewer = reviewResult.metadata.model;
-    segment.reviewResult.modificationDegree = reviewResult.metadata.modificationDegree;
-
-    // 保存评分
-    const scores = reviewResult.scores.map((score: any) => ({
-      type: score.type,
-      score: score.score,
-      details: score.details
+    // 保存评分 as issues
+    const scores = reviewResult.scores || [];
+    const issuesFromScores: IIssue[] = scores.map((score: any) => ({
+      type: IssueType.OTHER, // Represent score as a generic issue type
+      // Add severity based on score
+      severity: this.mapScoreToSeverity(score.score), 
+      description: `AI Score (${score.type}): ${score.score}/100. ${score.details || ''}`,
+      status: IssueStatus.OPEN,
+      createdAt: new Date(),
+      // createdBy: ?? // Needs user context if available
     }));
 
-    segment.reviewResult.scores = scores;
+    // Save AI-detected issues
+    const issuesFromAI = (reviewResult.issues || []).map((issueData: any): IIssue => ({
+      type: issueData.type || IssueType.OTHER,
+      // Add severity if missing, default to MEDIUM
+      severity: issueData.severity || IssueSeverity.MEDIUM, 
+      description: issueData.description,
+      position: issueData.position,
+      suggestion: issueData.suggestion,
+      status: IssueStatus.OPEN, // Default status
+      createdAt: new Date(),
+      // createdBy: ?? // Needs user context if available
+    }));
 
-    // 保存问题
-    if (!segment.issues) {
-      segment.issues = [];
-    }
+    // Combine issues
+    segment.issues = [...(segment.issues || []), ...issuesFromAI, ...issuesFromScores];
+    segment.markModified('issues'); // Ensure array modification is saved
 
-    // 保存问题
-    for (const issueData of reviewResult.issues) {
-      segment.issues.push({
-        type: issueData.type,
-        description: issueData.description,
-        position: issueData.position,
-        suggestion: issueData.suggestion,
-        resolved: false,
-        createdAt: new Date()
-      });
-    }
+    // Update review metadata (no scores field here)
+    segment.reviewMetadata = {
+      ...(segment.reviewMetadata || {}), // Preserve existing metadata if any
+      aiModel: reviewResult.metadata?.model,
+      // promptTemplateId: ??? // Needs context
+      tokenCount: (reviewResult.metadata?.tokens?.input ?? 0) + (reviewResult.metadata?.tokens?.output ?? 0),
+      processingTime: reviewResult.metadata?.processingTime,
+      modificationDegree: reviewResult.metadata?.modificationDegree
+    };
+    segment.markModified('reviewMetadata');
 
     // 更新段落状态
-    segment.status = SegmentStatus.REVIEW_COMPLETED;
+    segment.status = SegmentStatus.REVIEW_PENDING; // Status indicates AI review done, pending human
     await segment.save();
   }
   
@@ -571,6 +572,16 @@ export class ReviewTaskProcessor implements TaskProcessor {
     
     await Promise.all(executing);
     return results;
+  }
+
+  /**
+   * 将评分映射为问题严重性
+   */
+  private mapScoreToSeverity(score: number): IssueSeverity {
+    if (score >= 90) return IssueSeverity.HIGH;
+    if (score >= 70) return IssueSeverity.MEDIUM;
+    if (score >= 50) return IssueSeverity.LOW;
+    return IssueSeverity.LOW;
   }
 }
 

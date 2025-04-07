@@ -32,12 +32,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const reviewController = __importStar(require("../../controllers/review.controller"));
-const review_service_1 = __importDefault(require("../../services/review.service"));
+const review_service_1 = require("../../services/review.service");
 const translation_queue_service_1 = require("../../services/translation/queue/translation-queue.service");
 const queue_task_interface_1 = require("../../services/translation/queue/queue-task.interface");
 const errors_1 = require("../../utils/errors");
@@ -137,11 +134,11 @@ describe('Review Controller', () => {
                 _id: 'test-segment-id',
                 status: 'REVIEW_COMPLETED'
             };
-            review_service_1.default.startAIReview.mockResolvedValue(mockSegment);
+            review_service_1.reviewService.startAIReview.mockResolvedValue(mockSegment);
             // Act
             await reviewController.requestSegmentReview(mockRequest, mockResponse);
             // Assert
-            expect(review_service_1.default.startAIReview).toHaveBeenCalledWith('test-segment-id', 'test-user-id', expect.objectContaining({
+            expect(review_service_1.reviewService.startAIReview).toHaveBeenCalledWith('test-segment-id', 'test-user-id', expect.objectContaining({
                 aiModel: 'gpt-4'
             }));
             expect(mockStatusFn).toHaveBeenCalledWith(200);
@@ -185,7 +182,7 @@ describe('Review Controller', () => {
             mockRequest.user = undefined;
             mockRequest.body = { segmentId: 'test-segment-id' };
             // Mock the startAIReview to throw an UnauthorizedError
-            review_service_1.default.startAIReview.mockImplementation(() => {
+            review_service_1.reviewService.startAIReview.mockImplementation(() => {
                 throw new errors_1.UnauthorizedError('未授权的访问');
             });
             // Act
@@ -203,7 +200,7 @@ describe('Review Controller', () => {
                 options: { immediate: true }
             };
             // Mock the startAIReview to throw a NotFoundError
-            review_service_1.default.startAIReview.mockImplementation(() => {
+            review_service_1.reviewService.startAIReview.mockImplementation(() => {
                 throw new errors_1.NotFoundError('段落不存在');
             });
             // Act

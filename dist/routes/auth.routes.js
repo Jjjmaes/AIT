@@ -5,15 +5,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const auth_controller_1 = __importDefault(require("../controllers/auth.controller"));
+const express_1 = __importDefault(require("express"));
+const auth_controller_1 = require("../controllers/auth.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
 const authValidator_1 = require("../validators/authValidator");
 const validate_middleware_1 = require("../middleware/validate.middleware");
-const router = (0, express_1.Router)();
+const authRouter = express_1.default.Router();
 // 用户注册
-router.post('/register', (0, validate_middleware_1.validateRequest)(authValidator_1.validateRegister), auth_controller_1.default.register);
+authRouter.post('/register', (0, validate_middleware_1.validateRequest)(authValidator_1.validateRegister), auth_controller_1.authController.register);
 // 用户登录
-router.post('/login', (0, validate_middleware_1.validateRequest)(authValidator_1.validateLogin), auth_controller_1.default.login);
+authRouter.post('/login', (0, validate_middleware_1.validateRequest)(authValidator_1.validateLogin), auth_controller_1.authController.login);
 // 用户登出
-router.post('/logout', auth_controller_1.default.logout);
-exports.default = router;
+authRouter.post('/logout', auth_controller_1.authController.logout);
+// GET /api/auth/profile (Protected route)
+authRouter.get('/profile', auth_middleware_1.authenticateJwt, auth_controller_1.authController.getProfile);
+// TODO: Add routes for password reset, email verification, etc.
+exports.default = authRouter;

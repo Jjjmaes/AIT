@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import * as reviewController from '../../controllers/review.controller';
-import reviewService from '../../services/review.service';
+import { reviewService } from '../../services/review.service';
 import { TranslationQueueService } from '../../services/translation/queue/translation-queue.service';
 import { QueueTaskType, QueueTaskStatus } from '../../services/translation/queue/queue-task.interface';
 import { UnauthorizedError, NotFoundError } from '../../utils/errors';

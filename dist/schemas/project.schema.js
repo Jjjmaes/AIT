@@ -2,25 +2,34 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.projectProgressSchema = exports.updateProjectSchema = exports.createProjectSchema = void 0;
 const zod_1 = require("zod");
-const project_types_1 = require("../types/project.types");
+const project_model_1 = require("../models/project.model");
+const languagePairSchema = zod_1.z.object({
+    source: zod_1.z.string(),
+    target: zod_1.z.string()
+});
 exports.createProjectSchema = zod_1.z.object({
     name: zod_1.z.string().min(1, '项目名称不能为空'),
-    description: zod_1.z.string().min(1, '项目描述不能为空'),
-    sourceLanguage: zod_1.z.string().min(1, '源语言不能为空'),
-    targetLanguage: zod_1.z.string().min(1, '目标语言不能为空'),
-    translationPromptTemplate: zod_1.z.string().min(1, '翻译提示模板不能为空'),
-    reviewPromptTemplate: zod_1.z.string().min(1, '审核提示模板不能为空'),
-    deadline: zod_1.z.string().datetime().optional().transform(val => val ? new Date(val) : undefined),
-    priority: zod_1.z.nativeEnum(project_types_1.ProjectPriority).optional()
+    description: zod_1.z.string().optional(),
+    languagePairs: zod_1.z.array(languagePairSchema).min(1, '至少需要一个语言对'),
+    manager: zod_1.z.string(),
+    members: zod_1.z.array(zod_1.z.string()).optional(),
+    defaultPromptTemplateId: zod_1.z.string().optional(),
+    domain: zod_1.z.string().optional(),
+    terminologyId: zod_1.z.string().optional(),
+    status: zod_1.z.nativeEnum(project_model_1.ProjectStatus).optional(),
+    priority: zod_1.z.number().optional()
 });
 exports.updateProjectSchema = zod_1.z.object({
     name: zod_1.z.string().min(1, '项目名称不能为空').optional(),
-    description: zod_1.z.string().min(1, '项目描述不能为空').optional(),
-    status: zod_1.z.nativeEnum(project_types_1.ProjectStatus).optional(),
-    priority: zod_1.z.nativeEnum(project_types_1.ProjectPriority).optional(),
-    deadline: zod_1.z.string().datetime().optional().transform(val => val ? new Date(val) : undefined),
-    translationPromptTemplate: zod_1.z.string().min(1, '翻译提示模板不能为空').optional(),
-    reviewPromptTemplate: zod_1.z.string().min(1, '审核提示模板不能为空').optional()
+    description: zod_1.z.string().optional(),
+    languagePairs: zod_1.z.array(languagePairSchema).optional(),
+    manager: zod_1.z.string().optional(),
+    members: zod_1.z.array(zod_1.z.string()).optional(),
+    defaultPromptTemplateId: zod_1.z.string().optional(),
+    domain: zod_1.z.string().optional(),
+    terminologyId: zod_1.z.string().optional(),
+    status: zod_1.z.nativeEnum(project_model_1.ProjectStatus).optional(),
+    priority: zod_1.z.number().optional()
 });
 exports.projectProgressSchema = zod_1.z.object({
     completionPercentage: zod_1.z.number().min(0).max(100),

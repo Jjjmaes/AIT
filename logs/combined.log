@@ -9699,3 +9699,15 @@
 {"level":"info","message":"File file123 progress updated successfully","timestamp":"2025-03-28T08:39:06.238Z"}
 {"level":"info","message":"User 67e6602a64f37f32e1b9a77b updating progress for project project123","timestamp":"2025-03-28T08:39:06.239Z"}
 {"level":"info","message":"Project project123 progress updated successfully","timestamp":"2025-03-28T08:39:06.239Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T06:31:28.383Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T10:57:01.274Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T10:57:32.476Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T11:05:39.332Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T11:05:56.252Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T11:06:12.538Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T11:06:25.202Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-03-30T11:06:34.280Z"}
+{"level":"info","message":"Registered processor for file type: txt","timestamp":"2025-04-07T08:25:41.973Z"}
+{"level":"info","message":"Registered processor for file type: xliff","timestamp":"2025-04-07T08:25:41.976Z"}
+{"level":"info","message":"Registered processor for file type: mqxliff","timestamp":"2025-04-07T08:25:41.985Z"}
+{"level":"info","message":"Review routes registered","timestamp":"2025-04-07T08:25:42.605Z"}

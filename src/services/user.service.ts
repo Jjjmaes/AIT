@@ -12,17 +12,34 @@ import {
   NotFoundError, 
   ConflictError, 
   UnauthorizedError,
-  ForbiddenError
+  ForbiddenError,
+  AppError
 } from '../utils/errors';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger';
 import { validateId, validateEntityExists } from '../utils/errorHandler';
+import bcrypt from 'bcryptjs';
+import { handleServiceError } from '../utils/errorHandler';
+
+interface LoginResponse {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    fullName?: string;
+  };
+}
 
 export class UserService {
+  private serviceName = 'UserService';
+
   /**
    * 用户注册
    */
-  async register(data: RegisterUserDto) {
+  async registerUser(data: RegisterUserDto): Promise<IUser> {
+    const methodName = 'registerUser';
     try {
       // 检查用户名和邮箱是否已被注册
       const existingUser = await User.findOne({ 
@@ -34,11 +51,13 @@ export class UserService {
       }
       
       // 创建新用户
+      const hashedPassword = await bcrypt.hash(data.password, 10);
       const user = await User.create({
         username: data.username,
         email: data.email,
-        password: data.password,
-        role: data.role || UserRole.TRANSLATOR
+        password: hashedPassword,
+        role: data.role || UserRole.TRANSLATOR,
+        active: true
       });
       
       // 生成JWT令牌
@@ -53,52 +72,73 @@ export class UserService {
         id: user._id,
         email: user.email,
         username: user.username,
-        role: user.role
+        role: user.role,
+        fullName: user.fullName
       };
       
       logger.info(`User registered: ${user._id}`);
-      return { token, user: userData };
+      const userToReturn = user.toObject();
+      delete userToReturn.password;
+      return userToReturn as IUser;
     } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
       if ((error as any).code === 11000) {
         throw new ConflictError('用户名或邮箱已被注册');
       }
-      throw error;
+      throw handleServiceError(error, this.serviceName, methodName, '用户注册');
     }
   }
 
   /**
    * 用户登录
    */
-  async login(data: LoginUserDto) {
-    // 查找用户
-    const user = await User.findOne({ email: data.email });
-    if (!user) {
-      throw new UnauthorizedError('邮箱或密码不正确');
+  async loginUser(data: LoginUserDto): Promise<LoginResponse> {
+    const methodName = 'loginUser';
+    try {
+      // 查找用户
+      const user = await User.findOne({ email: data.email }).select('+password');
+      if (!user) {
+        throw new UnauthorizedError('邮箱或密码不正确');
+      }
+      
+      // 验证密码
+      const isPasswordValid = await bcrypt.compare(data.password, user.password!);
+      if (!isPasswordValid) {
+        throw new UnauthorizedError('邮箱或密码不正确');
+      }
+      
+      // 检查用户是否被禁用
+      if (!user.active) {
+        throw new UnauthorizedError('用户账号已被禁用');
+      }
+      
+      // 生成JWT令牌
+      const token = jwt.sign(
+        { sub: user._id },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '1d' }
+      );
+      
+      // 移除密码后返回用户数据
+      const userData = {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        fullName: user.fullName
+      };
+      
+      logger.info(`User logged in: ${user._id}`);
+      return { token, user: userData };
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      // 不要在登录失败时暴露具体的内部错误
+      if (error instanceof UnauthorizedError || error instanceof ValidationError) {
+        throw error; // 重新抛出已知的认证或验证错误
+      }
+      // 为其他错误抛出通用错误
+      throw new UnauthorizedError('登录失败，请稍后重试');
     }
-    
-    // 验证密码
-    const isPasswordValid = await user.comparePassword(data.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('邮箱或密码不正确');
-    }
-    
-    // 生成JWT令牌
-    const token = jwt.sign(
-      { sub: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '1d' }
-    );
-    
-    // 移除密码后返回用户数据
-    const userData = {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-      role: user.role
-    };
-    
-    logger.info(`User logged in: ${user._id}`);
-    return { token, user: userData };
   }
 
   /**
@@ -164,23 +204,38 @@ export class UserService {
    * 修改密码
    */
   async changePassword(userId: string, data: ChangePasswordDto) {
+    const methodName = 'changePassword';
     validateId(userId, '用户');
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new NotFoundError('用户不存在');
+    if (!data.currentPassword || !data.newPassword) {
+        throw new ValidationError('当前密码和新密码不能为空');
+    }
+    if (data.newPassword.length < 6) {
+        throw new ValidationError('新密码长度不能小于6位');
     }
     
-    const isPasswordValid = await user.comparePassword(data.currentPassword);
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('当前密码不正确');
+    try {
+        // Fetch user including password
+        const user = await User.findById(userId).select('+password');
+        if (!user || !user.password) {
+          throw new NotFoundError('用户不存在或无法验证密码');
+        }
+        
+        // Compare password using bcrypt directly
+        const isPasswordValid = await bcrypt.compare(data.currentPassword, user.password);
+        if (!isPasswordValid) {
+          throw new UnauthorizedError('当前密码不正确');
+        }
+        
+        // Hash and save new password
+        user.password = await bcrypt.hash(data.newPassword, 10);
+        await user.save();
+        
+        logger.info(`Password changed for user: ${userId}`);
+        return { success: true };
+    } catch (error) {
+         logger.error(`Error in ${this.serviceName}.${methodName} for user ${userId}:`, error);
+         throw handleServiceError(error, this.serviceName, methodName, '修改密码');
     }
-    
-    user.password = data.newPassword;
-    await user.save();
-    
-    logger.info(`Password changed for user: ${userId}`);
-    return { success: true };
   }
 }
 

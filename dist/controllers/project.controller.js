@@ -25,14 +25,16 @@ class ProjectController {
             }
             const validationResult = project_schema_1.createProjectSchema.safeParse(req.body);
             if (!validationResult.success) {
-                throw new errors_1.ValidationError(validationResult.error.errors[0].message);
+                // Convert the flattened error object to a string for the message
+                const errorMessage = JSON.stringify(validationResult.error.flatten());
+                throw new errors_1.ValidationError(errorMessage); // Pass the string message
             }
+            const validatedData = validationResult.data;
             logger_1.default.info(`User ${userId} creating new project`);
-            const projectData = {
-                ...validationResult.data,
-                managerId: userId
-            };
-            const project = await projectService.createProject(projectData);
+            const project = await projectService.createProject({
+                ...validatedData,
+                manager: userId // Ensure manager is set from auth user
+            });
             logger_1.default.info(`Project ${project.id} created successfully by user ${userId}`);
             res.status(201).json({
                 success: true,
@@ -55,7 +57,7 @@ class ProjectController {
             const { status, priority, search, page, limit } = req.query;
             const result = await projectService.getUserProjects(userId, {
                 status: status,
-                priority: priority,
+                priority: priority ? parseInt(priority, 10) : undefined,
                 search: search,
                 page: page ? parseInt(page) : undefined,
                 limit: limit ? parseInt(limit) : undefined
@@ -100,11 +102,19 @@ class ProjectController {
             }
             const validationResult = project_schema_1.updateProjectSchema.safeParse(req.body);
             if (!validationResult.success) {
-                throw new errors_1.ValidationError(validationResult.error.errors[0].message);
+                // Convert the flattened error object to a string for the message
+                const errorMessage = JSON.stringify(validationResult.error.flatten());
+                throw new errors_1.ValidationError(errorMessage); // Pass the string message
             }
+            const validatedData = validationResult.data;
             const { projectId } = req.params;
-            const updateData = validationResult.data;
+            // Directly use validatedData as it matches UpdateProjectDto now
+            const updateData = validatedData;
             logger_1.default.info(`User ${userId} updating project ${projectId}`);
+            if (Object.keys(updateData).length === 0) {
+                logger_1.default.warn(`No valid fields provided for updating project ${projectId}`);
+                return res.status(400).json({ success: false, message: '没有提供可更新的字段' });
+            }
             const project = await projectService.updateProject(projectId, userId, updateData);
             logger_1.default.info(`Project ${projectId} updated successfully by user ${userId}`);
             res.status(200).json({
@@ -147,28 +157,27 @@ class ProjectController {
             const { projectId } = req.params;
             const userId = req.user?.id;
             if (!userId) {
-                throw new errors_1.UnauthorizedError('未授权的访问');
+                return next(new errors_1.UnauthorizedError('请先登录'));
             }
-            const file = req.file;
-            if (!file) {
-                throw new errors_1.ValidationError('未提供文件');
+            if (!req.file) {
+                return next(new errors_1.ValidationError('请选择要上传的文件'));
             }
-            logger_1.default.info(`User ${userId} uploading file to project ${projectId}`);
+            const { originalname, path, size, mimetype } = req.file;
+            const { sourceLanguage, targetLanguage, category, tags } = req.body;
+            // 转换文件数据为DTO
             const fileData = {
-                originalName: file.originalname,
-                fileSize: file.size,
-                mimeType: file.mimetype,
-                filePath: file.path,
-                sourceLanguage: req.body.sourceLanguage,
-                targetLanguage: req.body.targetLanguage,
-                category: req.body.category,
-                tags: req.body.tags ? JSON.parse(req.body.tags) : undefined
+                originalName: originalname,
+                filePath: path,
+                fileSize: size,
+                mimeType: mimetype,
+                sourceLanguage,
+                targetLanguage,
+                fileType: category
             };
             const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);
-            logger_1.default.info(`File ${uploadedFile.id} uploaded successfully to project ${projectId}`);
             res.status(201).json({
                 success: true,
-                data: { file: uploadedFile }
+                data: uploadedFile
             });
         }
         catch (error) {

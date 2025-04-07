@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TranslationEventType = exports.TranslationStatus = void 0;
+exports.TranslationJobType = exports.TranslationJobStatus = exports.TranslationEventType = exports.TranslationStatus = void 0;
 // 翻译状态枚举
 var TranslationStatus;
 (function (TranslationStatus) {
@@ -20,3 +20,16 @@ var TranslationEventType;
     TranslationEventType["TASK_CANCELLED"] = "TASK_CANCELLED";
     TranslationEventType["PROGRESS_UPDATED"] = "PROGRESS_UPDATED";
 })(TranslationEventType || (exports.TranslationEventType = TranslationEventType = {}));
+var TranslationJobStatus;
+(function (TranslationJobStatus) {
+    TranslationJobStatus["PENDING"] = "pending";
+    TranslationJobStatus["PROCESSING"] = "processing";
+    TranslationJobStatus["COMPLETED"] = "completed";
+    TranslationJobStatus["FAILED"] = "failed";
+})(TranslationJobStatus || (exports.TranslationJobStatus = TranslationJobStatus = {}));
+var TranslationJobType;
+(function (TranslationJobType) {
+    TranslationJobType["SEGMENT"] = "segment";
+    TranslationJobType["FILE"] = "file";
+    TranslationJobType["PROJECT"] = "project";
+})(TranslationJobType || (exports.TranslationJobType = TranslationJobType = {}));

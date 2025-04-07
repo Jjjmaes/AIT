@@ -1,7 +1,8 @@
 // src/validators/projectValidator.ts
 
 import { z } from 'zod';
-import { ProjectPriority, ProjectStatus } from '../types/project.types';
+import { ProjectPriority } from '../types/project.types';
+import { ProjectStatus } from '../models/project.model';
 import { mongoIdSchema, createEnumValidator } from './common';
 
 // 项目创建验证

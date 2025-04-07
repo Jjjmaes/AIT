@@ -3,852 +3,671 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReviewService = void 0;
-const ai_adapters_1 = require("../services/translation/ai-adapters");
+exports.reviewService = exports.ReviewService = void 0;
+const aiServiceFactory_1 = require("../services/translation/aiServiceFactory");
 const segment_model_1 = require("../models/segment.model");
 const file_model_1 = require("../models/file.model");
 const project_model_1 = __importDefault(require("../models/project.model"));
 const errors_1 = require("../utils/errors");
 const logger_1 = __importDefault(require("../utils/logger"));
-const mongoose_1 = __importDefault(require("mongoose"));
+const mongoose_1 = require("mongoose");
 const ai_service_types_1 = require("../types/ai-service.types");
-// 定义错误类
-class NotFoundError extends errors_1.AppError {
-    constructor(message = '未找到资源') {
-        super(message, 404);
-        this.name = 'NotFoundError';
-    }
-}
-class BadRequestError extends errors_1.AppError {
-    constructor(message = '请求参数错误') {
-        super(message, 400);
-        this.name = 'BadRequestError';
-    }
-}
-class ForbiddenError extends errors_1.AppError {
-    constructor(message = '禁止访问') {
-        super(message, 403);
-        this.name = 'ForbiddenError';
-    }
-}
+const errorHandler_1 = require("../utils/errorHandler");
+const promptProcessor_1 = require("../utils/promptProcessor");
+const config_1 = require("../config");
+const openai_1 = __importDefault(require("openai"));
 /**
  * 审校服务类
  */
-class ReviewService {
-    constructor(aiReviewService) {
-        this.aiServiceFactory = ai_adapters_1.AIServiceFactory.getInstance();
-        this.aiReviewService = aiReviewService || null; // 存储传入的AIReviewService实例
+class ReviewService /* implements IReviewService */ {
+    constructor() {
+        this.serviceName = 'ReviewService';
+        this.aiServiceFactory = aiServiceFactory_1.aiServiceFactory;
+        this.openaiClient = new openai_1.default({
+            apiKey: config_1.config.openai.apiKey,
+            timeout: config_1.config.openai.timeout || 60000,
+        });
     }
     /**
      * 开始AI审校
-     * @param segmentId 段落ID
-     * @param userId 用户ID
-     * @param options 审校选项
-     * @returns 审校结果
      */
     async startAIReview(segmentId, userId, options) {
+        const methodName = 'startAIReview';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '用户');
+        let segment = null;
         try {
-            if (!segmentId) {
-                throw new BadRequestError('段落ID不能为空');
-            }
-            if (!userId) {
-                throw new BadRequestError('用户ID不能为空');
-            }
-            // 1. 查找段落
-            const segment = await segment_model_1.Segment.findById(segmentId).exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
-            }
-            // 2. 检查段落状态
+            // 1. Fetch Segment & related data
+            segment = await segment_model_1.Segment.findById(segmentId).exec();
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            // 2. Check status
             if (segment.status !== segment_model_1.SegmentStatus.TRANSLATED && segment.status !== segment_model_1.SegmentStatus.REVIEW_FAILED) {
-                throw new BadRequestError(`段落状态不允许审校，当前状态: ${segment.status}`);
+                throw new errors_1.ValidationError(`段落状态不允许审校，当前状态: ${segment.status}`);
             }
-            // 3. 获取关联文件和项目
-            const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
-            const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
-            }
-            // 4. 检查用户权限
-            const userIdStr = userId.toString();
-            const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-            const isManager = project.managerId.toString() === userIdStr;
-            const isReviewer = projectReviewers.includes(userIdStr);
-            const isTranslator = segment.translator && segment.translator.toString() === userIdStr;
-            if (!isManager && !isReviewer && !isTranslator) {
-                throw new ForbiddenError(`用户(${userId})无权审校段落(${segmentId})`);
-            }
-            // 5. 检查是否有翻译内容
             if (!segment.translation) {
-                throw new BadRequestError('段落没有翻译内容，无法进行审校');
+                throw new errors_1.ValidationError('段落没有翻译内容，无法进行审校');
             }
-            // 6. 更新段落状态为审校中
-            segment.status = segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS;
-            segment.reviewer = new mongoose_1.default.Types.ObjectId(userId);
-            // 保存状态更新
+            // 3. Get File & Project for context and permissions
+            const file = await file_model_1.File.findById(segment.fileId).exec();
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
+            const project = await project_model_1.default.findById(file.projectId).populate('reviewPromptTemplate').populate('defaultReviewPromptTemplate').exec();
+            (0, errorHandler_1.validateEntityExists)(project, '关联项目');
+            // 4. Check Permissions (Manager or assigned Reviewer?)
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            // Use correct manager field
+            const isManager = project.manager?.equals(userObjectId);
+            const isReviewer = project.reviewers?.some((r) => r.equals(userObjectId));
+            // Removed check for non-existent segment.translator
+            if (!isManager && !isReviewer) {
+                // Adjusted error message as translator role isn't checked here
+                throw new errors_1.ForbiddenError(`用户 (${userId}) 不是项目经理或审校员，无权审校项目 (${project._id}) 中的段落`);
+            }
+            // 5. Update segment status to REVIEWING
+            segment.status = segment_model_1.SegmentStatus.REVIEWING;
+            segment.reviewer = userObjectId;
+            segment.reviewCompletedAt = undefined;
+            segment.reviewMetadata = undefined;
+            segment.issues = [];
             await segment.save();
-            // 7. 获取上下文段落
-            const contextSegments = await this.getContextSegments(segment, file);
-            // 8. 调用AI审校服务
-            // 如果没有注入自定义的AI审校服务，则使用默认的
-            let aiReviewServiceToUse;
-            if (this.aiReviewService) {
-                aiReviewServiceToUse = this.aiReviewService;
-            }
-            else {
-                // 使用默认的OpenAI审校适配器
-                const reviewAdapter = this.aiServiceFactory.getReviewAdapter(ai_service_types_1.AIProvider.OPENAI);
-                if (!reviewAdapter) {
-                    throw new BadRequestError('无法创建AI审校服务');
+            // 6. Prepare Prompt Context & Build Prompt
+            const reviewTemplate = options?.promptTemplateId || project.reviewPromptTemplate || project.defaultReviewPromptTemplate;
+            let reviewTemplateId;
+            let reviewTemplateObjectId = undefined;
+            if (reviewTemplate) {
+                if (typeof reviewTemplate === 'string' && mongoose_1.Types.ObjectId.isValid(reviewTemplate)) {
+                    reviewTemplateId = reviewTemplate;
+                    reviewTemplateObjectId = new mongoose_1.Types.ObjectId(reviewTemplate);
                 }
-                aiReviewServiceToUse = reviewAdapter;
+                else if (reviewTemplate instanceof mongoose_1.Types.ObjectId) {
+                    reviewTemplateId = reviewTemplate;
+                    reviewTemplateObjectId = reviewTemplate;
+                }
+                else if (typeof reviewTemplate === 'object' && reviewTemplate._id) {
+                    reviewTemplateId = reviewTemplate._id;
+                    reviewTemplateObjectId = reviewTemplate._id;
+                }
             }
-            // 9. 准备AI审校所需数据
-            const reviewPrompt = project.reviewPromptTemplate || '请审校以下翻译，指出错误并提供修改建议。';
-            const reviewData = {
-                segmentId: segment._id,
-                content: segment.content,
-                translation: segment.translation,
+            const promptContext = {
+                promptTemplateId: reviewTemplateId,
                 sourceLanguage: file.metadata.sourceLanguage,
                 targetLanguage: file.metadata.targetLanguage,
-                contextSegments: contextSegments,
-                prompt: reviewPrompt,
-                options: options || {} // 可以传入额外的审校选项，如审校严格度等
+                domain: project.domain,
+                industry: project.industry,
             };
-            // 10. 执行AI审校
+            const reviewPromptData = await promptProcessor_1.promptProcessor.buildReviewPrompt(segment.sourceText, segment.translation, promptContext);
+            // 7. Get AI Provider & Model
+            const aiProvider = options?.aiProvider || ai_service_types_1.AIProvider.OPENAI;
+            const model = options?.aiModel || config_1.config.openai.defaultModel || 'gpt-4-turbo'; // Use config default
+            // 8. Execute AI review directly using OpenAI client
+            const startTime = Date.now();
             let aiReviewResult;
+            let processingTime = 0;
             try {
-                aiReviewResult = await aiReviewServiceToUse.reviewTranslation({
-                    originalContent: segment.content,
-                    translatedContent: segment.translation || '',
-                    sourceLanguage: file.metadata.sourceLanguage,
-                    targetLanguage: file.metadata.targetLanguage,
-                    contextSegments: contextSegments.map(ctx => ({
-                        original: ctx.content,
-                        translation: ctx.translation || ''
-                    })),
-                    customPrompt: reviewPrompt
+                logger_1.default.info(`Calling OpenAI ${model} for review...`);
+                const response = await this.openaiClient.chat.completions.create({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: reviewPromptData.systemInstruction },
+                        { role: 'user', content: reviewPromptData.userPrompt }
+                    ],
+                    temperature: options?.temperature || 0.5,
                 });
-            }
-            catch (error) {
-                logger_1.default.error('AI审校失败', {
-                    segmentId: segment._id,
-                    error: error.message
-                });
-                throw new BadRequestError(`AI审校失败: ${error.message}`);
-            }
-            // 11. 保存审校结果
-            if (!segment.reviewResult) {
-                segment.reviewResult = {
-                    originalTranslation: segment.translation || '',
-                    suggestedTranslation: aiReviewResult.suggestedTranslation || segment.translation || '',
-                    issues: [],
-                    scores: aiReviewResult.scores || [],
-                    reviewDate: new Date(),
-                    reviewerId: new mongoose_1.default.Types.ObjectId(userId),
-                    aiReviewer: aiReviewResult.metadata?.model || 'AI',
-                    modificationDegree: aiReviewResult.metadata?.modificationDegree || 0
+                processingTime = Date.now() - startTime;
+                const responseContent = response.choices[0]?.message?.content;
+                if (!responseContent) {
+                    throw new errors_1.AppError('OpenAI did not return content for review.', 500);
+                }
+                let parsedResponse = {};
+                try {
+                    parsedResponse = JSON.parse(responseContent);
+                }
+                catch (parseError) {
+                    logger_1.default.error('Failed to parse OpenAI JSON response for review:', { responseContent, parseError });
+                    parsedResponse.suggestedTranslation = responseContent.trim();
+                    // Create AIReviewIssue without status
+                    parsedResponse.issues = [{
+                            type: segment_model_1.IssueType.OTHER,
+                            severity: segment_model_1.IssueSeverity.HIGH,
+                            description: 'AI response format error, could not parse JSON.'
+                        }];
+                    parsedResponse.scores = [];
+                }
+                // Construct the full AIReviewResponse
+                aiReviewResult = {
+                    suggestedTranslation: parsedResponse.suggestedTranslation || segment.translation,
+                    issues: parsedResponse.issues || [],
+                    scores: parsedResponse.scores || [],
+                    metadata: {
+                        provider: ai_service_types_1.AIProvider.OPENAI,
+                        model: response.model || model,
+                        processingTime: processingTime,
+                        confidence: parsedResponse.metadata?.confidence || 0,
+                        wordCount: (parsedResponse.suggestedTranslation || '').split(/\s+/).length,
+                        characterCount: (parsedResponse.suggestedTranslation || '').length,
+                        tokens: {
+                            input: response.usage?.prompt_tokens ?? 0,
+                            output: response.usage?.completion_tokens ?? 0,
+                        },
+                        modificationDegree: parsedResponse.metadata?.modificationDegree || 0,
+                    }
                 };
             }
-            else {
-                segment.reviewResult.suggestedTranslation = aiReviewResult.suggestedTranslation || segment.translation || '';
-                segment.reviewResult.scores = aiReviewResult.scores || segment.reviewResult.scores || [];
-                segment.reviewResult.reviewDate = new Date();
-                segment.reviewResult.aiReviewer = aiReviewResult.metadata?.model || 'AI';
-                segment.reviewResult.modificationDegree = aiReviewResult.metadata?.modificationDegree || 0;
+            catch (aiError) {
+                logger_1.default.error('OpenAI审校调用失败', { segmentId, model, error: aiError?.message || aiError });
+                segment.status = segment_model_1.SegmentStatus.REVIEW_FAILED;
+                segment.error = `AI审校失败: ${aiError?.message || 'Unknown OpenAI error'}`;
+                await segment.save();
+                throw new errors_1.AppError(`AI审校调用失败: ${aiError?.message || 'Unknown OpenAI error'}`, 500);
             }
-            // 12. 添加审校历史记录
-            if (!segment.reviewHistory) {
-                segment.reviewHistory = [];
-            }
-            segment.reviewHistory.push({
-                version: segment.reviewHistory.length + 1,
-                content: aiReviewResult.suggestedTranslation || segment.translation,
-                timestamp: new Date(),
-                modifiedBy: new mongoose_1.default.Types.ObjectId(userId),
-                aiGenerated: true,
-                acceptedByHuman: false
-            });
-            // 13. 如果有AI检测出的问题，添加到段落问题列表
-            if (aiReviewResult.issues && aiReviewResult.issues.length > 0) {
-                for (const issueData of aiReviewResult.issues) {
-                    const issue = new segment_model_1.Issue({
-                        type: issueData.type || segment_model_1.IssueType.OTHER,
-                        description: issueData.description,
-                        position: issueData.position,
-                        suggestion: issueData.suggestion,
-                        resolved: false,
-                        createdAt: new Date(),
-                        createdBy: new mongoose_1.default.Types.ObjectId(userId)
-                    });
-                    await issue.save();
-                    if (!segment.issues) {
-                        segment.issues = [];
-                    }
-                    // Type assertion to fix the incompatible types
-                    segment.issues.push(issue._id);
-                    if (!segment.reviewResult) {
-                        segment.reviewResult = {
-                            originalTranslation: segment.translation || '',
-                            issues: [],
-                            scores: [],
-                            reviewDate: new Date()
-                        };
-                    }
-                    if (!segment.reviewResult.issues) {
-                        segment.reviewResult.issues = [];
-                    }
-                    segment.reviewResult.issues.push(issue._id);
-                }
-            }
-            // 14. 保存更新的段落
-            await segment.save();
-            // 15. 返回AI审校结果
-            return {
-                segmentId: segment._id,
-                originalTranslation: segment.translation,
-                suggestedTranslation: aiReviewResult.suggestedTranslation,
-                issues: aiReviewResult.issues,
-                scores: aiReviewResult.scores,
-                status: segment.status
+            // 9. Process AI Issues (Map AIReviewIssue to IIssue)
+            const userObjectIdForIssue = new mongoose_1.Types.ObjectId(userId); // Reuse userObjectId from permission check
+            const newIssues = (aiReviewResult.issues || []).map((aiIssue) => ({
+                type: aiIssue.type || segment_model_1.IssueType.OTHER,
+                severity: aiIssue.severity || segment_model_1.IssueSeverity.MEDIUM,
+                description: aiIssue.description || 'AI detected issue',
+                position: aiIssue.position,
+                suggestion: aiIssue.suggestion,
+                status: segment_model_1.IssueStatus.OPEN,
+                createdAt: new Date(),
+                createdBy: userObjectIdForIssue
+            }));
+            // 10. Update Segment with Review Metadata and Issues
+            segment.review = aiReviewResult.suggestedTranslation; // Store AI suggestion in 'review' field
+            segment.issues = newIssues;
+            segment.reviewMetadata = {
+                aiModel: aiReviewResult.metadata?.model,
+                promptTemplateId: reviewTemplateObjectId,
+                tokenCount: (aiReviewResult.metadata?.tokens?.input ?? 0) + (aiReviewResult.metadata?.tokens?.output ?? 0),
+                processingTime: processingTime,
+                acceptedChanges: false,
+                modificationDegree: aiReviewResult.metadata?.modificationDegree
             };
+            segment.status = segment_model_1.SegmentStatus.REVIEW_PENDING;
+            segment.error = undefined;
+            segment.markModified('issues');
+            segment.markModified('reviewMetadata');
+            await segment.save();
+            logger_1.default.info(`AI Review completed for segment ${segmentId}`);
+            // 11. Return updated segment
+            return segment;
         }
         catch (error) {
-            logger_1.default.error('开始AI审校失败', {
-                segmentId,
-                userId,
-                error: error.message,
-                stack: error.stack
-            });
-            // 如果是已知错误类型，直接抛出
-            if (error instanceof errors_1.AppError) {
-                throw error;
+            if (segment && segment.status === segment_model_1.SegmentStatus.REVIEWING && !(error instanceof errors_1.ForbiddenError || error instanceof errors_1.ValidationError)) {
+                try {
+                    segment.status = segment_model_1.SegmentStatus.REVIEW_FAILED;
+                    segment.error = `审校处理失败: ${error instanceof Error ? error.message : '未知错误'}`;
+                    await segment.save();
+                }
+                catch (failSaveError) {
+                    logger_1.default.error(`Failed to mark segment ${segmentId} as REVIEW_FAILED after error:`, failSaveError);
+                }
             }
-            // 未知错误统一抛出BadRequestError
-            throw new BadRequestError(`开始AI审校失败: ${error.message}`);
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, 'AI审校');
         }
     }
     /**
-     * 完成段落审校
-     * @param segmentId 段落ID
-     * @param userId 用户ID
-     * @param reviewData 审校数据
-     * @returns 更新后的段落
+     * 完成段落审校 (Reviewer submits their work)
      */
     async completeSegmentReview(segmentId, userId, reviewData) {
+        const methodName = 'completeSegmentReview';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '审校用户');
+        if (!reviewData || !reviewData.finalTranslation) {
+            throw new errors_1.ValidationError('缺少必要的审校数据: finalTranslation');
+        }
+        let segment = null;
         try {
-            if (!segmentId) {
-                throw new BadRequestError('段落ID不能为空');
+            // 1. Fetch Segment
+            segment = await segment_model_1.Segment.findById(segmentId).populate('issues').exec(); // Populate issues
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            // 2. Check Status
+            if (segment.status !== segment_model_1.SegmentStatus.REVIEW_PENDING &&
+                segment.status !== segment_model_1.SegmentStatus.REVIEW_FAILED &&
+                segment.status !== segment_model_1.SegmentStatus.REVIEWING) {
+                throw new errors_1.ValidationError(`段落状态 (${segment.status}) 不允许完成审校`);
             }
-            if (!userId) {
-                throw new BadRequestError('用户ID不能为空');
-            }
-            if (!reviewData) {
-                throw new BadRequestError('审校数据不能为空');
-            }
-            // 1. 查找段落
-            const segment = await segment_model_1.Segment.findById(segmentId).exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
-            }
-            // 2. 检查段落状态
-            if (segment.status !== segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS) {
-                throw new BadRequestError(`段落状态不允许完成审校，当前状态: ${segment.status}`);
-            }
-            // 3. 获取关联文件和项目
+            // 3. Check Permissions (Manager or assigned Reviewer)
             const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
             const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
+            (0, errorHandler_1.validateEntityExists)(project, '关联项目');
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            // Use correct manager field
+            const isManager = project.manager?.equals(userObjectId);
+            const isAssignedReviewer = segment.reviewer?.equals(userObjectId);
+            if (!isManager && !isAssignedReviewer) {
+                throw new errors_1.ForbiddenError(`用户 (${userId}) 不是该段落的指定审校员，也非项目经理，无权完成审校`);
             }
-            // 4. 检查用户权限
-            const userIdStr = userId.toString();
-            const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-            const isManager = project.managerId.toString() === userIdStr;
-            const isReviewer = projectReviewers.includes(userIdStr);
-            // 检查是否是当前段落的审校者
-            const isCurrentReviewer = segment.reviewer && segment.reviewer.toString() === userIdStr;
-            if (!isManager && !isReviewer && !isCurrentReviewer) {
-                throw new ForbiddenError(`用户(${userId})无权完成段落(${segmentId})的审校`);
-            }
-            // 5. 处理审校数据
-            let finalTranslation = '';
-            if (reviewData.finalTranslation) {
-                finalTranslation = reviewData.finalTranslation;
-            }
-            else if (segment.reviewResult?.suggestedTranslation) {
-                finalTranslation = segment.reviewResult.suggestedTranslation;
-            }
-            else if (segment.translation) {
-                finalTranslation = segment.translation;
-            }
-            const acceptedChanges = reviewData.acceptedChanges !== undefined ? reviewData.acceptedChanges : true;
-            const reviewStatus = reviewData.status || segment_model_1.SegmentStatus.REVIEW_COMPLETED;
-            // 验证审校状态
-            if (reviewStatus !== segment_model_1.SegmentStatus.REVIEW_COMPLETED && reviewStatus !== segment_model_1.SegmentStatus.REVIEW_FAILED) {
-                throw new BadRequestError(`无效的审校状态: ${reviewStatus}`);
-            }
-            // 6. 更新段落审校结果
-            if (!segment.reviewResult) {
-                segment.reviewResult = {
-                    // @ts-ignore: 忽略string|undefined不能赋值给string的错误
-                    originalTranslation: segment.translation,
-                    finalTranslation: finalTranslation,
-                    issues: [],
-                    scores: reviewData.scores || [],
-                    reviewDate: new Date(),
-                    reviewerId: new mongoose_1.default.Types.ObjectId(userId),
-                    acceptedChanges: acceptedChanges
-                };
-            }
-            else {
-                segment.reviewResult.finalTranslation = finalTranslation;
-                if (reviewData.scores) {
-                    segment.reviewResult.scores = reviewData.scores;
+            // 4. Process Issue Resolutions
+            if (reviewData.issuesResolution && segment.issues) {
+                for (const res of reviewData.issuesResolution) {
+                    // Explicitly check if res.resolution is defined
+                    if (!res.resolution) {
+                        logger_1.default.warn(`Missing resolution details for issue index ${res.issueIndex}, segment ${segmentId}`);
+                        continue; // Skip this iteration if resolution details are missing
+                    }
+                    if (res.issueIndex >= 0 && res.issueIndex < segment.issues.length) {
+                        const issue = segment.issues[res.issueIndex];
+                        if (issue && (issue.status === segment_model_1.IssueStatus.OPEN || issue.status === segment_model_1.IssueStatus.IN_PROGRESS)) {
+                            issue.resolution = res.resolution; // Safe to assign
+                            issue.resolvedAt = new Date();
+                            issue.resolvedBy = userObjectId;
+                            // Safe to access res.resolution.action now
+                            switch (res.resolution.action) {
+                                case 'accept':
+                                    issue.status = segment_model_1.IssueStatus.RESOLVED;
+                                    break;
+                                case 'modify':
+                                    issue.status = segment_model_1.IssueStatus.RESOLVED;
+                                    break;
+                                case 'reject':
+                                    issue.status = segment_model_1.IssueStatus.REJECTED;
+                                    break;
+                                default:
+                                    issue.status = segment_model_1.IssueStatus.RESOLVED;
+                                    logger_1.default.warn(`Unknown resolution action '${res.resolution.action}' for issue ${res.issueIndex}, segment ${segmentId}. Marking as resolved.`);
+                                    break;
+                            }
+                        }
+                        else {
+                            logger_1.default.warn(`Issue index ${res.issueIndex} invalid or issue already resolved/closed for segment ${segmentId}`);
+                        }
+                    }
+                    else {
+                        logger_1.default.warn(`Invalid issue index ${res.issueIndex} provided for segment ${segmentId}`);
+                    }
                 }
-                segment.reviewResult.reviewDate = new Date();
-                segment.reviewResult.reviewerId = new mongoose_1.default.Types.ObjectId(userId);
-                segment.reviewResult.acceptedChanges = acceptedChanges;
+                segment.markModified('issues');
             }
-            // 7. 添加人工审校历史记录
-            if (!segment.reviewHistory) {
-                segment.reviewHistory = [];
+            else if (reviewData.acceptAllSuggestions && segment.issues) {
+                segment.issues.forEach(issue => {
+                    if (issue.status === segment_model_1.IssueStatus.OPEN) {
+                        issue.status = segment_model_1.IssueStatus.RESOLVED;
+                        issue.resolution = { action: 'accept', comment: 'Accepted AI suggestion' };
+                        issue.resolvedAt = new Date();
+                        issue.resolvedBy = userObjectId;
+                    }
+                });
+                segment.markModified('issues');
             }
-            segment.reviewHistory.push({
-                version: segment.reviewHistory.length + 1,
-                // @ts-ignore: 忽略string|undefined不能赋值给string的错误
-                content: finalTranslation,
-                timestamp: new Date(),
-                modifiedBy: new mongoose_1.default.Types.ObjectId(userId),
-                aiGenerated: false,
-                acceptedByHuman: true
-            });
-            // 8. 更新段落状态和翻译内容
-            segment.status = reviewStatus;
-            // @ts-ignore: 忽略string|undefined不能赋值给string的错误
-            segment.translation = finalTranslation;
-            segment.translatedLength = finalTranslation.length;
-            // 9. 保存更新的段落
-            await segment.save();
-            // 10. 如果审校完成，检查文件完成状态
-            if (reviewStatus === segment_model_1.SegmentStatus.REVIEW_COMPLETED) {
-                await this.checkFileCompletionStatus(file);
-            }
-            // 11. 返回完成的审校结果
-            return {
-                segmentId: segment._id,
-                originalTranslation: segment.reviewResult?.originalTranslation || segment.translation,
-                finalTranslation: segment.translation,
-                issues: segment.issues,
-                scores: segment.reviewResult?.scores || [],
-                status: segment.status,
-                acceptedChanges: segment.reviewResult?.acceptedChanges
+            // 5. Update Segment Data
+            segment.finalText = reviewData.finalTranslation;
+            segment.status = segment_model_1.SegmentStatus.REVIEW_COMPLETED;
+            segment.reviewCompletedAt = new Date();
+            segment.error = undefined;
+            // Update reviewMetadata using existing data + new info
+            const originalTranslation = segment.translation || '';
+            const modificationDegree = this.calculateModificationDegree(originalTranslation, segment.finalText);
+            segment.reviewMetadata = {
+                ...(segment.reviewMetadata || {}), // Keep existing AI info if available
+                acceptedChanges: reviewData.acceptAllSuggestions ?? false, // Reflect user action
+                modificationDegree: modificationDegree, // Recalculate based on final text
+                // Add reviewer ID? reviewCompletedAt is already set
             };
+            segment.markModified('reviewMetadata');
+            // Remove reviewHistory references as it's not in the model
+            // Remove reviewResult references
+            // 6. Save Segment
+            await segment.save();
+            logger_1.default.info(`Segment ${segmentId} review completed by user ${userId}`);
+            // TODO: Optionally trigger file progress update check here
+            // projectService.updateFileProgress(file._id.toString(), userId);
+            // 7. Return Updated Segment
+            return segment;
         }
         catch (error) {
-            logger_1.default.error('完成段落审校失败', {
-                segmentId,
-                userId,
-                error: error.message,
-                stack: error.stack
-            });
-            // 如果是已知错误类型，直接抛出
-            if (error instanceof errors_1.AppError) {
-                throw error;
-            }
-            // 未知错误统一抛出BadRequestError
-            throw new BadRequestError(`完成段落审校失败: ${error.message}`);
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, '完成段落审校');
         }
     }
     /**
-     * 获取段落审校结果
-     * @param segmentId 段落ID
-     * @param userId 用户ID
-     * @returns 段落审校结果
+     * 获取段落审校结果 (Simplified - returns segment data)
      */
     async getSegmentReviewResult(segmentId, userId) {
+        const methodName = 'getSegmentReviewResult';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '用户');
         try {
-            if (!segmentId) {
-                throw new BadRequestError('段落ID不能为空');
-            }
-            if (!userId) {
-                throw new BadRequestError('用户ID不能为空');
-            }
-            // 1. 查找段落
+            // 1. Fetch Segment, populate reviewer
             const segment = await segment_model_1.Segment.findById(segmentId)
-                .populate('issues')
-                .populate('reviewer')
-                .populate('translator')
+                .populate('reviewer', 'id fullName email') // Populate reviewer details
+                .populate('issues') // Populate issues
                 .exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
-            }
-            // 2. 获取关联文件和项目
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            // 2. Get File & Project for permissions
             const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
             const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
+            (0, errorHandler_1.validateEntityExists)(project, '关联项目');
+            // 3. Check Permissions (Manager or assigned Reviewer)
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            // Use correct manager field
+            const isManager = project.manager?.equals(userObjectId);
+            const isReviewer = project.reviewers?.some((r) => r.equals(userObjectId));
+            const isAssignedReviewer = segment.reviewer?._id?.equals(userObjectId);
+            // Allow manager, project reviewer, or the specific segment reviewer to view
+            if (!isManager && !isReviewer && !isAssignedReviewer) {
+                throw new errors_1.ForbiddenError(`用户 (${userId}) 无权查看段落 (${segmentId}) 的审校结果`);
             }
-            // 3. 检查用户权限
-            const userIdStr = userId.toString();
-            const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-            const isManager = project.managerId.toString() === userIdStr;
-            const isReviewer = projectReviewers.includes(userIdStr);
-            const isTranslator = segment.translator && segment.translator.toString() === userIdStr;
-            if (!isManager && !isReviewer && !isTranslator) {
-                throw new ForbiddenError(`用户(${userId})无权查看段落(${segmentId})的审校结果`);
-            }
-            // 4. 如果段落没有审校结果，则返回空结果
-            if (!segment.reviewResult) {
-                return {
-                    segmentId: segment._id,
-                    status: segment.status,
-                    hasReviewResult: false,
-                    message: '段落尚未进行审校'
-                };
-            }
-            // 5. 返回审校结果
-            return {
-                segmentId: segment._id,
-                content: segment.content,
-                originalTranslation: segment.reviewResult.originalTranslation,
-                suggestedTranslation: segment.reviewResult.suggestedTranslation,
-                finalTranslation: segment.reviewResult.finalTranslation || segment.translation,
-                issues: segment.issues,
-                scores: segment.reviewResult.scores,
-                status: segment.status,
-                reviewer: segment.reviewer,
-                translator: segment.translator,
-                reviewDate: segment.reviewResult.reviewDate,
-                aiReviewer: segment.reviewResult.aiReviewer,
-                modificationDegree: segment.reviewResult.modificationDegree,
-                acceptedChanges: segment.reviewResult.acceptedChanges,
-                reviewHistory: segment.reviewHistory,
-                hasReviewResult: true
-            };
+            // 4. Return the full segment data
+            // The segment now contains reviewMetadata, issues, finalText etc.
+            return segment;
         }
         catch (error) {
-            logger_1.default.error('获取段落审校结果失败', {
-                segmentId,
-                userId,
-                error: error.message,
-                stack: error.stack
-            });
-            // 如果是已知错误类型，直接抛出
-            if (error instanceof errors_1.AppError) {
-                throw error;
-            }
-            // 未知错误统一抛出BadRequestError
-            throw new BadRequestError(`获取段落审校结果失败: ${error.message}`);
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, '获取段落审校结果');
         }
     }
     /**
-     * 获取段落上下文
-     * @param segment 当前段落
-     * @param file 所属文件
-     * @returns 上下文段落
+     * 获取段落上下文 (No changes needed here)
      */
     async getContextSegments(segment, file) {
         try {
-            // 获取当前段落前后各两个段落作为上下文
-            const contextSegments = await segment_model_1.Segment.find({
-                fileId: file._id,
-                _id: { $ne: segment._id } // 排除当前段落
-            })
-                .sort({ _id: 1 }) // 按ID排序
-                .limit(5) // 最多取5个段落
-                .exec();
-            // 过滤掉没有内容或翻译的段落
-            return contextSegments
-                .filter(seg => seg.content && (seg.translation || seg.status === segment_model_1.SegmentStatus.TRANSLATED))
+            const currentIndex = segment.index; // Assuming segments have an index
+            const contextSize = 2; // Get 2 segments before and 2 after
+            const [prevSegments, nextSegments] = await Promise.all([
+                segment_model_1.Segment.find({ fileId: file._id, index: { $lt: currentIndex } })
+                    .sort({ index: -1 })
+                    .limit(contextSize)
+                    .exec(),
+                segment_model_1.Segment.find({ fileId: file._id, index: { $gt: currentIndex } })
+                    .sort({ index: 1 })
+                    .limit(contextSize)
+                    .exec()
+            ]);
+            // Combine and format
+            const context = [...prevSegments.reverse(), ...nextSegments];
+            return context
+                .filter(seg => seg.sourceText && (seg.translation || seg.status === segment_model_1.SegmentStatus.TRANSLATED))
                 .map(seg => ({
-                content: seg.content,
+                sourceText: seg.sourceText,
                 translation: seg.translation,
-                position: 'context' // 标识为上下文段落
+                position: seg.index < currentIndex ? 'before' : 'after'
             }));
         }
         catch (error) {
             logger_1.default.error('获取上下文段落失败', { segmentId: segment._id, fileId: file._id, error });
-            return []; // 出错时返回空数组，不影响主流程
+            return [];
         }
     }
     /**
      * 添加段落审校问题
-     * @param segmentId 段落ID
-     * @param userId 用户ID
-     * @param issueData 问题数据
-     * @returns 创建的问题对象
      */
     async addSegmentIssue(segmentId, userId, issueData) {
+        const methodName = 'addSegmentIssue';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '用户');
+        // Validate required fields from IIssue
+        if (!issueData || !issueData.type || !issueData.description || !issueData.severity || !issueData.status) {
+            throw new errors_1.ValidationError('问题数据不完整 (缺少类型, 描述, 严重性或状态)');
+        }
         try {
-            // 1. 查找段落
+            // 1. Find segment
             const segment = await segment_model_1.Segment.findById(segmentId).exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            // 2. Check status (allow adding issues during review phases or even completed)
+            if (![segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS, segment_model_1.SegmentStatus.TRANSLATED, segment_model_1.SegmentStatus.REVIEW_FAILED, segment_model_1.SegmentStatus.REVIEW_PENDING, segment_model_1.SegmentStatus.REVIEW_COMPLETED, segment_model_1.SegmentStatus.COMPLETED].includes(segment.status)) {
+                throw new errors_1.ValidationError(`段落状态 (${segment.status}) 不允许添加问题`);
             }
-            // 2. 检查段落状态
-            if (![segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS, segment_model_1.SegmentStatus.TRANSLATED].includes(segment.status)) {
-                throw new BadRequestError(`段落状态不允许添加问题，当前状态: ${segment.status}`);
-            }
-            // 3. 获取关联文件和项目
-            const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
-            const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
-            }
-            // 4. 检查用户权限
-            const userIdStr = userId.toString();
-            const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-            const isManager = project.managerId.toString() === userIdStr;
-            const isReviewer = projectReviewers.includes(userIdStr);
-            if (!isManager && !isReviewer) {
-                throw new ForbiddenError(`用户(${userId})无权为段落(${segmentId})添加问题`);
-            }
-            // 5. 验证问题数据
-            if (!issueData || !issueData.type || !issueData.description) {
-                throw new BadRequestError('问题数据不完整');
-            }
-            // 6. 创建新问题
-            const issue = new segment_model_1.Issue({
-                type: issueData.type,
-                description: issueData.description,
-                position: issueData.position,
-                suggestion: issueData.suggestion,
-                resolved: false,
-                createdAt: new Date(),
-                createdBy: new mongoose_1.default.Types.ObjectId(userId)
-            });
-            // 7. 保存问题
-            await issue.save();
-            // 8. 更新段落
-            // 此处需要使用Segment.findByIdAndUpdate而不是直接修改segment对象
-            // 这样可以避免类型问题
-            await segment_model_1.Segment.findByIdAndUpdate(segmentId, {
-                $push: { issues: issue._id },
-                $set: {
-                    'reviewResult.issues': segment.reviewResult?.issues
-                        ? [...segment.reviewResult.issues, issue._id]
-                        : [issue._id]
-                }
-            }, { new: true });
-            // 添加这个类型声明，处理issues类型问题
-            // 在MongoDB实际运行时，segment.issues确实是ObjectId的数组而不是IIssue的数组
-            // 这是由于TypeScript接口定义和实际Mongoose Schema的差异
-            // @ts-ignore 忽略类型检查
-            segment.issues.push(issue._id);
-            return issue;
-        }
-        catch (error) {
-            logger_1.default.error('添加段落审校问题失败', { segmentId, userId, error });
-            throw error;
-        }
-    }
-    /**
-     * 解决段落审校问题
-     * @param segmentId 段落ID
-     * @param issueId 问题ID
-     * @param userId 用户ID
-     * @returns 更新后的问题对象
-     */
-    async resolveSegmentIssue(segmentId, issueId, userId) {
-        try {
-            // 1. 查找段落和问题
-            const segment = await segment_model_1.Segment.findById(segmentId).exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
-            }
-            const issue = await segment_model_1.Issue.findById(issueId).exec();
-            if (!issue) {
-                throw new NotFoundError(`问题不存在: ${issueId}`);
-            }
-            // 2. 检查问题是否属于该段落
-            const segmentHasIssue = segment.issues?.some(i => i.toString() === issueId);
-            if (!segmentHasIssue) {
-                throw new BadRequestError(`问题(${issueId})不属于该段落(${segmentId})`);
-            }
-            // 3. 获取关联文件和项目
-            const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
-            const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
-            }
-            // 4. 检查用户权限
-            const userIdStr = userId.toString();
-            const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-            // 项目可能没有翻译者字段，所以只考虑段落的译者
-            const isManager = project.managerId.toString() === userIdStr;
-            const isReviewer = projectReviewers.includes(userIdStr);
-            const isSegmentReviewer = segment.reviewer && segment.reviewer.toString() === userIdStr;
-            const isSegmentTranslator = segment.translator && segment.translator.toString() === userIdStr;
-            const isIssueCreator = issue.createdBy && issue.createdBy.toString() === userIdStr;
-            if (!isManager && !isReviewer && !isSegmentTranslator && !isSegmentReviewer && !isIssueCreator) {
-                throw new ForbiddenError(`用户(${userId})无权解决此问题(${issueId})`);
-            }
-            // 5. 检查问题是否已解决
-            if (issue.resolved) {
-                throw new BadRequestError(`问题(${issueId})已解决`);
-            }
-            // 6. 更新问题状态
-            issue.resolved = true;
-            issue.resolvedAt = new Date();
-            issue.resolvedBy = new mongoose_1.default.Types.ObjectId(userId);
-            // 7. 保存更新后的问题
-            await issue.save();
-            // 8. 检查是否所有问题都已解决
-            const allIssuesResolved = await this.checkAllIssuesResolved(segment);
-            if (allIssuesResolved && segment.status === segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS) {
-                // 可以选择自动完成审校或记录日志提醒用户
-                logger_1.default.info('段落所有问题已解决', { segmentId, issueCount: segment.issues?.length || 0 });
-            }
-            return issue;
-        }
-        catch (error) {
-            logger_1.default.error('解决段落审校问题失败', { segmentId, issueId, userId, error });
-            throw error;
-        }
-    }
-    /**
-     * 确认段落审校结果
-     * @param segmentId 段落ID
-     * @param userId 用户ID
-     * @returns 更新后的段落对象
-     */
-    async finalizeSegmentReview(segmentId, userId) {
-        try {
-            // 1. 查找段落
-            const segment = await segment_model_1.Segment.findById(segmentId).exec();
-            if (!segment) {
-                throw new NotFoundError(`段落不存在: ${segmentId}`);
-            }
-            // 2. 检查段落状态
-            if (segment.status !== segment_model_1.SegmentStatus.REVIEW_COMPLETED) {
-                throw new BadRequestError(`段落不处于审校完成状态，当前状态: ${segment.status}`);
-            }
-            // 3. 获取关联文件和项目
-            const file = await file_model_1.File.findById(segment.fileId).exec();
-            if (!file) {
-                throw new NotFoundError(`关联文件不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}`);
-            }
-            const project = await project_model_1.default.findById(file.projectId).exec();
-            if (!project) {
-                throw new NotFoundError(`关联项目不存在，段落ID: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
-            }
-            // 4. 检查用户权限
-            const userIdStr = userId.toString();
-            const isManager = project.managerId.toString() === userIdStr;
-            const isTranslator = segment.translator && segment.translator.toString() === userIdStr;
-            if (!isManager && !isTranslator) {
-                throw new ForbiddenError(`用户(${userId})无权确认段落(${segmentId})的审校结果`);
-            }
-            // 5. 更新段落状态
-            segment.status = segment_model_1.SegmentStatus.COMPLETED;
-            // 6. 保存更新后的段落
+            // 3. Get project and check permissions (Manager or Reviewer)
+            const file = await file_model_1.File.findById(segment.fileId);
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
+            const projectForPermission = await project_model_1.default.findById(file.projectId);
+            (0, errorHandler_1.validateEntityExists)(projectForPermission, '关联项目');
+            const reviewerIds = projectForPermission.reviewers?.map(id => id.toString());
+            // Use correct manager field
+            const managerIdStr = projectForPermission.manager?.toString();
+            (0, errorHandler_1.validateOwnership)(managerIdStr, userId, '添加段落问题', true, reviewerIds);
+            // 4. Create the new issue object, ensuring defaults/required fields
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            const newIssue = {
+                ...issueData, // Spread provided data
+                status: issueData.status || segment_model_1.IssueStatus.OPEN, // Ensure status
+                createdAt: issueData.createdAt || new Date(), // Ensure createdAt
+                createdBy: issueData.createdBy || userObjectId, // Ensure createdBy
+                // _id will be generated by Mongoose for the subdocument
+            };
+            // 5. Add the issue to the segment's issues array
+            segment.issues = segment.issues || [];
+            segment.issues.push(newIssue);
+            segment.markModified('issues'); // Mark array modified
+            // 6. Save the updated segment
             await segment.save();
-            // 7. 检查文件是否所有段落都已完成
-            await this.checkFileCompletionStatus(file);
+            // 7. Return the added issue object (last element)
+            logger_1.default.info(`Issue added to segment ${segmentId} by user ${userId}`);
+            return segment.issues[segment.issues.length - 1];
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, '添加段落问题');
+        }
+    }
+    /**
+     * 解决段落审校问题 (No changes needed here as it was updated recently)
+     */
+    async resolveSegmentIssue(segmentId, issueIndex, userId, resolution) {
+        // ... recent implementation looks okay ...
+        const methodName = 'resolveSegmentIssue';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '用户');
+        if (issueIndex === undefined || issueIndex < 0) {
+            throw new errors_1.ValidationError('无效的问题索引');
+        }
+        if (!resolution || !resolution.action) {
+            throw new errors_1.ValidationError('缺少问题解决方案或操作');
+        }
+        let segment = null;
+        try {
+            segment = await segment_model_1.Segment.findById(segmentId).exec();
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            if (segment.status !== segment_model_1.SegmentStatus.REVIEW_PENDING &&
+                segment.status !== segment_model_1.SegmentStatus.REVIEW_FAILED &&
+                segment.status !== segment_model_1.SegmentStatus.REVIEWING) {
+                throw new errors_1.ValidationError(`无法在当前状态 (${segment.status}) 下解决问题`);
+            }
+            const file = await file_model_1.File.findById(segment.fileId).exec();
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
+            const project = await project_model_1.default.findById(file.projectId).exec();
+            (0, errorHandler_1.validateEntityExists)(project, '关联项目');
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            const isManager = project.manager?.equals(userObjectId); // Use manager
+            const isAssignedReviewer = segment.reviewer?.equals(userObjectId);
+            if (!isManager && !isAssignedReviewer) {
+                throw new errors_1.ForbiddenError(`用户 (${userId}) 不是该段落的审校员或项目经理，无权解决问题`);
+            }
+            if (!segment.issues || issueIndex >= segment.issues.length) {
+                throw new errors_1.NotFoundError(`索引 ${issueIndex} 处的问题不存在`);
+            }
+            const issue = segment.issues[issueIndex];
+            if (issue.status !== segment_model_1.IssueStatus.OPEN && issue.status !== segment_model_1.IssueStatus.IN_PROGRESS) {
+                logger_1.default.warn(`Issue at index ${issueIndex} for segment ${segmentId} is not open or in progress (status: ${issue.status}). Skipping resolution.`);
+                return segment;
+            }
+            issue.resolution = resolution;
+            issue.resolvedAt = new Date();
+            issue.resolvedBy = userObjectId;
+            switch (resolution.action) {
+                case 'accept':
+                case 'modify':
+                    issue.status = segment_model_1.IssueStatus.RESOLVED;
+                    break;
+                case 'reject':
+                    issue.status = segment_model_1.IssueStatus.REJECTED;
+                    break;
+                default:
+                    issue.status = segment_model_1.IssueStatus.RESOLVED;
+                    break;
+            }
+            segment.markModified('issues');
+            await segment.save();
+            logger_1.default.info(`Issue ${issueIndex} for segment ${segmentId} resolved by user ${userId} with action: ${resolution.action}`);
             return segment;
         }
         catch (error) {
-            logger_1.default.error('确认段落审校结果失败', { segmentId, userId, error });
-            throw error;
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}, issue ${issueIndex}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, '解决审校问题');
         }
     }
     /**
-     * 批量更新段落审校状态
-     * @param segmentIds 段落ID数组
-     * @param userId 用户ID
-     * @param status 目标状态
-     * @returns 更新结果
+     * 确认段落审校结果 (Manager finalizes) (No changes needed here as it was updated recently)
      */
-    async batchUpdateSegmentStatus(segmentIds, userId, status) {
-        const results = {
-            success: 0,
-            failed: 0,
-            errors: [],
-            modifiedCount: 0,
-            matchedCount: segmentIds.length
-        };
+    async finalizeSegmentReview(segmentId, userId) {
+        // ... recent implementation looks okay ...
+        const methodName = 'finalizeSegmentReview';
+        (0, errorHandler_1.validateId)(segmentId, '段落');
+        (0, errorHandler_1.validateId)(userId, '用户');
+        let segment = null;
         try {
-            if (!segmentIds || segmentIds.length === 0) {
-                throw new BadRequestError('段落ID列表不能为空');
+            segment = await segment_model_1.Segment.findById(segmentId).populate('issues').exec();
+            (0, errorHandler_1.validateEntityExists)(segment, '段落');
+            if (segment.status !== segment_model_1.SegmentStatus.REVIEW_COMPLETED) {
+                throw new errors_1.ValidationError(`无法确认状态为 (${segment.status}) 的段落审校`);
             }
-            if (!userId) {
-                throw new BadRequestError('用户ID不能为空');
+            const file = await file_model_1.File.findById(segment.fileId).exec();
+            (0, errorHandler_1.validateEntityExists)(file, '关联文件');
+            const project = await project_model_1.default.findById(file.projectId).exec();
+            (0, errorHandler_1.validateEntityExists)(project, '关联项目');
+            const userObjectId = new mongoose_1.Types.ObjectId(userId);
+            if (!project.manager || !project.manager.equals(userObjectId)) {
+                throw new errors_1.ForbiddenError(`用户 (${userId}) 不是项目经理，无权确认审校`);
             }
-            if (!status) {
-                throw new BadRequestError('目标状态不能为空');
+            const unresolvedIssues = segment.issues?.filter(issue => issue.status === segment_model_1.IssueStatus.OPEN || issue.status === segment_model_1.IssueStatus.IN_PROGRESS);
+            if (unresolvedIssues && unresolvedIssues.length > 0) {
+                logger_1.default.warn(`Finalizing segment ${segmentId} with ${unresolvedIssues.length} unresolved issues.`);
             }
-            // 验证目标状态
-            // 使用显式类型注释
-            const validStatusTransitions = {
-                [segment_model_1.SegmentStatus.PENDING]: [],
-                [segment_model_1.SegmentStatus.TRANSLATED]: [segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS, segment_model_1.SegmentStatus.REVIEW_PENDING],
-                [segment_model_1.SegmentStatus.REVIEWING]: [],
-                [segment_model_1.SegmentStatus.REVIEW_PENDING]: [segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS],
-                [segment_model_1.SegmentStatus.REVIEW_IN_PROGRESS]: [segment_model_1.SegmentStatus.REVIEW_COMPLETED, segment_model_1.SegmentStatus.REVIEW_FAILED],
-                [segment_model_1.SegmentStatus.REVIEW_COMPLETED]: [segment_model_1.SegmentStatus.COMPLETED],
-                [segment_model_1.SegmentStatus.REVIEW_FAILED]: [segment_model_1.SegmentStatus.TRANSLATED],
-                [segment_model_1.SegmentStatus.COMPLETED]: [],
-                [segment_model_1.SegmentStatus.ERROR]: []
-            };
-            // 检查用户权限
-            const userIdStr = userId.toString();
-            // 对每个段落进行处理
-            for (const segmentId of segmentIds) {
-                try {
-                    // 查找段落
-                    const segment = await segment_model_1.Segment.findById(segmentId).exec();
-                    if (!segment) {
-                        throw new NotFoundError(`段落不存在: ${segmentId}`);
-                    }
-                    // 获取关联文件
-                    const file = await file_model_1.File.findById(segment.fileId).exec();
-                    if (!file) {
-                        throw new NotFoundError(`关联文件不存在: ${segmentId}, 文件ID: ${segment.fileId}`);
-                    }
-                    // 获取关联项目
-                    const project = await project_model_1.default.findById(file.projectId).exec();
-                    if (!project) {
-                        throw new NotFoundError(`关联项目不存在: ${segmentId}, 文件ID: ${segment.fileId}, 项目ID: ${file.projectId}`);
-                    }
-                    // 检查用户权限
-                    const projectReviewers = project.reviewers?.map(r => r.toString()) || [];
-                    const isManager = project.managerId.toString() === userIdStr;
-                    const isReviewer = projectReviewers.includes(userIdStr);
-                    const isSegmentReviewer = segment.reviewer && segment.reviewer.toString() === userIdStr;
-                    if (!isManager && !isReviewer && !isSegmentReviewer) {
-                        throw new ForbiddenError(`用户(${userId})无权更新段落状态: ${segmentId}`);
-                    }
-                    // 检查状态转换是否有效
-                    const currentStatus = segment.status;
-                    const validNextStatuses = validStatusTransitions[currentStatus] || [];
-                    if (!validNextStatuses.includes(status)) {
-                        throw new BadRequestError(`无效的状态转换: ${currentStatus} -> ${status}`);
-                    }
-                    // 更新段落状态
-                    segment.status = status;
-                    // 添加历史记录
-                    if (status === segment_model_1.SegmentStatus.REVIEW_COMPLETED || status === segment_model_1.SegmentStatus.COMPLETED) {
-                        if (!segment.reviewHistory) {
-                            segment.reviewHistory = [];
-                        }
-                        segment.reviewHistory.push({
-                            version: segment.reviewHistory.length + 1,
-                            // @ts-ignore: 忽略string|undefined不能赋值给string的错误
-                            content: segment.translation || '',
-                            timestamp: new Date(),
-                            modifiedBy: new mongoose_1.default.Types.ObjectId(userId),
-                            aiGenerated: false,
-                            acceptedByHuman: true
-                        });
-                    }
-                    // 保存更新后的段落
-                    try {
-                        await segment.save();
-                        results.success++;
-                        results.modifiedCount++;
-                    }
-                    catch (saveError) {
-                        results.failed++;
-                        results.errors.push({
-                            segmentId,
-                            error: `保存失败: ${saveError.message}`
-                        });
-                        logger_1.default.error('批量更新保存段落失败', { segmentId, status, error: saveError.message });
-                    }
-                }
-                catch (error) {
-                    results.failed++;
-                    results.errors.push({
-                        segmentId,
-                        error: error instanceof Error ? error.message : String(error)
-                    });
-                    if (error instanceof errors_1.AppError) {
-                        logger_1.default.warn('批量更新段落状态单个错误', { segmentId, errorType: error.name, errorMessage: error.message });
-                    }
-                    else {
-                        logger_1.default.error('批量更新段落状态单个未知错误', { segmentId, error: error.message });
-                    }
-                }
-            }
-            // 返回更新结果
-            return results;
+            segment.status = segment_model_1.SegmentStatus.COMPLETED;
+            segment.error = undefined;
+            await segment.save();
+            logger_1.default.info(`Segment ${segmentId} review finalized by manager ${userId}`);
+            // Use file._id.toString() for the check
+            this.checkFileCompletionStatus(file._id.toString()).catch(err => {
+                logger_1.default.error(`Failed to check/update file completion status after finalizing segment ${segmentId}:`, err);
+            });
+            return segment;
         }
         catch (error) {
-            logger_1.default.error('批量更新段落状态过程中发生未知错误', { segmentIds: segmentIds.length, error: error.message });
-            // 依然返回当前的结果，即使出现错误
-            return results;
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
+            throw (0, errorHandler_1.handleServiceError)(error, this.serviceName, methodName, '确认段落审校');
         }
     }
     /**
-     * 检查段落的所有问题是否都已解决
-     * @param segment 段落对象
-     * @returns 是否所有问题都已解决
+     * 检查文件完成状态并更新 (No changes needed here as it was updated recently)
      */
-    async checkAllIssuesResolved(segment) {
+    async checkFileCompletionStatus(fileId) {
+        // ... recent implementation looks okay ...
         try {
-            if (!segment.issues || segment.issues.length === 0) {
-                return true;
-            }
-            const issueIds = segment.issues.map(id => id.toString());
-            const unresolvedCount = await segment_model_1.Issue.countDocuments({
-                _id: { $in: issueIds },
-                resolved: false
-            }).exec();
-            return unresolvedCount === 0;
-        }
-        catch (error) {
-            logger_1.default.error('检查段落问题状态失败', { segmentId: segment._id, error });
-            return false;
-        }
-    }
-    /**
-     * 检查文件完成状态并更新
-     * @param file 文件对象
-     */
-    async checkFileCompletionStatus(file) {
-        try {
-            // 检查文件下所有段落的状态
-            const totalSegments = await segment_model_1.Segment.countDocuments({ fileId: file._id }).exec();
+            const file = await file_model_1.File.findById(fileId);
+            if (!file)
+                return;
+            const totalSegments = await segment_model_1.Segment.countDocuments({ fileId: file._id });
             const completedSegments = await segment_model_1.Segment.countDocuments({
                 fileId: file._id,
-                status: { $in: [segment_model_1.SegmentStatus.REVIEW_COMPLETED, segment_model_1.SegmentStatus.COMPLETED] }
-            }).exec();
-            // 如果所有段落都已完成或审校完成，更新文件状态
+                status: segment_model_1.SegmentStatus.COMPLETED
+            });
             if (totalSegments > 0 && completedSegments === totalSegments) {
-                file.status = file_model_1.FileStatus.COMPLETED;
-                try {
+                if (file.status !== file_model_1.FileStatus.COMPLETED) {
+                    file.status = file_model_1.FileStatus.COMPLETED;
+                    file.processingCompletedAt = new Date();
                     await file.save();
-                    logger_1.default.info('文件所有段落审校完成', { fileId: file._id, totalSegments, completedSegments });
+                    logger_1.default.info(`File ${fileId} marked as COMPLETED as all segments are finalized.`);
                 }
-                catch (saveError) {
-                    logger_1.default.error('更新文件状态失败', { fileId: file._id, error: saveError.message });
-                    // 不抛出异常，不影响主流程
+            }
+            else {
+                if (file.status === file_model_1.FileStatus.COMPLETED) {
+                    const reviewCompletedCount = await segment_model_1.Segment.countDocuments({ fileId: file._id, status: segment_model_1.SegmentStatus.REVIEW_COMPLETED });
+                    const reviewPendingCount = await segment_model_1.Segment.countDocuments({ fileId: file._id, status: segment_model_1.SegmentStatus.REVIEW_PENDING });
+                    const reviewingCount = await segment_model_1.Segment.countDocuments({ fileId: file._id, status: segment_model_1.SegmentStatus.REVIEWING });
+                    const translatedCount = await segment_model_1.Segment.countDocuments({ fileId: file._id, status: segment_model_1.SegmentStatus.TRANSLATED });
+                    let newStatus = file_model_1.FileStatus.PENDING;
+                    if (reviewCompletedCount > 0 || reviewPendingCount > 0 || reviewingCount > 0) {
+                        newStatus = file_model_1.FileStatus.REVIEWING;
+                    }
+                    else if (translatedCount > 0) {
+                        newStatus = file_model_1.FileStatus.TRANSLATED;
+                    }
+                    file.status = newStatus;
+                    await file.save();
+                    logger_1.default.warn(`File ${fileId} status reverted from COMPLETED to ${newStatus} as not all segments are finalized.`);
                 }
             }
         }
         catch (error) {
-            logger_1.default.error('检查文件完成状态失败', { fileId: file._id, error });
-            // 不抛出异常，因为这是辅助功能，不应影响主流程
+            logger_1.default.error(`Error checking file completion status for ${fileId}:`, error);
         }
+    }
+    // ===== Helper/Utility Methods =====
+    /** Recalculate modification degree between two strings (simple implementation) */
+    calculateModificationDegree(original, modified) {
+        if (!original || !modified)
+            return 0;
+        if (original === modified)
+            return 0;
+        // Simple Levenshtein distance based calculation
+        // For more accuracy, consider a library like 'fast-levenshtein'
+        const distance = this.levenshteinDistance(original, modified);
+        const maxLength = Math.max(original.length, modified.length);
+        if (maxLength === 0)
+            return 0;
+        return Math.min(1, distance / maxLength); // Cap at 1
+    }
+    // Basic Levenshtein distance implementation
+    levenshteinDistance(a, b) {
+        const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+        for (let i = 0; i <= a.length; i += 1)
+            matrix[0][i] = i;
+        for (let j = 0; j <= b.length; j += 1)
+            matrix[j][0] = j;
+        for (let j = 1; j <= b.length; j += 1) {
+            for (let i = 1; i <= a.length; i += 1) {
+                const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+                matrix[j][i] = Math.min(matrix[j][i - 1] + 1, // deletion
+                matrix[j - 1][i] + 1, // insertion
+                matrix[j - 1][i - 1] + indicator);
+            }
+        }
+        return matrix[b.length][a.length];
+    }
+    // ===== Project Reviewer Management =====
+    async getProjectReviewers(projectId) {
+        const project = await project_model_1.default.findById(projectId);
+        if (!project) {
+            throw new errors_1.NotFoundError('Project not found');
+        }
+        return project.reviewers || [];
+    }
+    async addReviewer(projectId, reviewerId) {
+        const project = await project_model_1.default.findById(projectId);
+        if (!project) {
+            throw new errors_1.NotFoundError('Project not found');
+        }
+        if (!project.reviewers) {
+            project.reviewers = [];
+        }
+        if (project.reviewers.some((r) => r.equals(reviewerId))) {
+            throw new errors_1.ConflictError('Reviewer already assigned to project');
+        }
+        project.reviewers.push(reviewerId);
+        await project.save();
+        logger_1.default.info(`Reviewer ${reviewerId} added to project ${projectId}`);
+    }
+    async removeReviewer(projectId, reviewerId) {
+        const project = await project_model_1.default.findById(projectId);
+        if (!project) {
+            throw new errors_1.NotFoundError('Project not found');
+        }
+        if (!project.reviewers) {
+            throw new errors_1.NotFoundError('No reviewers assigned to project');
+        }
+        const initialLength = project.reviewers.length;
+        project.reviewers = project.reviewers.filter((r) => !r.equals(reviewerId));
+        if (project.reviewers.length === initialLength) {
+            throw new errors_1.NotFoundError('Reviewer not found in project');
+        }
+        await project.save();
+        logger_1.default.info(`Reviewer ${reviewerId} removed from project ${projectId}`);
     }
 }
 exports.ReviewService = ReviewService;
 // 创建并导出默认实例
-const reviewService = new ReviewService();
-exports.default = reviewService;
+exports.reviewService = new ReviewService();

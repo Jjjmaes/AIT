@@ -2,7 +2,30 @@ import { IAIServiceAdapter, AIServiceConfig, AIServiceResponse, AIModelInfo, AIS
 import { TranslationOptions } from '../../../types/translation.types';
 import { AIProvider } from '../../../types/ai-service.types';
 
-export abstract class BaseAIServiceAdapter implements IAIServiceAdapter {
+// Force export AIModelInfo (even if imported)
+export type { AIModelInfo };
+
+// Response structure for translation
+export interface TranslationResponse {
+  translatedText: string;
+  tokenCount?: { input: number; output: number; total: number };
+  processingTime?: number;
+  modelInfo: { provider: string; model: string };
+  error?: string;
+}
+
+// Base interface for translation adapters
+export interface ITranslationServiceAdapter {
+  translateText(
+    sourceText: string, 
+    promptData: any, // Type for processed prompt data needed
+    options?: TranslationOptions & { model?: string; temperature?: number } // Allow specific model/temp override
+  ): Promise<TranslationResponse>;
+  
+  getAvailableModels?(): Promise<AIModelInfo[]>;
+}
+
+export abstract class BaseAIServiceAdapter implements ITranslationServiceAdapter {
   protected config: AIServiceConfig;
   protected provider: AIProvider;
 
@@ -11,11 +34,9 @@ export abstract class BaseAIServiceAdapter implements IAIServiceAdapter {
     this.provider = config.provider;
   }
 
-  abstract translateText(sourceText: string, options: TranslationOptions): Promise<AIServiceResponse>;
+  abstract translateText(sourceText: string, promptData: any, options?: TranslationOptions & { model?: string; temperature?: number }): Promise<TranslationResponse>;
   abstract validateApiKey(): Promise<boolean>;
   abstract getAvailableModels(): Promise<AIModelInfo[]>;
-  abstract getModelInfo(modelId: string): Promise<AIModelInfo>;
-  abstract getPricing(modelId: string): Promise<{ input: number; output: number }>;
 
   protected createError(code: string, message: string, details?: any): Error {
     const error = new Error(message);

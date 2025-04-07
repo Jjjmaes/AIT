@@ -4,90 +4,124 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FileController = void 0;
-const file_service_1 = __importDefault(require("../services/file.service"));
-const file_model_1 = require("../models/file.model");
-const segment_model_1 = require("../models/segment.model");
+const fileManagement_service_1 = require("../services/fileManagement.service");
+const errorHandler_1 = require("../utils/errorHandler");
 const errors_1 = require("../utils/errors");
+const logger_1 = __importDefault(require("../utils/logger"));
+const fileUtils_1 = require("../utils/fileUtils"); // Assuming validateFileType exists here
+const promises_1 = __importDefault(require("fs/promises")); // Import fs for cleanup
 class FileController {
     constructor() {
-        /**
-         * 处理文件分段
-         */
-        this.processFile = async (req, res, next) => {
-            try {
-                const { fileId } = req.params;
-                const options = req.body;
-                await file_service_1.default.processFile(fileId, options);
-                res.json({ message: '文件处理成功' });
+        this.serviceName = 'FileController'; // Add service name
+    }
+    async uploadFile(req, res, next) {
+        const methodName = 'uploadFile';
+        const { projectId } = req.params;
+        const userId = req.user?.id;
+        const { sourceLanguage, targetLanguage } = req.body;
+        try {
+            (0, errorHandler_1.validateId)(projectId, '项目');
+            if (!userId) {
+                // Use specific error from errors utility
+                return next(new errors_1.AppError('认证失败，无法获取用户ID', 401));
             }
-            catch (error) {
-                next(error);
+            if (!req.file) {
+                return next(new errors_1.AppError('未找到上传的文件', 400));
             }
-        };
-        /**
-         * 获取文件分段列表
-         */
-        this.getFileSegments = async (req, res, next) => {
-            try {
-                const { fileId } = req.params;
-                const { page = 1, limit = 50, status } = req.query;
-                const file = await file_model_1.File.findById(fileId);
-                if (!file) {
-                    throw new errors_1.NotFoundError('文件不存在');
-                }
-                // 构建查询条件
-                const query = { fileId };
-                if (status) {
-                    query.status = status;
-                }
-                // 获取分页数据
-                const skip = (Number(page) - 1) * Number(limit);
-                const segments = await segment_model_1.Segment.find(query)
-                    .sort({ order: 1 })
-                    .skip(skip)
-                    .limit(Number(limit));
-                // 获取总数
-                const total = await segment_model_1.Segment.countDocuments(query);
-                res.json({
-                    segments,
-                    total,
-                    page: Number(page),
-                    limit: Number(limit),
-                    status: file.status
-                });
+            if (!sourceLanguage || !targetLanguage) {
+                return next(new errors_1.ValidationError('请求体中必须提供源语言 (sourceLanguage) 和目标语言 (targetLanguage)'));
             }
-            catch (error) {
-                next(error);
+            logger_1.default.info(`User ${userId} uploading file ${req.file.originalname} to project ${projectId}`);
+            // Validate and determine FileType
+            const fileType = (0, fileUtils_1.validateFileType)(req.file.originalname, req.file.mimetype);
+            if (!fileType) {
+                // Use specific error
+                throw new errors_1.ValidationError(`不支持的文件类型: ${req.file.originalname} (MIME: ${req.file.mimetype})`);
             }
-        };
-        /**
-         * 更新文件进度
-         */
-        this.updateFileProgress = async (req, res, next) => {
-            try {
-                const { fileId } = req.params;
-                const { status, error } = req.body;
-                const file = await file_model_1.File.findById(fileId);
-                if (!file) {
-                    throw new errors_1.NotFoundError('文件不存在');
-                }
-                if (status) {
-                    if (!Object.values(file_model_1.FileStatus).includes(status)) {
-                        throw new errors_1.ValidationError('无效的文件状态');
-                    }
-                    file.status = status;
-                }
-                if (error) {
-                    file.error = error;
-                }
-                await file.save();
-                res.json({ message: '文件进度更新成功' });
+            // Prepare file info for the service
+            const fileInfo = {
+                path: req.file.path,
+                originalName: req.file.originalname,
+                mimeType: req.file.mimetype,
+                size: req.file.size,
+                fileType: fileType,
+                destination: req.file.destination,
+                filename: req.file.filename
+            };
+            // Call the service to process the file
+            const fileRecord = await fileManagement_service_1.fileManagementService.processUploadedFile(projectId, userId, fileInfo, sourceLanguage, targetLanguage);
+            res.status(201).json({
+                success: true,
+                message: '文件上传成功并开始处理',
+                data: fileRecord.toObject() // Return plain object
+            });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            // Ensure cleanup happens on error
+            if (req.file?.path) {
+                // Use fs.promises.unlink
+                promises_1.default.unlink(req.file.path).catch(unlinkErr => logger_1.default.error(`Failed to delete uploaded file ${req.file?.path} after error:`, unlinkErr));
             }
-            catch (error) {
-                next(error);
+            next(error);
+        }
+    }
+    async getFiles(req, res, next) {
+        const methodName = 'getFiles';
+        const { projectId } = req.params;
+        const userId = req.user?.id;
+        try {
+            (0, errorHandler_1.validateId)(projectId, '项目');
+            if (!userId)
+                return next(new errors_1.AppError('认证失败', 401));
+            const files = await fileManagement_service_1.fileManagementService.getFilesByProjectId(projectId, userId);
+            // Return plain objects
+            res.status(200).json({ success: true, data: files.map(f => f.toObject()) });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error);
+        }
+    }
+    async getFile(req, res, next) {
+        const methodName = 'getFile';
+        const { projectId, fileId } = req.params;
+        const userId = req.user?.id;
+        try {
+            (0, errorHandler_1.validateId)(projectId, '项目');
+            (0, errorHandler_1.validateId)(fileId, '文件');
+            if (!userId)
+                return next(new errors_1.AppError('认证失败', 401));
+            const file = await fileManagement_service_1.fileManagementService.getFileById(fileId, projectId, userId);
+            if (!file) {
+                return next(new errors_1.NotFoundError('文件未找到'));
             }
-        };
+            // Return plain object
+            res.status(200).json({ success: true, data: file.toObject() });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error);
+        }
+    }
+    async deleteFile(req, res, next) {
+        const methodName = 'deleteFile';
+        const { projectId, fileId } = req.params;
+        const userId = req.user?.id;
+        try {
+            (0, errorHandler_1.validateId)(projectId, '项目');
+            (0, errorHandler_1.validateId)(fileId, '文件');
+            if (!userId)
+                return next(new errors_1.AppError('认证失败', 401));
+            await fileManagement_service_1.fileManagementService.deleteFile(fileId, projectId, userId);
+            res.status(200).json({ success: true, message: '文件已成功删除' });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error);
+        }
     }
 }
 exports.FileController = FileController;
-exports.default = new FileController();
+// Export class directly, instantiation happens in routes file
+// export default new FileController(); 

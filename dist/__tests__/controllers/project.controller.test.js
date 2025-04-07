@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const project_controller_1 = __importDefault(require("../../controllers/project.controller"));
 const project_service_1 = require("../../services/project.service");
+const project_model_1 = require("../../models/project.model");
 const project_types_1 = require("../../types/project.types");
 const errors_1 = require("../../utils/errors");
 const user_1 = require("../../types/user");
@@ -91,7 +92,7 @@ describe('ProjectController', () => {
     describe('getProjects', () => {
         it('should get projects successfully', async () => {
             mockReq.query = {
-                status: project_types_1.ProjectStatus.IN_PROGRESS,
+                status: project_model_1.ProjectStatus.IN_PROGRESS,
                 priority: project_types_1.ProjectPriority.HIGH,
                 search: 'test',
                 page: '1',
@@ -106,7 +107,7 @@ describe('ProjectController', () => {
             project_service_1.projectService.getUserProjects.mockResolvedValue(mockResult);
             await controller.getProjects(mockReq, mockRes, mockNext);
             expect(project_service_1.projectService.getUserProjects).toHaveBeenCalledWith(mockUser.id, {
-                status: project_types_1.ProjectStatus.IN_PROGRESS,
+                status: project_model_1.ProjectStatus.IN_PROGRESS,
                 priority: project_types_1.ProjectPriority.HIGH,
                 search: 'test',
                 page: 1,
@@ -278,25 +279,22 @@ describe('ProjectController', () => {
                 filePath: '/uploads/test-123.txt',
                 sourceLanguage: 'en',
                 targetLanguage: 'zh',
-                category: 'test',
-                tags: ['test']
+                fileType: 'test'
             });
             expect(mockRes.status).toHaveBeenCalledWith(201);
             expect(mockRes.json).toHaveBeenCalledWith({
                 success: true,
                 data: {
-                    file: {
-                        _id: 'file123',
-                        originalName: 'test.txt',
-                        fileName: 'test-123.txt'
-                    }
+                    _id: 'file123',
+                    originalName: 'test.txt',
+                    fileName: 'test-123.txt'
                 }
             });
         });
         it('should return 400 if no file is uploaded', async () => {
             await controller.uploadFile(mockReqWithoutFile, mockRes, mockNext);
             expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({
-                message: '未提供文件'
+                message: '请选择要上传的文件'
             }));
         });
     });

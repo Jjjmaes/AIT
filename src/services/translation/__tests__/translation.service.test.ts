@@ -556,43 +556,6 @@ describe('TranslationService', () => {
     });
   });
 
-  describe('getModelInfo', () => {
-    it('should get model info successfully', async () => {
-      const modelInfo = await translationService.getModelInfo('gpt-3.5-turbo');
-      expect(modelInfo.name).toBe('GPT-3.5 Turbo');
-      expect(modelInfo.maxTokens).toBe(4096);
-      expect(modelInfo.capabilities).toContain('translation');
-    });
-
-    it('should use cache for model info', async () => {
-      // 第一次获取
-      const info1 = await translationService.getModelInfo('gpt-3.5-turbo');
-      
-      // 第二次获取应该使用缓存
-      const info2 = await translationService.getModelInfo('gpt-3.5-turbo');
-
-      expect(info1).toEqual(info2);
-    });
-  });
-
-  describe('getPricing', () => {
-    it('should get pricing info successfully', async () => {
-      const pricing = await translationService.getPricing('gpt-3.5-turbo');
-      expect(pricing.input).toBe(0.0015);
-      expect(pricing.output).toBe(0.002);
-    });
-
-    it('should use cache for pricing info', async () => {
-      // 第一次获取
-      const pricing1 = await translationService.getPricing('gpt-3.5-turbo');
-      
-      // 第二次获取应该使用缓存
-      const pricing2 = await translationService.getPricing('gpt-3.5-turbo');
-
-      expect(pricing1).toEqual(pricing2);
-    });
-  });
-
   describe('error handling', () => {
     it('should handle translation errors gracefully', async () => {
       // 直接测试性能监控方法，而不是测试服务方法

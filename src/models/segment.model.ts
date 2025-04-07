@@ -1,9 +1,10 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 import { IFile } from './file.model';
 import { IUser } from './user.model';
 
 export enum SegmentStatus {
   PENDING = 'pending',
+  TRANSLATING = 'translating',
   TRANSLATED = 'translated',
   REVIEWING = 'reviewing',
   REVIEW_PENDING = 'review_pending', // 等待审校
@@ -21,7 +22,24 @@ export enum IssueType {
   ACCURACY = 'accuracy',
   FORMATTING = 'formatting',
   CONSISTENCY = 'consistency',
+  OMISSION = 'omission',
+  ADDITION = 'addition',
   OTHER = 'other'
+}
+
+export enum IssueSeverity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum IssueStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  RESOLVED = 'resolved',
+  REJECTED = 'rejected',
+  DEFERRED = 'deferred'
 }
 
 export enum ReviewScoreType {
@@ -34,18 +52,18 @@ export enum ReviewScoreType {
 }
 
 export interface IIssue {
+  _id?: Types.ObjectId; // Optional _id for subdocuments
   type: IssueType;
+  severity: IssueSeverity;
   description: string;
-  position?: {
-    start: number;
-    end: number;
-  };
+  position?: { start: number; end: number; };
   suggestion?: string;
-  resolved: boolean;
+  status: IssueStatus;
+  resolution?: { action: 'accept' | 'modify' | 'reject'; modifiedText?: string; comment?: string; };
   createdAt?: Date;
   resolvedAt?: Date;
-  createdBy?: mongoose.Types.ObjectId;
-  resolvedBy?: mongoose.Types.ObjectId;
+  createdBy?: Types.ObjectId;
+  resolvedBy?: Types.ObjectId;
 }
 
 // 审校变更历史
@@ -81,62 +99,56 @@ export interface IReviewResult {
 
 export interface ISegment extends Document {
   fileId: mongoose.Types.ObjectId;
-  content: string;
+  index: number;
+  sourceText: string;
+  sourceLength: number;
   translation?: string;
-  originalLength: number;
-  translatedLength: number;
+  translatedLength?: number;
+  review?: string;
+  finalText?: string;
   status: SegmentStatus;
-  translator?: mongoose.Types.ObjectId;
+  issues?: IIssue[];
   reviewer?: mongoose.Types.ObjectId;
-  metadata?: {
-    path?: string;
-    [key: string]: any;
+  translationMetadata?: {
+    aiModel?: string;
+    promptTemplateId?: mongoose.Types.ObjectId;
+    tokenCount?: number;
+    processingTime?: number;
   };
+  reviewMetadata?: {
+    aiModel?: string;
+    promptTemplateId?: mongoose.Types.ObjectId;
+    tokenCount?: number;
+    processingTime?: number;
+    acceptedChanges?: boolean;
+    modificationDegree?: number;
+  };
+  metadata?: Record<string, any>;
+  translationCompletedAt?: Date;
+  reviewCompletedAt?: Date;
   error?: string;
-  issues?: IIssue[]; // 审校问题列表
-  reviewResult?: IReviewResult; // 审校结果
-  reviewHistory?: IReviewChange[]; // 审校历史
   createdAt: Date;
   updatedAt: Date;
 }
 
+// Define IssueSchema for embedding
 const IssueSchema = new Schema<IIssue>({
-  type: { 
-    type: String, 
-    enum: Object.values(IssueType),
-    required: true 
+  type: { type: String, enum: Object.values(IssueType), required: true },
+  severity: { type: String, enum: Object.values(IssueSeverity), required: true },
+  description: { type: String, required: true },
+  position: { start: { type: Number }, end: { type: Number } },
+  suggestion: { type: String },
+  status: { type: String, enum: Object.values(IssueStatus), required: true, default: IssueStatus.OPEN },
+  resolution: {
+      action: { type: String, enum: ['accept', 'modify', 'reject'] },
+      modifiedText: String,
+      comment: String
   },
-  description: { 
-    type: String, 
-    required: true 
-  },
-  position: {
-    start: { type: Number },
-    end: { type: Number }
-  },
-  suggestion: { 
-    type: String 
-  },
-  resolved: { 
-    type: Boolean, 
-    default: false 
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
+  createdAt: { type: Date, default: Date.now },
   resolvedAt: Date,
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  resolvedBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  }
-}, { 
-  _id: true 
-});
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, { _id: true }); // Enable _id for subdocuments if needed
 
 const ReviewScoreSchema = new Schema<IReviewScore>({
   type: {
@@ -220,54 +232,86 @@ const segmentSchema = new Schema<ISegment>(
     fileId: {
       type: Schema.Types.ObjectId,
       ref: 'File',
-      required: true
+      required: true,
+      index: true
     },
-    content: {
+    index: { type: Number, required: true },
+    sourceText: {
       type: String,
       required: true
     },
-    translation: String,
-    originalLength: {
+    sourceLength: {
       type: Number,
       required: true
     },
+    translation: {
+      type: String
+    },
     translatedLength: {
-      type: Number,
-      default: 0
+      type: Number
+    },
+    review: {
+      type: String
+    },
+    finalText: {
+      type: String
     },
     status: {
       type: String,
       enum: Object.values(SegmentStatus),
-      default: SegmentStatus.PENDING
+      default: SegmentStatus.PENDING,
+      index: true
     },
-    translator: {
-      type: Schema.Types.ObjectId,
-      ref: 'User'
-    },
+    issues: [IssueSchema],
     reviewer: {
       type: Schema.Types.ObjectId,
       ref: 'User'
     },
+    translationMetadata: {
+      aiModel: String,
+      promptTemplateId: {
+        type: Schema.Types.ObjectId,
+        ref: 'PromptTemplate'
+      },
+      tokenCount: Number,
+      processingTime: Number
+    },
+    reviewMetadata: {
+      aiModel: String,
+      promptTemplateId: {
+        type: Schema.Types.ObjectId,
+        ref: 'PromptTemplate'
+      },
+      tokenCount: Number,
+      processingTime: Number,
+      acceptedChanges: Boolean,
+      modificationDegree: Number
+    },
     metadata: {
       type: Schema.Types.Mixed
     },
-    error: String,
-    issues: [IssueSchema],
-    reviewResult: ReviewResultSchema,
-    reviewHistory: [ReviewChangeSchema]
+    translationCompletedAt: {
+      type: Date
+    },
+    reviewCompletedAt: {
+      type: Date
+    },
+    error: {
+      type: String
+    }
   },
   {
     timestamps: true
   }
 );
 
-// 创建索引
+// Compound index for efficient querying within a file
+segmentSchema.index({ fileId: 1, index: 1 });
+
+// Existing indexes
 segmentSchema.index({ fileId: 1 });
 segmentSchema.index({ status: 1 });
-segmentSchema.index({ translator: 1 });
 segmentSchema.index({ reviewer: 1 });
 
 export const Segment = mongoose.model<ISegment>('Segment', segmentSchema);
-
-// 导出问题模型，用于独立查询
 export const Issue = mongoose.model<IIssue>('Issue', IssueSchema);

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
+import { TranslationStatus } from '../types/translation.types';
 
 export enum FileStatus {
   PENDING = 'pending',
@@ -14,6 +15,10 @@ export enum FileType {
   JSON = 'json',
   MD = 'md',
   DOCX = 'docx',
+  HTML = 'html',
+  XML = 'xml',
+  CSV = 'csv',
+  XLSX = 'xlsx',
   MEMOQ_XLIFF = 'mqxliff',
   XLIFF = 'xliff'
 }
@@ -45,9 +50,54 @@ export interface IFile extends Document {
   errorDetails?: string;
   processingStartedAt?: Date;
   processingCompletedAt?: Date;
-  segmentCount?: number;
+  segmentCount: number;
   translatedCount: number;
   reviewedCount: number;
+  processedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IFileSegment {
+  id: string;
+  sourceText: string;
+  translatedText: string;
+  status: TranslationStatus;
+  metadata: {
+    processingTime?: number;
+    tokens?: number;
+    cost?: number;
+    reviewStatus?: 'approved' | 'rejected';
+  };
+  reviewedBy?: Types.ObjectId;
+  reviewedAt?: Date;
+}
+
+export interface IProjectFile {
+  _id: Types.ObjectId;
+  fileName: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+  type: FileType;
+  status: FileStatus;
+  uploadedBy: Types.ObjectId;
+  storageUrl: string;
+  path: string;
+  metadata: {
+    processingTime?: number;
+    tokens?: number;
+    cost?: number;
+  };
+  progress: number;
+  error?: string;
+  errorDetails?: any;
+  processingStartedAt?: Date;
+  processingCompletedAt?: Date;
+  segmentCount: number;
+  translatedCount: number;
+  reviewedCount: number;
+  segments: IFileSegment[];
   processedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -121,7 +171,11 @@ const fileSchema = new Schema<IFile>(
     errorDetails: String,
     processingStartedAt: Date,
     processingCompletedAt: Date,
-    segmentCount: Number,
+    segmentCount: {
+      type: Number,
+      required: true,
+      default: 0
+    },
     translatedCount: {
       type: Number,
       default: 0

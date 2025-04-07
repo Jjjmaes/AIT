@@ -5,90 +5,105 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const user_model_1 = __importDefault(require("../models/user.model"));
+exports.authController = void 0;
+const user_service_1 = require("../services/user.service");
 const errors_1 = require("../utils/errors");
-// 注册新用户
-const register = async (req, res, next) => {
-    try {
-        const { username, email, password } = req.body;
-        // 检查用户名和邮箱是否已被注册
-        const existingUser = await user_model_1.default.findOne({ $or: [{ username }, { email }] });
-        if (existingUser) {
-            return next(new errors_1.ConflictError('用户名或邮箱已被注册'));
+const logger_1 = __importDefault(require("../utils/logger"));
+// Define AuthRequest locally if not imported
+/*
+interface AuthRequest extends Request {
+  user?: { id: string; [key: string]: any };
+}
+*/
+class AuthController {
+    constructor() {
+        this.serviceName = 'AuthController';
+        // TODO: Add methods for password reset, email verification etc.
+    }
+    async register(req, res, next) {
+        const methodName = 'register';
+        // Optional: Input validation using express-validator or similar
+        // const errors = validationResult(req);
+        // if (!errors.isEmpty()) {
+        //   return next(new ValidationError('输入验证失败', errors.array()));
+        // }
+        try {
+            const userData = req.body;
+            logger_1.default.info(`${this.serviceName}.${methodName} - Attempting registration for: ${userData.email}`);
+            const newUser = await user_service_1.userService.registerUser(userData);
+            // Exclude password from response
+            const { password, ...userResponse } = newUser.toObject();
+            res.status(201).json({
+                success: true,
+                message: '用户注册成功',
+                data: userResponse
+            });
         }
-        // 创建新用户
-        const user = await user_model_1.default.create({
-            username,
-            email,
-            password, // 密码会在模型的pre-save钩子中自动加密
-        });
-        // 生成JWT令牌
-        const token = jsonwebtoken_1.default.sign({ sub: user._id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1d' });
-        // 移除密码后返回用户数据
-        const userData = {
-            id: user._id,
-            email: user.email,
-            username: user.username
-        };
-        res.status(201).json({
-            success: true,
-            token,
-            user: userData
-        });
-    }
-    catch (error) {
-        next(error);
-    }
-};
-// 用户登录
-const login = async (req, res, next) => {
-    try {
-        const { email, password } = req.body;
-        // 查找用户
-        const user = await user_model_1.default.findOne({ email });
-        if (!user) {
-            return next(new errors_1.UnauthorizedError('邮箱或密码不正确'));
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error); // Pass to error handling middleware
         }
-        // 验证密码
-        const isPasswordValid = await user.comparePassword(password);
-        if (!isPasswordValid) {
-            return next(new errors_1.UnauthorizedError('邮箱或密码不正确'));
+    }
+    async login(req, res, next) {
+        const methodName = 'login';
+        // Optional: Input validation
+        try {
+            const loginData = req.body;
+            logger_1.default.info(`${this.serviceName}.${methodName} - Attempting login for: ${loginData.email}`);
+            const loginResponse = await user_service_1.userService.loginUser(loginData);
+            res.status(200).json({
+                success: true,
+                message: '登录成功',
+                data: loginResponse // Contains token and user info
+            });
         }
-        // 生成JWT令牌
-        const token = jsonwebtoken_1.default.sign({ sub: user._id }, process.env.JWT_SECRET || 'your-secret-key', { expiresIn: '1d' });
-        // 移除密码后返回用户数据
-        const userData = {
-            id: user._id,
-            email: user.email,
-            username: user.username
-        };
-        res.status(200).json({
-            success: true,
-            token,
-            user: userData
-        });
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error); // Pass to error handling middleware
+        }
     }
-    catch (error) {
-        next(error);
+    // Optional: Get current user profile
+    async getProfile(req, res, next) {
+        const methodName = 'getProfile';
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return next(new errors_1.UnauthorizedError('认证失败，无法获取用户信息'));
+            }
+            // Fetch user details (excluding password) - userService method needed
+            // const userProfile = await userService.getUserProfile(userId);
+            // res.status(200).json({ success: true, data: userProfile });
+            // For now, just return the user info from the token payload
+            res.status(200).json({ success: true, data: req.user });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error);
+        }
     }
-};
+    // Placeholder for logout
+    async logout(req, res, next) {
+        const methodName = 'logout';
+        try {
+            // In a stateless JWT setup, logout is typically handled client-side by deleting the token.
+            // Server-side might involve blacklisting the token if using a blacklist strategy.
+            logger_1.default.info(`${this.serviceName}.${methodName} - Logout requested.`);
+            res.status(200).json({ success: true, message: '登出成功' });
+        }
+        catch (error) {
+            logger_1.default.error(`Error in ${this.serviceName}.${methodName}:`, error);
+            next(error);
+        }
+    }
+}
+exports.authController = new AuthController();
 // 获取当前用户信息
 const getCurrentUser = async (req, res, next) => {
     try {
         if (!req.user) {
             return next(new errors_1.UnauthorizedError('请先登录'));
         }
-        const user = await user_model_1.default.findById(req.user.id).select('-password');
-        if (!user) {
-            return next(new errors_1.NotFoundError('用户不存在'));
-        }
-        const userData = {
-            id: user._id,
-            email: user.email,
-            username: user.username,
-            role: user.role
-        };
+        const userData = await user_service_1.userService.getUserById(req.user.id);
         res.status(200).json({
             success: true,
             data: userData
@@ -112,27 +127,10 @@ const updateProfile = async (req, res, next) => {
             return next(new errors_1.UnauthorizedError('请先登录'));
         }
         const userId = req.user.id;
-        const { username, email, role } = req.body;
-        // 检查邮箱是否已被其他用户使用
-        if (email) {
-            const existingUser = await user_model_1.default.findOne({ email, _id: { $ne: userId } });
-            if (existingUser) {
-                return next(new errors_1.ConflictError('该邮箱已被其他用户使用'));
-            }
-        }
-        // 更新用户信息
-        const user = await user_model_1.default.findByIdAndUpdate(userId, { username, email, role }, { new: true, runValidators: true });
-        if (!user) {
-            return next(new errors_1.NotFoundError('用户不存在'));
-        }
+        const userData = await user_service_1.userService.updateUser(userId, req.body);
         res.status(200).json({
             success: true,
-            data: {
-                id: user._id,
-                email: user.email,
-                username: user.username,
-                role: user.role
-            }
+            data: userData
         });
     }
     catch (error) {
@@ -145,17 +143,7 @@ const changePassword = async (req, res, next) => {
         if (!req.user) {
             return next(new errors_1.UnauthorizedError('请先登录'));
         }
-        const user = await user_model_1.default.findById(req.user.id);
-        if (!user) {
-            return next(new errors_1.NotFoundError('用户不存在'));
-        }
-        const { currentPassword, newPassword } = req.body;
-        const isPasswordValid = await user.comparePassword(currentPassword);
-        if (!isPasswordValid) {
-            return next(new errors_1.UnauthorizedError('当前密码不正确'));
-        }
-        user.password = newPassword;
-        await user.save();
+        const result = await user_service_1.userService.changePassword(req.user.id, req.body);
         res.status(200).json({
             success: true,
             message: '密码修改成功'
@@ -166,10 +154,11 @@ const changePassword = async (req, res, next) => {
     }
 };
 exports.default = {
-    register,
-    login,
+    register: exports.authController.register,
+    login: exports.authController.login,
     getCurrentUser,
     logout,
     updateProfile,
-    changePassword
+    changePassword,
+    getProfile: exports.authController.getProfile
 };

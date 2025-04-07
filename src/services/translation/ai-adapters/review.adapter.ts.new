@@ -1,0 +1,498 @@
+﻿import { OpenAI } from 'openai';
+import { 
+  AIModelInfo, 
+  AIProvider, 
+  AIServiceConfig, 
+  AIServiceError, 
+  AIServiceResponse 
+} from '../../../types/ai-service.types';
+import { 
+  IssueType, 
+  ReviewScoreType,
+  AIReviewResponse
+} from '../../../types/review.types';
+import { BaseAIServiceAdapter } from './base.adapter';
+import logger from '../../../utils/logger';
+import { TranslationOptions } from '../../../types/translation.types';
+
+// 瀹℃牎閫夐」鎺ュ彛
+export interface ReviewOptions extends TranslationOptions {
+  originalContent: string;  // 鍘熷鍐呭
+  translatedContent: string;  // 缈昏瘧鍐呭
+  projectId?: string;  // 椤圭洰ID
+  requestedScores?: ReviewScoreType[];  // 璇锋眰璇勫垎鐨勭被锟?  checkIssueTypes?: IssueType[];  // 妫€鏌ラ棶棰樼殑绫诲瀷
+  contextSegments?: Array<{  // 涓婁笅鏂囨锟?    original: string;
+    translation: string;
+  }>;
+  customPrompt?: string;  // 鑷畾涔夋彁绀鸿瘝
+}
+
+/**
+ * OpenAI 瀹℃牎閫傞厤锟? */
+export class ReviewAdapter extends BaseAIServiceAdapter {
+  private client: OpenAI;
+  private static readonly AVAILABLE_MODELS: AIModelInfo[] = [
+    {
+      id: 'gpt-4',
+      name: 'GPT-4',
+      provider: AIProvider.OPENAI,
+      maxTokens: 8192,
+      capabilities: ['review', 'translation'],
+      pricing: {
+        input: 0.03,
+        output: 0.06
+      }
+    },
+    {
+      id: 'gpt-4-turbo',
+      name: 'GPT-4 Turbo',
+      provider: AIProvider.OPENAI,
+      maxTokens: 128000,
+      capabilities: ['review', 'translation'],
+      pricing: {
+        input: 0.01,
+        output: 0.03
+      }
+    },
+    {
+      id: 'gpt-3.5-turbo',
+      name: 'GPT-3.5 Turbo',
+      provider: AIProvider.OPENAI,
+      maxTokens: 16385,
+      capabilities: ['review', 'translation'],
+      pricing: {
+        input: 0.0005,
+        output: 0.0015
+      }
+    }
+  ];
+
+  constructor(config: AIServiceConfig) {
+    super(config);
+    
+    // 鍒濆锟?OpenAI 瀹㈡埛锟?    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      timeout: config.timeout || 60000,
+    });
+  }
+
+  /**
+   * 璁＄畻鏂囨湰涓殑token鏁伴噺
+   * 杩欐槸涓€涓畝鍖栫殑璁＄畻鏂规硶锛屽疄闄呬笂OpenAI浣跨敤鐨勬槸鍩轰簬BPE鐨則okenizer
+   * 鍦ㄧ敓浜х幆澧冧腑锛屽簲璇ヤ娇鐢ㄦ洿鍑嗙‘鐨勮绠楁柟锟?   */
+  private calculateTokens(text: string): number {
+    // 绠€鍗曠殑浼扮畻鏂规硶锛氬ぇ绾︽瘡4涓瓧绗︿负1涓猼oken
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * 璁＄畻鏂囨湰涓殑鍗曡瘝鏁伴噺
+   */
+  protected calculateWordCount(text: string): number {
+    return text.trim().split(/\s+/).length;
+  }
+
+  /**
+   * 璁＄畻鏂囨湰涓殑瀛楃鏁伴噺
+   */
+  protected calculateCharacterCount(text: string): number {
+    return text.length;
+  }
+
+  /**
+   * 鏋勫缓瀹℃牎鎻愮ず锟?   */
+  private buildReviewPrompt(options: ReviewOptions): string {
+    const {
+      sourceLanguage,
+      targetLanguage,
+      originalContent,
+      translatedContent,
+      contextSegments = [],
+      customPrompt
+    } = options;
+
+    // 濡傛灉鏈夎嚜瀹氫箟鎻愮ず璇嶏紝鍒欎娇鐢ㄨ嚜瀹氫箟鎻愮ず锟?    if (customPrompt) {
+      return customPrompt
+        .replace('{SOURCE_LANGUAGE}', sourceLanguage)
+        .replace('{TARGET_LANGUAGE}', targetLanguage)
+        .replace('{ORIGINAL_CONTENT}', originalContent)
+        .replace('{TRANSLATED_CONTENT}', translatedContent);
+    }
+
+    let context = '';
+    if (contextSegments.length > 0) {
+      context = '涓婁笅鏂囨钀斤細\n';
+      contextSegments.forEach((segment, index) => {
+        context += `[娈佃惤 ${index + 1}]\n鍘熸枃锟?{segment.original}\n璇戞枃锟?{segment.translation}\n\n`;
+      });
+    }
+
+    return `
+浣犳槸涓€浣嶄笓涓氱殑缈昏瘧瀹℃牎涓撳锛岀簿锟?{sourceLanguage}锟?{targetLanguage}锟?璇峰鏍′互涓嬬炕璇戯紝鎻愪緵璇︾粏鐨勯棶棰樺垎鏋愬拰鏀硅繘寤鸿锟?浣跨敤JSON鏍煎紡鍥炲锛屽寘鍚互涓嬪唴瀹癸細
+
+1. 鍘熸枃鍐呭锟?${originalContent}
+
+2. 褰撳墠缈昏瘧锟?${translatedContent}
+
+${context}
+
+璇峰垎鏋愪互涓嬪嚑涓柟闈細
+1. 鍑嗙‘鎬э細璇戞枃鏄惁鍑嗙‘浼犺揪浜嗗師鏂囩殑鎵€鏈変俊鎭拰鍚箟
+2. 娴佺晠搴︼細璇戞枃鏄惁绗﹀悎鐩爣璇█鐨勮〃杈句範鎯紝鏄惁鑷劧娴佺晠
+3. 鏈涓€鑷存€э細涓撲笟鏈鍜屽叧閿瘝鐨勭炕璇戞槸鍚﹀噯纭竴锟?4. 璇硶鍜屾嫾鍐欙細鏄惁瀛樺湪璇硶閿欒鎴栨嫾鍐欓敊锟?5. 椋庢牸涓€鑷存€э細璇戞枃椋庢牸鏄惁涓庡師鏂囦竴锟?
+璇锋寜鐓т互涓婮SON鏍煎紡鍥炲锛屼粎杩斿洖JSON鏁版嵁锟?
+{
+  "suggestedTranslation": "浣犺涓虹殑鏈€浣崇炕锟?,
+  "issues": [
+    {
+      "type": "闂绫诲瀷(accuracy/grammar/terminology/style/consistency/formatting/other)",
+      "description": "闂鎻忚堪",
+      "position": {
+        "start": 闂鍦ㄨ瘧鏂囦腑鐨勮捣濮嬩綅锟?鏁板瓧),
+        "end": 闂鍦ㄨ瘧鏂囦腑鐨勭粨鏉熶綅锟?鏁板瓧)
+      },
+      "suggestion": "淇敼寤鸿"
+    }
+  ],
+  "scores": [
+    {
+      "type": "overall",
+      "score": 璇勫垎(0-100),
+      "details": "璇勫垎鐞嗙敱"
+    },
+    {
+      "type": "accuracy",
+      "score": 璇勫垎(0-100),
+      "details": "璇勫垎鐞嗙敱"
+    },
+    {
+      "type": "fluency",
+      "score": 璇勫垎(0-100),
+      "details": "璇勫垎鐞嗙敱"
+    },
+    {
+      "type": "terminology",
+      "score": 璇勫垎(0-100),
+      "details": "璇勫垎鐞嗙敱"
+    },
+    {
+      "type": "style",
+      "score": 璇勫垎(0-100),
+      "details": "璇勫垎鐞嗙敱"
+    }
+  ]
+}
+
+璇风‘淇濊繑鍥炵殑JSON鏍煎紡瑙勮寖锛屽彲浠ヨ鐩存帴瑙ｆ瀽銆備笉瑕佸寘鍚换浣旿SON浠ュ鐨勮鏄庢枃瀛楋拷?`;
+  }
+
+  /**
+   * 璁＄畻淇敼绋嬪害
+   * 杩斿洖涓€锟?-1涔嬮棿鐨勬暟鍊硷紝琛ㄧず淇敼鐨勭▼锟?   */
+  private calculateModificationDegree(original: string, modified: string): number {
+    if (!original || !modified) return 0;
+    
+    // 绠€鍗曠殑瀛楃绾у埆宸紓璁＄畻
+    let changes = 0;
+    const maxLength = Math.max(original.length, modified.length);
+    const minLength = Math.min(original.length, modified.length);
+    
+    // 闀垮害宸紓
+    changes += maxLength - minLength;
+    
+    // 瀛楃宸紓
+    for (let i = 0; i < minLength; i++) {
+      if (original[i] !== modified[i]) {
+        changes++;
+      }
+    }
+    
+    return Math.min(1, changes / maxLength);
+  }
+
+  /**
+   * 鑾峰彇鍙敤妯″瀷鍒楄〃
+   */
+  async getAvailableModels(): Promise<string[]> {
+    return ReviewAdapter.AVAILABLE_MODELS.map(model => model.id);
+  }
+
+  /**
+   * 鑾峰彇鐗瑰畾妯″瀷淇℃伅
+   */
+  async getModelInfo(modelId: string): Promise<AIModelInfo> {
+    const model = ReviewAdapter.AVAILABLE_MODELS.find(model => model.id === modelId);
+    
+    if (!model) {
+      throw this.createError('MODEL_NOT_FOUND', `Model ${modelId} not found`);
+    }
+    
+    return model;
+  }
+
+  /**
+   * 鑾峰彇妯″瀷瀹氫环淇℃伅
+   */
+  async getModelPricing(modelId: string): Promise<{ input: number; output: number }> {
+    const model = ReviewAdapter.AVAILABLE_MODELS.find(model => model.id === modelId);
+    
+    if (!model) {
+      throw this.createError('MODEL_NOT_FOUND', `Model ${modelId} not found`);
+    }
+    
+    return model.pricing;
+  }
+
+  /**
+   * 瀹炵幇鍩虹被鐨勫繀闇€鏂规硶锛堜负瀹℃牎鏈嶅姟鎻愪緵杞崲锟?   */
+  async translateText(sourceText: string, options: TranslationOptions): Promise<AIServiceResponse> {
+    throw this.createError('UNSUPPORTED_OPERATION', 'This adapter is for review only. Use translate adapter for translation.');
+  }
+
+  /**
+   * 楠岃瘉API瀵嗛挜
+   */
+  async validateApiKey(): Promise<boolean> {
+    try {
+      // 绠€鍗曡皟鐢ㄦā鍨嬪垪琛ˋPI鏉ラ獙璇丄PI瀵嗛挜
+      await this.client.models.list();
+      return true;
+    } catch (error: any) {
+      logger.error('API key validation failed', { error });
+      return false;
+    }
+  }
+
+  /**
+   * 鎵ц鏂囨湰瀹℃牎
+   */
+  async reviewText(options: ReviewOptions): Promise<AIReviewResponse> {
+    try {
+      const startTime = Date.now();
+
+      // 鏋勫缓绯荤粺鎻愮ず锟?      const systemPrompt = this.getSystemPrompt(options.sourceLanguage, options.targetLanguage);
+      
+      // 鏋勫缓鐢ㄦ埛鎻愮ず锟?      const userPrompt = this.getUserPrompt(options);
+
+      // 璋冪敤 OpenAI API
+      const response = await this.client.chat.completions.create({
+        model: this.config.model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: userPrompt
+          }
+        ],
+        temperature: this.config.temperature || 0.3,
+        max_tokens: this.config.maxTokens || 4000
+      });
+
+      if (!response.choices?.[0]?.message?.content) {
+        throw this.createError('INVALID_RESPONSE', 'Invalid response from OpenAI API');
+      }
+
+      // 瑙ｆ瀽鍝嶅簲
+      const parsedResult = this.parseReviewResponse(response.choices[0].message.content);
+      const processingTime = Date.now() - startTime;
+
+      // 璁＄畻淇敼绋嬪害
+      const modificationDegree = this.calculateModificationDegree(
+        options.translatedContent,
+        parsedResult.suggestedTranslation
+      );
+
+      // 鏋勫缓瀹屾暣鐨勫搷锟?      const result: AIReviewResponse = {
+        suggestedTranslation: parsedResult.suggestedTranslation,
+        issues: parsedResult.issues,
+        scores: parsedResult.scores,
+        metadata: {
+          provider: AIProvider.OPENAI,
+          model: this.config.model,
+          processingTime,
+          confidence: parsedResult.scores.find(s => s.type === ReviewScoreType.OVERALL)?.score || 0.85,
+          wordCount: this.calculateWordCount(options.translatedContent),
+          characterCount: this.calculateCharacterCount(options.translatedContent),
+          tokens: {
+            input: response.usage?.prompt_tokens || 0,
+            output: response.usage?.completion_tokens || 0
+          },
+          modificationDegree
+        }
+      };
+
+      return result;
+
+    } catch (error: any) {
+      logger.error('Review failed:', error);
+      throw this.handleOpenAIError(error);
+    }
+  }
+
+  /**
+   * 鑾峰彇绯荤粺鎻愮ず锟?   */
+  private getSystemPrompt(sourceLanguage: string, targetLanguage: string): string {
+    return `You are a professional translation reviewer. Your task is to review the translation from ${sourceLanguage} to ${targetLanguage}. 
+    Please provide a detailed review including:
+    1. Accuracy of the translation
+    2. Naturalness of the target language
+    3. Cultural appropriateness
+    4. Any issues or improvements needed
+    
+    Respond in JSON format with the following structure:
+    {
+      "scores": {
+        "accuracy": number,
+        "fluency": number,
+        "adherence": number,
+        "overall": number
+      },
+      "issues": [
+        {
+          "type": string,
+          "severity": "high" | "medium" | "low",
+          "description": string,
+          "suggestion": string
+        }
+      ],
+      "suggestedTranslation": string
+    }`;
+  }
+
+  /**
+   * 鑾峰彇鐢ㄦ埛鎻愮ず锟?   */
+  private getUserPrompt(options: ReviewOptions): string {
+    const { originalContent, translatedContent, contextSegments } = options;
+    
+    let prompt = `Original text: ${originalContent}\n\n`;
+    prompt += `Translated text: ${translatedContent}\n\n`;
+    
+    if (contextSegments && contextSegments.length > 0) {
+      prompt += 'Context segments:\n';
+      contextSegments.forEach((segment, index) => {
+        prompt += `${index + 1}. Original: ${segment.original}\n`;
+        prompt += `   Translation: ${segment.translation}\n`;
+      });
+    }
+    
+    return prompt;
+  }
+
+  /**
+   * 瑙ｆ瀽瀹℃牎鍝嶅簲
+   */
+  private parseReviewResponse(content: string): Omit<AIReviewResponse, 'metadata'> {
+    try {
+      const result = JSON.parse(content);
+      
+      // 楠岃瘉鍝嶅簲鏍煎紡
+      if (!result.scores || !result.issues || !result.suggestedTranslation) {
+        throw new Error('Invalid response format');
+      }
+
+      // 杞崲鍒嗘暟鏍煎紡
+      const scores: Array<{ type: ReviewScoreType; score: number; details?: string }> = [
+        { type: ReviewScoreType.ACCURACY, score: result.scores.accuracy },
+        { type: ReviewScoreType.FLUENCY, score: result.scores.fluency },
+        { type: ReviewScoreType.ADHERENCE, score: result.scores.adherence },
+        { type: ReviewScoreType.OVERALL, score: result.scores.overall }
+      ];
+
+      // 杞崲闂鏍煎紡
+      const issues = result.issues.map((issue: any) => ({
+        type: this.mapIssueType(issue.type),
+        description: issue.description,
+        suggestion: issue.suggestion
+      }));
+
+      return {
+        suggestedTranslation: result.suggestedTranslation,
+        issues,
+        scores
+      };
+    } catch (error) {
+      logger.error('Failed to parse review response:', error);
+      throw this.createError('PARSE_ERROR', 'Failed to parse review response');
+    }
+  }
+
+  /**
+   * 鏄犲皠闂绫诲瀷
+   */
+  private mapIssueType(type: string): IssueType {
+    const typeMap: Record<string, IssueType> = {
+      'accuracy': IssueType.ACCURACY,
+      'fluency': IssueType.FLUENCY,
+      'adherence': IssueType.ADHERENCE,
+      'grammar': IssueType.GRAMMAR,
+      'style': IssueType.STYLE,
+      'other': IssueType.OTHER
+    };
+
+    return typeMap[type.toLowerCase()] || IssueType.OTHER;
+  }
+
+  /**
+   * 澶勭悊 OpenAI API 閿欒
+   */
+  private handleOpenAIError(error: any): AIServiceError {
+    if (error.response) {
+      const statusCode = error.response.status;
+      const errorType = error.response.data?.error?.type || 'api_error';
+      const errorMessage = error.response.data?.error?.message || 'Unknown OpenAI API error';
+
+      return {
+        code: `openai_${errorType}`,
+        message: `OpenAI API error (${statusCode}): ${errorMessage}`,
+        provider: AIProvider.OPENAI,
+        details: error.response.data
+      };
+    }
+    
+    if (error.code === 'ETIMEDOUT' || error.code === 'ESOCKETTIMEDOUT') {
+      return {
+        code: 'timeout_error',
+        message: 'Request to OpenAI API timed out',
+        provider: AIProvider.OPENAI,
+        details: { originalError: error.message }
+      };
+    }
+    
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return {
+        code: 'connection_error',
+        message: 'Failed to connect to OpenAI API',
+        provider: AIProvider.OPENAI,
+        details: { originalError: error.message }
+      };
+    }
+    
+    if (error.message && error.message.includes('auth')) {
+      return {
+        code: 'authentication_error',
+        message: 'Invalid API key or authentication error',
+        provider: AIProvider.OPENAI,
+        details: { originalError: error.message }
+      };
+    }
+
+    if (error.message && error.message.includes('quota')) {
+      return {
+        code: 'quota_error',
+        message: 'OpenAI API quota exceeded',
+        provider: AIProvider.OPENAI,
+        details: { originalError: error.message }
+      };
+    }
+
+    return {
+      code: 'unknown_error',
+      message: `Unexpected error: ${error.message || 'Unknown error'}`,
+      provider: AIProvider.OPENAI,
+      details: { originalError: error }
+    };
+  }
+} 

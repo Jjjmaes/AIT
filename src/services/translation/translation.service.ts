@@ -1,13 +1,13 @@
 import { AIServiceFactory } from './ai-adapters/ai-service.factory';
-import { AIServiceConfig, AIProvider } from '../../types/ai-service.types';
+import { AIServiceConfig, AIProvider, AIServiceResponse } from '../../types/ai-service.types';
 import { TranslationOptions } from '../../types/translation.types';
-import { AIServiceResponse } from '../../types/ai-service.types';
 import { TranslationQueueService } from './queue/translation-queue.service';
 import { TranslationCacheService } from './cache/translation-cache.service';
 import { QueueTaskType, QueueTaskStatus } from './queue/queue-task.interface';
 import { CacheKey } from './cache/cache-keys.enum';
 import logger from '../../utils/logger';
 import { PerformanceMonitor } from './monitoring/performance-monitor';
+import { promptProcessor } from '../../utils/promptProcessor';
 
 export interface TranslationServiceConfig extends AIServiceConfig {
   /** 是否启用缓存 */
@@ -117,18 +117,35 @@ export class TranslationService {
 
       // 如果没有使用队列，直接执行翻译
       const adapter = this.aiServiceFactory.createAdapter(this.config);
-      const result = await adapter.translateText(sourceText, options);
+      const response = await adapter.translateText(sourceText, options);
 
-      // 缓存结果
+      // Construct AIServiceResponse
+      const result: AIServiceResponse = {
+        translatedText: response.translatedText,
+        metadata: {
+          provider: response.modelInfo.provider as AIProvider,
+          model: response.modelInfo.model,
+          processingTime: response.processingTime ?? 0,
+          tokens: {
+            input: response.tokenCount?.input ?? 0,
+            output: response.tokenCount?.output ?? 0,
+          },
+          confidence: 0.95,
+          wordCount: response.translatedText.split(/\s+/).filter(Boolean).length,
+          characterCount: response.translatedText.length
+        }
+      };
+
+      // Cache the constructed result
       if (this.cacheService) {
         const cacheKey = this.generateCacheKey(sourceText, options);
         await this.cacheService.set(cacheKey, result);
       }
 
-      // 记录翻译结果
+      // Log using constructed result
       logger.info('Translation completed', {
-        provider: this.config.provider,
-        model: this.config.model,
+        provider: result.metadata.provider,
+        model: result.metadata.model,
         sourceLength: sourceText.length,
         targetLength: result.translatedText.length,
         processingTime: result.metadata.processingTime
@@ -236,27 +253,43 @@ export class TranslationService {
 
       // 如果没有使用队列，直接执行翻译
       const adapter = this.aiServiceFactory.createAdapter(this.config);
-      const translationPromises = segments.map(segment =>
-        adapter.translateText(segment, options)
-      );
+      const translationPromises = segments.map(async (segment) => {
+        const promptData = await promptProcessor.buildTranslationPrompt(segment, {
+          sourceLanguage: options.sourceLanguage,
+          targetLanguage: options.targetLanguage,
+        });
+        return adapter.translateText(segment, promptData, options);
+      });
 
       const resultsArray = await Promise.all(translationPromises);
       
-      // 组装结果为预期格式
+      // Construct the final response structure with metadata
       const translations = segments.map((text, index) => {
-        const result = resultsArray && Array.isArray(resultsArray) && index < resultsArray.length ? 
+        const response = resultsArray && Array.isArray(resultsArray) && index < resultsArray.length ? 
           resultsArray[index] : null;
         return {
           originalText: text,
-          translatedText: result?.translatedText || '',
-          metadata: result?.metadata || {}
+          translatedText: response?.translatedText || '',
+          metadata: response ? { 
+            provider: response.modelInfo.provider as AIProvider,
+            model: response.modelInfo.model,
+            processingTime: response.processingTime ?? 0,
+            tokens: { 
+              input: response.tokenCount?.input ?? 0,
+              output: response.tokenCount?.output ?? 0,
+            },
+            confidence: 0.95,
+            wordCount: (response.translatedText || '').split(/\s+/).filter(Boolean).length,
+            characterCount: (response.translatedText || '').length
+          } : {}
         };
       });
       
+      // Provide default for reduce initial value or check response?.processingTime validity
       const totalProcessingTime = resultsArray && Array.isArray(resultsArray) ? 
-        resultsArray.reduce((sum, result) => sum + (result?.metadata?.processingTime || 0), 0) : 0;
+        resultsArray.reduce((sum, response) => sum + (response?.processingTime ?? 0), 0) : 0;
 
-      // 记录翻译结果
+      // Log using constructed result data
       logger.info('Multiple segments translation completed', {
         provider: this.config.provider,
         model: this.config.model,
@@ -354,78 +387,6 @@ export class TranslationService {
       await this.performanceMonitor.recordRequest(false, Date.now() - startTime);
       logger.error('Failed to get available models', {
         provider: this.config.provider,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      throw error;
-    }
-  }
-
-  async getModelInfo(modelId: string): Promise<any> {
-    const startTime = Date.now();
-    try {
-      // 检查缓存
-      if (this.cacheService) {
-        const cacheKey = `${CacheKey.MODEL_INFO}:${modelId}`;
-        const cachedResult = await this.cacheService.get(cacheKey);
-        if (cachedResult) {
-          await this.performanceMonitor.recordCacheAccess(true);
-          return cachedResult;
-        }
-        await this.performanceMonitor.recordCacheAccess(false);
-      }
-
-      const adapter = this.aiServiceFactory.createAdapter(this.config);
-      const modelInfo = await adapter.getModelInfo(modelId);
-
-      // 缓存结果
-      if (this.cacheService) {
-        const cacheKey = `${CacheKey.MODEL_INFO}:${modelId}`;
-        await this.cacheService.set(cacheKey, modelInfo);
-      }
-
-      await this.performanceMonitor.recordRequest(true, Date.now() - startTime);
-      return modelInfo;
-    } catch (error) {
-      await this.performanceMonitor.recordRequest(false, Date.now() - startTime);
-      logger.error('Failed to get model info', {
-        provider: this.config.provider,
-        modelId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      throw error;
-    }
-  }
-
-  async getPricing(modelId: string): Promise<{ input: number; output: number }> {
-    const startTime = Date.now();
-    try {
-      // 检查缓存
-      if (this.cacheService) {
-        const cacheKey = `${CacheKey.PRICING_INFO}:${modelId}`;
-        const cachedResult = await this.cacheService.get<{ input: number; output: number }>(cacheKey);
-        if (cachedResult) {
-          await this.performanceMonitor.recordCacheAccess(true);
-          return cachedResult;
-        }
-        await this.performanceMonitor.recordCacheAccess(false);
-      }
-
-      const adapter = this.aiServiceFactory.createAdapter(this.config);
-      const pricing = await adapter.getPricing(modelId);
-
-      // 缓存结果
-      if (this.cacheService) {
-        const cacheKey = `${CacheKey.PRICING_INFO}:${modelId}`;
-        await this.cacheService.set(cacheKey, pricing);
-      }
-
-      await this.performanceMonitor.recordRequest(true, Date.now() - startTime);
-      return pricing;
-    } catch (error) {
-      await this.performanceMonitor.recordRequest(false, Date.now() - startTime);
-      logger.error('Failed to get pricing', {
-        provider: this.config.provider,
-        modelId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;

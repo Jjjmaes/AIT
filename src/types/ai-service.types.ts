@@ -3,6 +3,9 @@ import { TranslationOptions } from './translation.types';
 // AI 服务提供商
 export enum AIProvider {
   OPENAI = 'openai',
+  GOOGLE = 'google',
+  AZURE = 'azure',
+  AWS = 'aws',
   GROK = 'grok',
   DEEPSEEK = 'deepseek',
   BAIDU = 'baidu',
@@ -26,13 +29,11 @@ export interface AIModelInfo {
 export interface AIServiceConfig {
   provider: AIProvider;
   apiKey: string;
-  model: string;
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
+  baseUrl?: string;
+  defaultModel?: string;
   timeout?: number;
+  // Provider-specific options
+  [key: string]: any;
 }
 
 // AI 服务响应

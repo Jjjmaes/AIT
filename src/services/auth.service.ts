@@ -2,6 +2,7 @@ import User, { IUser } from '../models/user.model';
 import { AppError } from '../utils/errors';
 import { sign, verify } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { UnauthorizedError } from '../utils/errors';
 
 export interface RegisterDTO {
   username: string;
@@ -49,6 +50,11 @@ export class AuthService {
         '邮箱或密码错误',
         401
       );
+    }
+
+    // Ensure user and password exist before comparing
+    if (!user || typeof user.password !== 'string') {
+      throw new UnauthorizedError('用户不存在或密码格式错误');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);

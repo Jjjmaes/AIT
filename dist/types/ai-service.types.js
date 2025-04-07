@@ -5,6 +5,9 @@ exports.AIProvider = void 0;
 var AIProvider;
 (function (AIProvider) {
     AIProvider["OPENAI"] = "openai";
+    AIProvider["GOOGLE"] = "google";
+    AIProvider["AZURE"] = "azure";
+    AIProvider["AWS"] = "aws";
     AIProvider["GROK"] = "grok";
     AIProvider["DEEPSEEK"] = "deepseek";
     AIProvider["BAIDU"] = "baidu";

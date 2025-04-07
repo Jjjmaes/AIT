@@ -8,9 +8,10 @@ import {
 } from '../../../types/ai-service.types';
 import { 
   IssueType, 
-  ReviewScoreType 
+  ReviewScoreType,
+  IssueSeverity
 } from '../../../models/segment.model';
-import { BaseAIServiceAdapter } from './base.adapter';
+import { BaseAIServiceAdapter, TranslationResponse } from './base.adapter';
 import logger from '../../../utils/logger';
 import { TranslationOptions } from '../../../types/translation.types';
 
@@ -28,18 +29,19 @@ export interface ReviewOptions extends TranslationOptions {
   customPrompt?: string;  // 自定义提示词
 }
 
+// Define the structure for issues returned by the AI review adapter
+export interface AIReviewIssue {
+  type: IssueType;
+  description: string;
+  position?: { start: number; end: number };
+  suggestion?: string;
+  severity?: IssueSeverity; // Add optional severity
+}
+
 // 审校结果接口
 export interface AIReviewResponse {
   suggestedTranslation: string;  // 建议翻译
-  issues: Array<{
-    type: IssueType;
-    description: string;
-    position?: {
-      start: number;
-      end: number;
-    };
-    suggestion?: string;
-  }>;
+  issues: AIReviewIssue[]; // Use the updated issue type
   scores: Array<{
     type: ReviewScoreType;
     score: number;
@@ -351,8 +353,45 @@ ${context}
   /**
    * 实现基类的必需方法（为审校服务提供转换）
    */
-  async translateText(sourceText: string, options: TranslationOptions): Promise<AIServiceResponse> {
-    throw this.createError('UNSUPPORTED_OPERATION', 'This adapter is for review only. Use translate adapter for translation.');
+  async translateText(
+    sourceText: string, 
+    promptData: any, // Use promptData from base
+    options?: TranslationOptions & { model?: string; temperature?: number }
+  ): Promise<TranslationResponse> { 
+    logger.warn('translateText called on ReviewAdapter. This might indicate a design issue.');
+    
+    const modelToUse = options?.model || this.config.defaultModel || 'gpt-3.5-turbo';
+    const temp = options?.temperature ?? 0.3;
+    const startTime = Date.now();
+    
+    try {
+      const completion = await this.client.chat.completions.create({
+        model: modelToUse,
+        messages: [
+            { role: 'system', content: promptData?.systemInstruction || 'Translate the following text.' },
+            { role: 'user', content: promptData?.userPrompt || sourceText }
+        ],
+        temperature: temp,
+      });
+
+      const translatedText = completion.choices[0]?.message?.content || '';
+      const processingTime = Date.now() - startTime;
+      const tokenCount = completion.usage ? { 
+          input: completion.usage.prompt_tokens, 
+          output: completion.usage.completion_tokens, 
+          total: completion.usage.total_tokens 
+      } : undefined;
+
+      return {
+        translatedText,
+        tokenCount,
+        processingTime,
+        modelInfo: { provider: this.provider.toString(), model: modelToUse }
+      };
+    } catch (error) {
+        logger.error('Error during translateText in ReviewAdapter:', error);
+        throw this.createError('TRANSLATION_FAILED', 'translateText failed in ReviewAdapter', error);
+    }
   }
 
   /**

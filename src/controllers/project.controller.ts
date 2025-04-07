@@ -9,12 +9,12 @@ import { validateRequest } from '../middleware/validate.middleware';
 import { createProjectSchema, updateProjectSchema, projectProgressSchema } from '../schemas/project.schema';
 import { fileUploadConfig } from '../config/upload.config';
 import logger from '../utils/logger';
+import { ProjectStatus } from '../models/project.model';
 import { 
-  ProjectStatus, 
   ProjectPriority, 
   CreateProjectDto, 
   UpdateProjectDto,
-  ProjectProgressDto 
+  IProjectProgress as ProjectProgressDto
 } from '../types/project.types';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
@@ -38,17 +38,18 @@ export default class ProjectController {
 
       const validationResult = createProjectSchema.safeParse(req.body);
       if (!validationResult.success) {
-        throw new ValidationError(validationResult.error.errors[0].message);
+        // Convert the flattened error object to a string for the message
+        const errorMessage = JSON.stringify(validationResult.error.flatten());
+        throw new ValidationError(errorMessage); // Pass the string message
       }
+      const validatedData = validationResult.data;
 
       logger.info(`User ${userId} creating new project`);
       
-      const projectData: CreateProjectDto = {
-        ...validationResult.data,
-        managerId: userId
-      };
-      
-      const project = await projectService.createProject(projectData);
+      const project = await projectService.createProject({
+          ...validatedData,
+          manager: userId // Ensure manager is set from auth user
+      });
       
       logger.info(`Project ${project.id} created successfully by user ${userId}`);
       
@@ -75,7 +76,7 @@ export default class ProjectController {
       
       const result = await projectService.getUserProjects(userId, {
         status: status as ProjectStatus,
-        priority: priority as ProjectPriority,
+        priority: priority ? parseInt(priority as string, 10) : undefined,
         search: search as string,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined
@@ -125,14 +126,24 @@ export default class ProjectController {
 
       const validationResult = updateProjectSchema.safeParse(req.body);
       if (!validationResult.success) {
-        throw new ValidationError(validationResult.error.errors[0].message);
+        // Convert the flattened error object to a string for the message
+        const errorMessage = JSON.stringify(validationResult.error.flatten());
+        throw new ValidationError(errorMessage); // Pass the string message
       }
+      const validatedData = validationResult.data;
 
       const { projectId } = req.params;
-      const updateData: UpdateProjectDto = validationResult.data;
+
+      // Directly use validatedData as it matches UpdateProjectDto now
+      const updateData: UpdateProjectDto = validatedData;
       
       logger.info(`User ${userId} updating project ${projectId}`);
       
+      if (Object.keys(updateData).length === 0) {
+        logger.warn(`No valid fields provided for updating project ${projectId}`);
+        return res.status(400).json({ success: false, message: '没有提供可更新的字段' });
+      }
+
       const project = await projectService.updateProject(projectId, userId, updateData);
       
       logger.info(`Project ${projectId} updated successfully by user ${userId}`);

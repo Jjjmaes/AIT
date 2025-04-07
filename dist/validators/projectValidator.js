@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateUpdateProjectProgress = exports.validateUpdateProject = exports.validateCreateProject = void 0;
 const zod_1 = require("zod");
 const project_types_1 = require("../types/project.types");
+const project_model_1 = require("../models/project.model");
 const common_1 = require("./common");
 // 项目创建验证
 exports.validateCreateProject = zod_1.z.object({
@@ -55,7 +56,7 @@ exports.validateUpdateProject = zod_1.z.object({
             .optional(),
         priority: (0, common_1.createEnumValidator)(project_types_1.ProjectPriority)
             .optional(),
-        status: (0, common_1.createEnumValidator)(project_types_1.ProjectStatus)
+        status: (0, common_1.createEnumValidator)(project_model_1.ProjectStatus)
             .optional()
     })
 });
@@ -65,7 +66,7 @@ exports.validateUpdateProjectProgress = zod_1.z.object({
         projectId: common_1.mongoIdSchema
     }),
     body: zod_1.z.object({
-        status: (0, common_1.createEnumValidator)(project_types_1.ProjectStatus)
+        status: (0, common_1.createEnumValidator)(project_model_1.ProjectStatus)
             .optional(),
         progress: zod_1.z.object({
             totalSegments: zod_1.z.number()

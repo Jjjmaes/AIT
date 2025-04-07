@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { FileStatus } from '../models/file.model';
-import { ProjectStatus } from '../types/project.types';
+import { ProjectStatus } from '../models/project.model';
 
 // 翻译状态枚举
 export enum TranslationStatus {
@@ -15,11 +15,19 @@ export enum TranslationStatus {
 export interface TranslationOptions {
   sourceLanguage: string;
   targetLanguage: string;
-  aiProvider?: string;        // AI 服务提供商
-  model?: string;            // 使用的模型
-  preserveFormatting?: boolean; // 是否保留格式
-  useTerminology?: boolean;   // 是否使用术语库
-  priority?: 'high' | 'normal' | 'low';
+  domain?: string;
+  aiProvider?: string;
+  aiModel?: string;
+  promptTemplateId?: string;
+  useTranslationMemory?: boolean;
+  useTerminology?: boolean;
+  preserveFormatting?: boolean;
+  context?: {
+    projectName: string;
+    fileName?: string;
+  };
+  temperature?: number;
+  priority?: number;
 }
 
 // 翻译任务
@@ -39,29 +47,23 @@ export interface TranslationTask {
 
 // 翻译结果
 export interface TranslationResult {
-  id: string;
-  taskId: string;
-  projectId: Types.ObjectId;
-  fileId: Types.ObjectId;
-  segmentId: Types.ObjectId;
-  originalText: string;
+  jobId: string;
+  sourceText: string;
   translatedText: string;
-  status: TranslationStatus;
-  quality?: number;
   metadata: {
-    aiProvider: string;
-    model: string;
-    processingTime: number;
-    wordCount: number;
-    characterCount: number;
-    tokens: {
+    projectId: string;
+    fileId: string;
+    segmentId: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+    domain?: string;
+    processingTime?: number;
+    tokens?: {
       input: number;
       output: number;
     };
-    cost: number;
+    cost?: number;
   };
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 // 翻译进度更新
@@ -103,13 +105,22 @@ export interface IAIServiceAdapter {
 
 // 翻译服务接口
 export interface ITranslationService {
-  translateSegment(segmentId: string, options: TranslationOptions): Promise<TranslationResult>;
-  translateMultipleSegments(segmentIds: string[], options: TranslationOptions): Promise<void>;
-  translateFile(fileId: string, options: TranslationOptions): Promise<void>;
-  translateText(text: string, options: TranslationOptions): Promise<string>;
-  getTranslationStatus(taskId: string): Promise<TranslationStatus>;
-  cancelTranslation(taskId: string): Promise<boolean>;
-  getTranslationProgress(projectId: string): Promise<TranslationProgressUpdate>;
+  translateSegment(segmentId: string, projectId: string, options?: TranslationOptions): Promise<TranslationResult>;
+  translateMultipleSegments(segmentIds: string[], projectId: string, options?: TranslationOptions): Promise<void>;
+  translateFile(fileId: string, projectId: string, options?: TranslationOptions): Promise<string>;
+  translateProject(projectId: string, options?: TranslationOptions): Promise<string>;
+  getTranslationStatus(jobId: string): Promise<{
+    status: TranslationJobStatus;
+    progress: number;
+    completedCount: number;
+    totalCount: number;
+    error?: string;
+    result?: TranslationResult;
+    jobId: string;
+  }>;
+  getProjectTranslationStatus(projectId: string): Promise<ProjectTranslationStatus>;
+  cancelTranslation(jobId: string): Promise<boolean>;
+  translateText(text: string, projectId: string, options: TranslationOptions): Promise<string>;
 }
 
 // 翻译队列服务接口
@@ -205,4 +216,50 @@ export interface ProjectTranslationResult {
     processingTime: number;
   };
   error?: string;
+}
+
+export enum TranslationJobStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed'
+}
+
+export enum TranslationJobType {
+  SEGMENT = 'segment',
+  FILE = 'file',
+  PROJECT = 'project'
+}
+
+export interface TranslationJob {
+  id: string;
+  type: TranslationJobType;
+  targetId: string;
+  projectId: string;
+  status: TranslationJobStatus;
+  priority: number;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  error?: string;
+  result?: TranslationResult;
+  options: TranslationOptions;
+  fileJobIds?: string[];
+}
+
+export interface ProjectTranslationStatus {
+  projectId: string;
+  status: TranslationJobStatus;
+  progress: {
+    completionPercentage: number;
+    translatedWords: number;
+    totalWords: number;
+  };
+  files: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    failed: number;
+  };
+  lastUpdated: Date;
 } 

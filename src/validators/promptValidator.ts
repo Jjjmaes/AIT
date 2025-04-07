@@ -1,7 +1,7 @@
 // src/validators/promptValidator.ts
 
 import { z } from 'zod';
-import { PromptType, PromptStatus } from '../models/prompt-template.model';
+import { PromptTaskType } from '../models/promptTemplate.model';
 import { mongoIdSchema, createEnumValidator } from './common';
 
 // 创建提示词模板验证
@@ -10,7 +10,7 @@ export const validateCreatePrompt = z.object({
     name: z.string()
       .min(3, '提示词模板名称长度必须在3-100个字符之间')
       .max(100, '提示词模板名称长度必须在3-100个字符之间'),
-    type: createEnumValidator(PromptType),
+    type: createEnumValidator(PromptTaskType),
     systemInstruction: z.string()
       .min(10, '系统指令长度不能少于10个字符'),
     userInputTemplate: z.string()
@@ -29,8 +29,6 @@ export const validateCreatePrompt = z.object({
       .min(1, 'AI模型不能为空'),
     parentTemplate: mongoIdSchema
       .optional(),
-    status: createEnumValidator(PromptStatus)
-      .optional()
   })
 });
 
@@ -62,8 +60,6 @@ export const validateUpdatePrompt = z.object({
     aiProvider: z.string()
       .optional(),
     aiModel: z.string()
-      .optional(),
-    status: createEnumValidator(PromptStatus)
       .optional(),
     version: z.number()
       .int('版本必须是整数')

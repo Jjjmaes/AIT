@@ -89,17 +89,19 @@ class ReviewTaskProcessor {
         }
         logger_1.default.debug(`Starting review for segment: ${segmentId}`, { segmentId, options: reviewOptions });
         // 查找段落
-        const segment = await segment_model_1.Segment.findById(segmentId);
+        const segment = await segment_model_1.Segment.findById(segmentId).exec();
         if (!segment) {
-            throw new Error(`Segment not found: ${segmentId}`);
+            logger_1.default.error(`Review Task: Segment ${segmentId} not found.`);
+            throw new Error(`Segment ${segmentId} not found`);
         }
         // 确保段落状态正确
         if (this.isInvalidSegmentStatus(segment.status)) {
             throw new Error(`Invalid segment status for review: ${segment.status}`);
         }
         // 确保段落有内容和翻译
-        if (!segment.content) {
-            throw new Error(`Segment ${segmentId} has no content`);
+        if (!segment.sourceText) {
+            logger_1.default.error(`Review Task: Segment ${segmentId} has no source text.`);
+            throw new Error(`Segment ${segmentId} has no source text`);
         }
         if (!segment.translation) {
             throw new Error(`Segment ${segmentId} has no translation to review`);
@@ -111,7 +113,7 @@ class ReviewTaskProcessor {
         try {
             // 执行AI审校
             logger_1.default.info(`Starting AI review for segment ${segmentId} using model ${reviewOptions.model || 'default'}`);
-            const reviewResult = await ai_review_service_1.default.reviewTranslation(segment.content, segment.translation || '', {
+            const reviewResult = await ai_review_service_1.default.reviewTranslation(segment.sourceText, segment.translation || '', {
                 sourceLanguage: reviewOptions.sourceLanguage || '',
                 targetLanguage: reviewOptions.targetLanguage || '',
                 model: reviewOptions.model,
@@ -125,12 +127,7 @@ class ReviewTaskProcessor {
             return {
                 segmentId: segment._id,
                 status: segment.status,
-                reviewResult: {
-                    scores: segment.reviewResult?.scores || [],
-                    suggestedTranslation: segment.reviewResult?.suggestedTranslation || '',
-                    issuesCount: segment.issues?.length || 0,
-                    modificationDegree: segment.reviewResult?.modificationDegree || 0
-                }
+                issuesCount: segment.issues?.length || 0
             };
         }
         catch (error) {
@@ -359,42 +356,46 @@ class ReviewTaskProcessor {
      * 保存审校结果到段落
      */
     async saveReviewResult(segment, reviewResult) {
-        // 保存建议的翻译
-        if (!segment.reviewResult) {
-            segment.reviewResult = {
-                originalTranslation: segment.translation || '',
-                reviewDate: new Date(),
-                issues: [],
-                scores: []
-            };
-        }
-        segment.reviewResult.suggestedTranslation = reviewResult.suggestedTranslation;
-        segment.reviewResult.aiReviewer = reviewResult.metadata.model;
-        segment.reviewResult.modificationDegree = reviewResult.metadata.modificationDegree;
-        // 保存评分
-        const scores = reviewResult.scores.map((score) => ({
-            type: score.type,
-            score: score.score,
-            details: score.details
+        // 保存建议的翻译到 segment.review
+        segment.review = reviewResult.suggestedTranslation;
+        // 保存评分 as issues
+        const scores = reviewResult.scores || [];
+        const issuesFromScores = scores.map((score) => ({
+            type: segment_model_1.IssueType.OTHER, // Represent score as a generic issue type
+            // Add severity based on score
+            severity: this.mapScoreToSeverity(score.score),
+            description: `AI Score (${score.type}): ${score.score}/100. ${score.details || ''}`,
+            status: segment_model_1.IssueStatus.OPEN,
+            createdAt: new Date(),
+            // createdBy: ?? // Needs user context if available
         }));
-        segment.reviewResult.scores = scores;
-        // 保存问题
-        if (!segment.issues) {
-            segment.issues = [];
-        }
-        // 保存问题
-        for (const issueData of reviewResult.issues) {
-            segment.issues.push({
-                type: issueData.type,
-                description: issueData.description,
-                position: issueData.position,
-                suggestion: issueData.suggestion,
-                resolved: false,
-                createdAt: new Date()
-            });
-        }
+        // Save AI-detected issues
+        const issuesFromAI = (reviewResult.issues || []).map((issueData) => ({
+            type: issueData.type || segment_model_1.IssueType.OTHER,
+            // Add severity if missing, default to MEDIUM
+            severity: issueData.severity || segment_model_1.IssueSeverity.MEDIUM,
+            description: issueData.description,
+            position: issueData.position,
+            suggestion: issueData.suggestion,
+            status: segment_model_1.IssueStatus.OPEN, // Default status
+            createdAt: new Date(),
+            // createdBy: ?? // Needs user context if available
+        }));
+        // Combine issues
+        segment.issues = [...(segment.issues || []), ...issuesFromAI, ...issuesFromScores];
+        segment.markModified('issues'); // Ensure array modification is saved
+        // Update review metadata (no scores field here)
+        segment.reviewMetadata = {
+            ...(segment.reviewMetadata || {}), // Preserve existing metadata if any
+            aiModel: reviewResult.metadata?.model,
+            // promptTemplateId: ??? // Needs context
+            tokenCount: (reviewResult.metadata?.tokens?.input ?? 0) + (reviewResult.metadata?.tokens?.output ?? 0),
+            processingTime: reviewResult.metadata?.processingTime,
+            modificationDegree: reviewResult.metadata?.modificationDegree
+        };
+        segment.markModified('reviewMetadata');
         // 更新段落状态
-        segment.status = segment_model_1.SegmentStatus.REVIEW_COMPLETED;
+        segment.status = segment_model_1.SegmentStatus.REVIEW_PENDING; // Status indicates AI review done, pending human
         await segment.save();
     }
     /**
@@ -463,6 +464,18 @@ class ReviewTaskProcessor {
         }
         await Promise.all(executing);
         return results;
+    }
+    /**
+     * 将评分映射为问题严重性
+     */
+    mapScoreToSeverity(score) {
+        if (score >= 90)
+            return segment_model_1.IssueSeverity.HIGH;
+        if (score >= 70)
+            return segment_model_1.IssueSeverity.MEDIUM;
+        if (score >= 50)
+            return segment_model_1.IssueSeverity.LOW;
+        return segment_model_1.IssueSeverity.LOW;
     }
 }
 exports.ReviewTaskProcessor = ReviewTaskProcessor;

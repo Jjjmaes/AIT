@@ -103,28 +103,12 @@ describe("TranslationService Error Handling", () => {
     expect(errorAdapter.validateApiKey).toHaveBeenCalled();
   });
 
-  it("should handle model info retrieval errors", async () => {
-    const errorAdapter = {
-      translateText: jest.fn(),
-      validateApiKey: jest.fn().mockResolvedValue(true),
-      getAvailableModels: jest.fn().mockResolvedValue([]),
-      getModelInfo: jest.fn().mockRejectedValue(new Error("Model info retrieval failed")),
-      getPricing: jest.fn().mockResolvedValue({})
-    };
-
+  it("should handle getAvailableModels failure", async () => {
+    const mockError = new Error("Model list retrieval failed");
+    const mockAdapter = { getAvailableModels: jest.fn().mockRejectedValue(mockError) };
     (AIServiceFactory.getInstance as jest.Mock).mockReturnValue({
-      createAdapter: jest.fn().mockReturnValue(errorAdapter)
+      createAdapter: jest.fn().mockReturnValue(mockAdapter)
     });
-
-    const mockCacheService = {
-      get: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockResolvedValue(true),
-      delete: jest.fn().mockResolvedValue(true),
-      clear: jest.fn().mockResolvedValue(true),
-      has: jest.fn().mockResolvedValue(false)
-    };
-    
-    (TranslationCacheService as jest.Mock).mockImplementation(() => mockCacheService);
 
     const errorService = new TranslationService({
       provider: AIProvider.OPENAI,
@@ -138,6 +122,6 @@ describe("TranslationService Error Handling", () => {
       }
     });
 
-    await expect(errorService.getModelInfo('test-model')).rejects.toThrow('Model info retrieval failed');
+    await expect(errorService.getAvailableModels()).rejects.toThrow("Model list retrieval failed");
   });
 });

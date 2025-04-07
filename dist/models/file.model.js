@@ -50,6 +50,10 @@ var FileType;
     FileType["JSON"] = "json";
     FileType["MD"] = "md";
     FileType["DOCX"] = "docx";
+    FileType["HTML"] = "html";
+    FileType["XML"] = "xml";
+    FileType["CSV"] = "csv";
+    FileType["XLSX"] = "xlsx";
     FileType["MEMOQ_XLIFF"] = "mqxliff";
     FileType["XLIFF"] = "xliff";
 })(FileType || (exports.FileType = FileType = {}));
@@ -120,7 +124,11 @@ const fileSchema = new mongoose_1.Schema({
     errorDetails: String,
     processingStartedAt: Date,
     processingCompletedAt: Date,
-    segmentCount: Number,
+    segmentCount: {
+        type: Number,
+        required: true,
+        default: 0
+    },
     translatedCount: {
         type: Number,
         default: 0

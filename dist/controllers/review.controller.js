@@ -9,7 +9,6 @@ exports.getSegmentReviewResult = getSegmentReviewResult;
 exports.finalizeSegmentReview = finalizeSegmentReview;
 exports.addSegmentIssue = addSegmentIssue;
 exports.resolveSegmentIssue = resolveSegmentIssue;
-exports.batchUpdateSegmentStatus = batchUpdateSegmentStatus;
 exports.reviewTextDirectly = reviewTextDirectly;
 exports.getSupportedReviewModels = getSupportedReviewModels;
 exports.queueSegmentReview = queueSegmentReview;
@@ -18,13 +17,15 @@ exports.queueBatchSegmentReview = queueBatchSegmentReview;
 exports.queueFileReview = queueFileReview;
 exports.getReviewTaskStatus = getReviewTaskStatus;
 exports.cancelReviewTask = cancelReviewTask;
-const review_service_1 = __importDefault(require("../services/review.service"));
+const review_service_1 = require("../services/review.service");
 const ai_review_service_1 = __importDefault(require("../services/ai-review.service"));
 const errors_1 = require("../utils/errors");
 const queue_task_interface_1 = require("../services/translation/queue/queue-task.interface");
 const translation_queue_service_1 = require("../services/translation/queue/translation-queue.service");
 const ai_service_types_1 = require("../types/ai-service.types");
 const logger_1 = __importDefault(require("../utils/logger"));
+const segment_model_1 = require("../models/segment.model");
+const mongoose_1 = require("mongoose");
 // 自定义错误类
 class BadRequestError extends errors_1.AppError {
     constructor(message = '请求参数错误') {
@@ -53,7 +54,7 @@ async function requestSegmentReview(req, res) {
                 aiModel: options.model || options.aiModel || 'gpt-3.5-turbo'
             };
             logger_1.default.info(`Starting immediate segment review for segment ${segmentId}`);
-            const segment = await review_service_1.default.startAIReview(segmentId, userId, reviewOptions);
+            const segment = await review_service_1.reviewService.startAIReview(segmentId, userId, reviewOptions);
             res.status(200).json({
                 success: true,
                 message: '段落审校已完成',
@@ -131,7 +132,7 @@ async function completeSegmentReview(req, res) {
             modificationDegree
         };
         logger_1.default.info(`Completing segment review for segment ${segmentId}`);
-        const segment = await review_service_1.default.completeSegmentReview(segmentId, userId, reviewData);
+        const segment = await review_service_1.reviewService.completeSegmentReview(segmentId, userId, reviewData);
         res.status(200).json({
             success: true,
             message: '段落审校已完成',
@@ -170,7 +171,7 @@ async function getSegmentReviewResult(req, res) {
             throw new errors_1.UnauthorizedError('未授权的访问');
         }
         logger_1.default.info(`Getting segment review result for segment ${segmentId}`);
-        const result = await review_service_1.default.getSegmentReviewResult(segmentId, userId);
+        const result = await review_service_1.reviewService.getSegmentReviewResult(segmentId, userId);
         res.status(200).json({
             success: true,
             data: result
@@ -205,7 +206,7 @@ async function finalizeSegmentReview(req, res) {
             throw new errors_1.UnauthorizedError('未授权的访问');
         }
         logger_1.default.info(`Finalizing segment review for segment ${segmentId}`);
-        const segment = await review_service_1.default.finalizeSegmentReview(segmentId, userId);
+        const segment = await review_service_1.reviewService.finalizeSegmentReview(segmentId, userId);
         res.status(200).json({
             success: true,
             message: '段落审校已确认',
@@ -234,9 +235,9 @@ async function finalizeSegmentReview(req, res) {
  */
 async function addSegmentIssue(req, res) {
     try {
-        const { segmentId, type, description, position, suggestion } = req.body;
-        if (!segmentId || !type || !description) {
-            res.status(400).json({ error: '缺少必要参数' });
+        const { segmentId, type, description, position, suggestion, severity } = req.body;
+        if (!segmentId || !type || !description || !severity) {
+            res.status(400).json({ error: '缺少必要参数 (segmentId, type, description, severity)' });
             return;
         }
         const userId = req.user?.id;
@@ -247,14 +248,18 @@ async function addSegmentIssue(req, res) {
             type,
             description,
             position,
-            suggestion
+            suggestion,
+            severity: severity,
+            status: segment_model_1.IssueStatus.OPEN,
+            createdBy: new mongoose_1.Types.ObjectId(userId),
+            createdAt: new Date()
         };
         logger_1.default.info(`Adding issue to segment ${segmentId}`);
-        const segment = await review_service_1.default.addSegmentIssue(segmentId, userId, issueData);
+        const issue = await review_service_1.reviewService.addSegmentIssue(segmentId, userId, issueData);
         res.status(200).json({
             success: true,
             message: '问题已添加',
-            data: segment
+            data: issue
         });
     }
     catch (error) {
@@ -277,16 +282,22 @@ async function addSegmentIssue(req, res) {
 async function resolveSegmentIssue(req, res) {
     try {
         const { segmentId, issueId } = req.params;
-        if (!segmentId || !issueId) {
-            res.status(400).json({ error: '缺少必要参数' });
+        const { resolution } = req.body;
+        if (!segmentId || !issueId || !resolution) {
+            res.status(400).json({ error: '缺少必要参数 (segmentId, issueId, resolution)' });
             return;
         }
         const userId = req.user?.id;
         if (!userId) {
             throw new errors_1.UnauthorizedError('未授权的访问');
         }
-        logger_1.default.info(`Resolving issue ${issueId} for segment ${segmentId}`);
-        const segment = await review_service_1.default.resolveSegmentIssue(segmentId, issueId, userId);
+        const issueIndex = parseInt(issueId, 10);
+        if (isNaN(issueIndex)) {
+            res.status(400).json({ error: '无效的 Issue ID (应为数字索引)' });
+            return;
+        }
+        logger_1.default.info(`Resolving issue index ${issueIndex} for segment ${segmentId}`);
+        const segment = await review_service_1.reviewService.resolveSegmentIssue(segmentId, issueIndex, userId, resolution);
         res.status(200).json({
             success: true,
             message: '问题已解决',
@@ -307,41 +318,47 @@ async function resolveSegmentIssue(req, res) {
     }
 }
 /**
- * 批量更新段落状态
+ * 批量更新段落状态 - Method commented out as service implementation is missing
  * POST /api/review/segment/batch-status
  */
-async function batchUpdateSegmentStatus(req, res) {
-    try {
-        const { segmentIds, status } = req.body;
-        if (!segmentIds || !Array.isArray(segmentIds) || segmentIds.length === 0 || !status) {
-            res.status(400).json({ error: '缺少必要参数' });
-            return;
-        }
-        const userId = req.user?.id;
-        if (!userId) {
-            throw new errors_1.UnauthorizedError('未授权的访问');
-        }
-        logger_1.default.info(`Batch updating status for ${segmentIds.length} segments to ${status}`);
-        const result = await review_service_1.default.batchUpdateSegmentStatus(segmentIds, userId, status);
-        res.status(200).json({
-            success: true,
-            message: `已更新 ${result.modifiedCount} 个段落的状态`,
-            data: {
-                updatedCount: result.modifiedCount,
-                skippedCount: segmentIds.length - result.modifiedCount
-            }
-        });
+/*
+export async function batchUpdateSegmentStatus(req: Request, res: Response): Promise<void> {
+  try {
+    const { segmentIds, status } = req.body;
+    
+    if (!segmentIds || !Array.isArray(segmentIds) || segmentIds.length === 0 || !status) {
+      res.status(400).json({ error: '缺少必要参数' });
+      return;
     }
-    catch (error) {
-        logger_1.default.error('批量更新段落状态失败', { error });
-        if (error.name === 'UnauthorizedError') {
-            res.status(401).json({ error: error.message });
-        }
-        else {
-            res.status(500).json({ error: error.message || '批量更新段落状态失败' });
-        }
+    
+    const userId = (req as AuthRequest).user?.id;
+    if (!userId) {
+      throw new UnauthorizedError('未授权的访问');
     }
+    
+    logger.info(`Batch updating status for ${segmentIds.length} segments to ${status}`);
+    // const result = await reviewService.batchUpdateSegmentStatus(segmentIds, userId, status);
+    const result = { modifiedCount: 0 }; // Placeholder
+    
+    res.status(200).json({
+      success: true,
+      message: `已更新 ${result.modifiedCount} 个段落的状态`,
+      data: {
+        updatedCount: result.modifiedCount,
+        skippedCount: segmentIds.length - result.modifiedCount
+      }
+    });
+  } catch (error: any) {
+    logger.error('批量更新段落状态失败', { error });
+    
+    if (error.name === 'UnauthorizedError') {
+      res.status(401).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message || '批量更新段落状态失败' });
+    }
+  }
 }
+*/
 /**
  * 直接审校文本
  * POST /api/review/text

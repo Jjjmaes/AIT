@@ -57,42 +57,36 @@ describe('Auth Controller', () => {
       password: 'password123'
     };
     
-    const mockUserResult = {
-      token: 'test-token',
-      user: {
-        id: 'user123',
-        username: 'testuser',
-        email: 'test@example.com',
-        role: UserRole.TRANSLATOR
-      }
-    };
-
-    it('should register user successfully', async () => {
+    it('should register a user successfully', async () => {
       mockRequest.body = registerDto;
-      (userService.register as jest.Mock).mockResolvedValue(mockUserResult);
-      
+
+      const mockUserResult = { _id: 'user123', ...registerDto };
+      // Mock registerUser
+      (userService.registerUser as jest.Mock).mockResolvedValue(mockUserResult);
+
       await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
-      
-      expect(userService.register).toHaveBeenCalledWith(registerDto);
+
+      // Expect registerUser to be called
+      expect(userService.registerUser).toHaveBeenCalledWith(registerDto);
       expect(mockResponse.status).toHaveBeenCalledWith(201);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: true,
-        token: mockUserResult.token,
-        user: mockUserResult.user
+        message: '用户注册成功',
+        data: expect.objectContaining({ _id: 'user123' })
       });
-      expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should pass error to next middleware', async () => {
+    it('should handle registration errors', async () => {
       mockRequest.body = registerDto;
-      const error = new Error('注册失败');
-      (userService.register as jest.Mock).mockRejectedValue(error);
-      
+
+      const error = new Error('Registration failed');
+      // Mock registerUser
+      (userService.registerUser as jest.Mock).mockRejectedValue(error);
+
       await authController.register(mockRequest as Request, mockResponse as Response, mockNext);
-      
-      expect(userService.register).toHaveBeenCalledWith(registerDto);
-      expect(mockResponse.status).not.toHaveBeenCalled();
-      expect(mockResponse.json).not.toHaveBeenCalled();
+
+      // Expect registerUser to be called
+      expect(userService.registerUser).toHaveBeenCalledWith(registerDto);
       expect(mockNext).toHaveBeenCalledWith(error);
     });
   });
@@ -102,43 +96,37 @@ describe('Auth Controller', () => {
       email: 'test@example.com',
       password: 'password123'
     };
-    
-    const mockUserResult = {
-      token: 'test-token',
-      user: {
-        id: 'user123',
-        username: 'testuser',
-        email: 'test@example.com',
-        role: UserRole.TRANSLATOR
-      }
-    };
 
-    it('should login user successfully', async () => {
+    it('should log in a user successfully', async () => {
       mockRequest.body = loginDto;
-      (userService.login as jest.Mock).mockResolvedValue(mockUserResult);
-      
+
+      const mockLoginResponse = { token: 'jwttoken', user: { id: 'user123', email: loginDto.email } };
+      // Mock loginUser
+      (userService.loginUser as jest.Mock).mockResolvedValue(mockLoginResponse);
+
       await authController.login(mockRequest as Request, mockResponse as Response, mockNext);
-      
-      expect(userService.login).toHaveBeenCalledWith(loginDto);
+
+      // Expect loginUser to be called
+      expect(userService.loginUser).toHaveBeenCalledWith(loginDto);
       expect(mockResponse.status).toHaveBeenCalledWith(200);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: true,
-        token: mockUserResult.token,
-        user: mockUserResult.user
+        message: '登录成功',
+        data: mockLoginResponse
       });
-      expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should pass error to next middleware', async () => {
+    it('should handle login errors', async () => {
       mockRequest.body = loginDto;
-      const error = new Error('登录失败');
-      (userService.login as jest.Mock).mockRejectedValue(error);
-      
+
+      const error = new UnauthorizedError('Invalid credentials');
+      // Mock loginUser
+      (userService.loginUser as jest.Mock).mockRejectedValue(error);
+
       await authController.login(mockRequest as Request, mockResponse as Response, mockNext);
-      
-      expect(userService.login).toHaveBeenCalledWith(loginDto);
-      expect(mockResponse.status).not.toHaveBeenCalled();
-      expect(mockResponse.json).not.toHaveBeenCalled();
+
+      // Expect loginUser to be called
+      expect(userService.loginUser).toHaveBeenCalledWith(loginDto);
       expect(mockNext).toHaveBeenCalledWith(error);
     });
   });

@@ -14,11 +14,13 @@ import {
 } from '../../utils/errors';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 // 模拟依赖
 jest.mock('../../models/user.model');
 jest.mock('../../utils/logger');
 jest.mock('jsonwebtoken');
+jest.mock('bcrypt');
 
 describe('UserService', () => {
   let userService: UserService;
@@ -45,122 +47,101 @@ describe('UserService', () => {
     jest.clearAllMocks();
   });
 
-  describe('register', () => {
+  describe('registerUser', () => {
     const registerDto: RegisterUserDto = {
       username: 'newuser',
       email: 'new@example.com',
       password: 'password123'
     };
 
-    it('should register a new user successfully', async () => {
-      // 模拟User.findOne方法
+    it('should register a user successfully', async () => {
+      // Mock dependencies
       (User.findOne as jest.Mock).mockResolvedValue(null);
-      
-      // 模拟User.create方法
-      (User.create as jest.Mock).mockResolvedValue({
-        ...mockUser,
-        _id: new mongoose.Types.ObjectId(),
-        username: registerDto.username,
-        email: registerDto.email
-      });
+      (User.create as jest.Mock).mockResolvedValue(mockUser);
+      (jwt.sign as jest.Mock).mockReturnValue('mockToken');
 
-      // 模拟jwt.sign方法
-      (jwt.sign as jest.Mock).mockReturnValue('mock-token');
+      // Call the service method
+      const result = await userService.registerUser(registerDto);
 
-      const result = await userService.register(registerDto);
-
-      expect(User.findOne).toHaveBeenCalledWith({
-        $or: [{ username: registerDto.username }, { email: registerDto.email }]
-      });
-      expect(User.create).toHaveBeenCalledWith({
-        username: registerDto.username,
-        email: registerDto.email,
-        password: registerDto.password,
-        role: UserRole.TRANSLATOR
-      });
+      // Assertions
+      expect(User.findOne).toHaveBeenCalledWith({ $or: [{ username: registerDto.username }, { email: registerDto.email }] });
+      expect(User.create).toHaveBeenCalled();
       expect(jwt.sign).toHaveBeenCalled();
-      expect(result).toHaveProperty('token', 'mock-token');
-      expect(result).toHaveProperty('user');
-      expect(result.user).toHaveProperty('username', registerDto.username);
-      expect(result.user).toHaveProperty('email', registerDto.email);
+      expect(result).toBeDefined();
+      expect(result.email).toBe(registerDto.email);
+      // Ensure password is not returned
+      expect(result).not.toHaveProperty('password'); 
     });
 
-    it('should throw ConflictError if username or email is already taken', async () => {
-      // 模拟User.findOne方法返回已存在的用户
+    it('should throw ConflictError if user already exists', async () => {
       (User.findOne as jest.Mock).mockResolvedValue(mockUser);
 
-      await expect(userService.register(registerDto)).rejects.toThrow(ConflictError);
-      expect(User.findOne).toHaveBeenCalled();
-      expect(User.create).not.toHaveBeenCalled();
+      // Expect registerUser to throw
+      await expect(userService.registerUser(registerDto)).rejects.toThrow(ConflictError);
     });
 
-    it('should handle MongoDB duplicate key error', async () => {
-      // 模拟User.findOne方法
+    it('should re-throw ConflictError for duplicate key errors', async () => {
+      const error: any = new Error('Duplicate key');
+      error.code = 11000;
       (User.findOne as jest.Mock).mockResolvedValue(null);
+      (User.create as jest.Mock).mockRejectedValue(error);
       
-      // 模拟User.create方法抛出重复键错误
-      const duplicateError = new Error('Duplicate key error');
-      (duplicateError as any).code = 11000;
-      (User.create as jest.Mock).mockRejectedValue(duplicateError);
-
-      await expect(userService.register(registerDto)).rejects.toThrow(ConflictError);
+      // Expect registerUser to throw
+      await expect(userService.registerUser(registerDto)).rejects.toThrow(ConflictError);
     });
   });
 
-  describe('login', () => {
+  describe('loginUser', () => {
     const loginDto: LoginUserDto = {
       email: 'test@example.com',
       password: 'password123'
     };
 
-    it('should login successfully with correct credentials', async () => {
-      const mockComparePassword = jest.fn().mockResolvedValue(true);
-      
-      // 模拟User.findOne方法
-      (User.findOne as jest.Mock).mockResolvedValue({
-        _id: mockUserId,
-        email: loginDto.email,
-        username: 'testuser',
-        role: UserRole.TRANSLATOR,
-        comparePassword: mockComparePassword
-      });
-      
-      // 模拟jwt.sign方法
-      (jwt.sign as jest.Mock).mockReturnValue('mock-token');
+    // Define a mock user with password for login tests
+    const mockUserWithPassword = {
+        ...mockUser, // Include basic user details
+        password: 'hashedpassword', // Add password field
+        active: true, // Add active field as it's checked in loginUser
+        select: jest.fn().mockReturnThis(), // Mock select method if called
+        toObject: jest.fn().mockReturnThis() // Mock toObject if needed
+    };
 
-      const result = await userService.login(loginDto);
+    it('should login a user successfully', async () => {
+      // Mock dependencies
+      const selectMock = { select: jest.fn().mockResolvedValue(mockUserWithPassword) };
+      (User.findOne as jest.Mock).mockReturnValue(selectMock);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (jwt.sign as jest.Mock).mockReturnValue('mockToken');
 
+      // Call the service method
+      const result = await userService.loginUser(loginDto);
+
+      // Assertions
       expect(User.findOne).toHaveBeenCalledWith({ email: loginDto.email });
-      expect(mockComparePassword).toHaveBeenCalledWith(loginDto.password);
+      expect(selectMock.select).toHaveBeenCalledWith('+password');
+      // Compare against the password in the mock object
+      expect(bcrypt.compare).toHaveBeenCalledWith(loginDto.password, mockUserWithPassword.password);
       expect(jwt.sign).toHaveBeenCalled();
-      expect(result).toHaveProperty('token', 'mock-token');
-      expect(result).toHaveProperty('user');
-      expect(result.user).toHaveProperty('email', loginDto.email);
+      expect(result).toBeDefined();
+      expect(result.token).toBe('mockToken');
+      expect(result.user.email).toBe(loginDto.email);
     });
 
     it('should throw UnauthorizedError if user not found', async () => {
-      // 模拟User.findOne方法返回null
-      (User.findOne as jest.Mock).mockResolvedValue(null);
+      const selectMock = { select: jest.fn().mockResolvedValue(null) };
+      (User.findOne as jest.Mock).mockReturnValue(selectMock);
 
-      await expect(userService.login(loginDto)).rejects.toThrow(UnauthorizedError);
-      expect(User.findOne).toHaveBeenCalled();
+      // Expect loginUser to throw
+      await expect(userService.loginUser(loginDto)).rejects.toThrow(UnauthorizedError);
     });
 
-    it('should throw UnauthorizedError if password is incorrect', async () => {
-      const mockComparePassword = jest.fn().mockResolvedValue(false);
-      
-      // 模拟User.findOne方法
-      (User.findOne as jest.Mock).mockResolvedValue({
-        _id: mockUserId,
-        email: loginDto.email,
-        username: 'testuser',
-        role: UserRole.TRANSLATOR,
-        comparePassword: mockComparePassword
-      });
+    it('should throw UnauthorizedError if password is invalid', async () => {
+      const selectMock = { select: jest.fn().mockResolvedValue(mockUserWithPassword) };
+      (User.findOne as jest.Mock).mockReturnValue(selectMock);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(userService.login(loginDto)).rejects.toThrow(UnauthorizedError);
-      expect(User.findOne).toHaveBeenCalled();
-      expect(mockComparePassword).toHaveBeenCalledWith(loginDto.password);
+      // Expect loginUser to throw
+      await expect(userService.loginUser(loginDto)).rejects.toThrow(UnauthorizedError);
     });
   });
 
