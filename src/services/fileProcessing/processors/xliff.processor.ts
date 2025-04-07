@@ -12,53 +12,65 @@ import { readFile, writeFile } from 'fs/promises';
 export class XliffProcessor implements IFileProcessor {
   private parser = new DOMParser();
   private serializer = new XMLSerializer();
+  private parseErrors: string[] = [];
 
-  // Update getJoinedText to handle Elements and extract textContent
-  private getJoinedText(nodes: Node | Node[] | null): string {
+  private errorHandler = {
+    warning: (msg: string) => {
+      logger.warn('XML Parser Warning:', msg);
+    },
+    error: (msg: string) => {
+      logger.error('XML Parser Error:', msg);
+      this.parseErrors.push(`ERROR: ${msg}`);
+    },
+    fatalError: (msg: string) => {
+      logger.error('XML Parser Fatal Error:', msg);
+      this.parseErrors.push(`FATAL: ${msg}`);
+    },
+  };
+
+  constructor() {
+    // this.parser = new DOMParser({ errorHandler: this.errorHandler });
+  }
+
+  private getJoinedText(nodes: any | any[] | null): string {
     if (!nodes) return '';
     
-    const extractText = (node: Node): string => {
-      if (node.nodeType === node.ELEMENT_NODE) {
-        // Recursively get text content, handling potential nested elements/text
+    const extractText = (node: any): string => {
+      if (node.nodeType === 1 /* ELEMENT_NODE */) { 
         let text = '';
         for (let i = 0; i < node.childNodes.length; i++) {
           const child = node.childNodes[i];
-          if (child.nodeType === child.TEXT_NODE) {
+          if (child.nodeType === 3 /* TEXT_NODE */) { 
             text += child.nodeValue;
-          } else if (child.nodeType === child.ELEMENT_NODE) {
-             // Keep simple inline tags like <g>, <x> etc. as placeholders 
-             // or implement more complex tag handling if needed
+          } else if (child.nodeType === 1 /* ELEMENT_NODE */) {
              if (['g', 'x', 'bx', 'ex', 'ph'].includes((child as Element).tagName)) {
                 text += this.serializer.serializeToString(child); 
              } else {
-                text += extractText(child); // Recurse for other elements
+                text += extractText(child); 
              }
           }
         }
         return text;
-      } else if (node.nodeType === node.TEXT_NODE) {
+      } else if (node.nodeType === 3 /* TEXT_NODE */) { 
         return node.nodeValue || '';
       }
       return '';
     };
 
     if (Array.isArray(nodes)) {
-      // If multiple nodes are somehow passed (e.g., selecting elements instead of first one),
-      // join their text contents.
       return nodes.map(extractText).join(''); 
     } else {
       return extractText(nodes);
     }
   }
   
-  // Helper to map XLIFF state back to internal status during extraction
   private mapXliffStateToStatus(state: string | null, hasTargetText: boolean): SegmentStatus {
       if (!state && hasTargetText) return SegmentStatus.TRANSLATED; 
       if (!state) return SegmentStatus.PENDING;
 
       switch (state.toLowerCase()) {
           case 'new':
-          case 'needs-translation': // Standard XLIFF states
+          case 'needs-translation':
           case 'needs-adaptation':
           case 'needs-l10n':
               return SegmentStatus.PENDING;
@@ -68,10 +80,10 @@ export class XliffProcessor implements IFileProcessor {
           case 'needs-review-l10n':
               return SegmentStatus.TRANSLATED;
           case 'reviewed': 
-              // Map XLIFF 'reviewed' to internal REVIEW_COMPLETED state
               return SegmentStatus.REVIEW_COMPLETED;
-          case 'signed-off': // MemoQ state often means final
-          case 'final': // Standard XLIFF state
+          case 'signed-off':
+          case 'final':
+          case 'confirmed':
               return SegmentStatus.COMPLETED;
           default:
               logger.warn(`Unknown XLIFF state encountered: '${state}'. Defaulting to PENDING.`);
@@ -79,57 +91,78 @@ export class XliffProcessor implements IFileProcessor {
       }
   }
 
-  /**
-   * Extracts segments and metadata from a given file path.
-   * Matches the IFileProcessor interface.
-   */
+  // Maps internal SegmentStatus back to XLIFF state attributes
+  private mapStatusToXliffState(status: SegmentStatus): string {
+    switch (status) {
+        case SegmentStatus.COMPLETED:
+            return 'final';
+        case SegmentStatus.REVIEW_COMPLETED:
+            return 'reviewed';
+        case SegmentStatus.TRANSLATED:
+            return 'translated';
+        case SegmentStatus.PENDING:
+        case SegmentStatus.ERROR:
+        default:
+            return 'new'; // Or 'needs-translation' depending on exact spec needs
+    }
+  }
+
   async extractSegments(filePath: string, ...options: any[]): Promise<FileProcessingResult> {
     const isMemoQ = options.some(opt => opt && opt.isMemoQ === true);
     logger.info(`Starting XLIFF segment extraction from file: ${filePath} (MemoQ: ${isMemoQ})`);
 
     try {
       const fileContent = await readFile(filePath, 'utf-8');
-      const doc = this.parser.parseFromString(fileContent, 'text/xml');
+      
+      this.parseErrors = [];
+      
+      const doc = this.parser.parseFromString(fileContent, 'text/xml'); 
+
+      const selectForStructure = xpath.useNamespaces({ 'xliff': 'urn:oasis:names:tc:xliff:document:1.2' });
+      const fileNode = selectForStructure('//xliff:file', doc, true);
+      const bodyNode = selectForStructure('//xliff:file/xliff:body', doc, true);
+
+      if (!fileNode || !bodyNode) {
+           const errorDetail = this.parseErrors.length > 0 ? this.parseErrors.join('; ') : 'Invalid XLIFF structure: Missing <file> or <body> element.';
+           logger.error(`Invalid XLIFF structure detected in ${filePath}. Details: ${errorDetail}`);
+           throw new Error(`XML parsing failed: ${errorDetail}`);
+      }
+      
       const select = xpath.useNamespaces({
           'xliff': 'urn:oasis:names:tc:xliff:document:1.2',
           ...(isMemoQ && { 'm': 'http://www.memoq.com/memoq/xliff' }) 
       });
 
-      const transUnitsXml = select(isMemoQ ? '//m:trans-unit' : '//xliff:trans-unit', doc);
-      if (!Array.isArray(transUnitsXml)) {
-        logger.warn(`No trans-unit elements found or xpath returned non-array in ${filePath}`);
-        return { segments: [], metadata: {}, segmentCount: 0 };
+      let fileMetadata: Record<string, any> = {};
+      if (fileNode && typeof fileNode === 'object' && !Array.isArray(fileNode) && fileNode.nodeType === 1) { 
+           const elementNode = fileNode as Element;
+           fileMetadata = {
+               original: elementNode.getAttribute(isMemoQ ? 'm:original' : 'original') || '',
+               sourceLanguage: elementNode.getAttribute(isMemoQ ? 'm:source-language' : 'source-language') || '',
+               targetLanguage: elementNode.getAttribute(isMemoQ ? 'm:target-language' : 'target-language') || '',
+               datatype: elementNode.getAttribute('datatype') || '',
+           };
+      }
+
+      const transUnitsXml = select(isMemoQ ? '//m:trans-unit' : '//xliff:file/xliff:body/xliff:trans-unit', doc);
+      if (!Array.isArray(transUnitsXml) || transUnitsXml.length === 0) {
+        logger.warn(`No trans-unit elements found or xpath returned empty array in ${filePath}`, transUnitsXml);
+        return { segments: [], metadata: fileMetadata, segmentCount: 0 };
       }
 
       const extractedSegments: Partial<ISegment>[] = [];
-      let fileMetadata: Record<string, any> = {};
-
-      // Extract file level metadata
-      const fileNodeSelector = isMemoQ ? '//m:file' : '//xliff:file'; // Adjust selector if needed for MemoQ file node
-      const fileNode = select(fileNodeSelector, doc, true) as Element | null;
-      if (fileNode) {
-          fileMetadata = {
-              original: fileNode.getAttribute('original') || '',
-              sourceLanguage: fileNode.getAttribute(isMemoQ ? 'm:source-language' : 'source-language') || '',
-              targetLanguage: fileNode.getAttribute(isMemoQ ? 'm:target-language' : 'target-language') || '',
-              datatype: fileNode.getAttribute('datatype') || '',
-          };
-      }
 
       for (const unitNode of transUnitsXml) {
-          if (!(unitNode instanceof Node)) continue;
+          if (!unitNode || typeof unitNode !== 'object' || !unitNode.nodeType) continue;
           const element = unitNode as Element;
 
           const id = element.getAttribute('id') ?? '';
-          // Select the source/target ELEMENT, not just text() nodes
           const sourceSelector = isMemoQ ? './/m:source' : './/xliff:source';
           const targetSelector = isMemoQ ? './/m:target' : './/xliff:target';
 
-          // Select the first matching element node
           const sourceNode = select(sourceSelector, element, true) as Node | null;
           const targetNode = select(targetSelector, element, true) as Node | null;
           
-          // Pass the element nodes to getJoinedText
           const sourceText = this.getJoinedText(sourceNode);
           const targetText = this.getJoinedText(targetNode);
 
@@ -138,13 +171,11 @@ export class XliffProcessor implements IFileProcessor {
             continue;
           }
 
-          // Extract segment state
           let segmentState = null;
           if (isMemoQ) {
-              segmentState = element.getAttribute('m:state'); // Or m:status?
+              segmentState = element.getAttribute('m:state'); 
           } else {
-              // State is typically on the target element in standard XLIFF
-              segmentState = targetNode instanceof Element ? targetNode.getAttribute('state') : null;
+              segmentState = targetNode?.nodeType === 1 ? (targetNode as Element).getAttribute('state') : null;
           }
           const status = this.mapXliffStateToStatus(segmentState, !!targetText);
 
@@ -177,16 +208,13 @@ export class XliffProcessor implements IFileProcessor {
     }
   }
 
-  /**
-   * Writes translations back into an XLIFF file structure.
-   * Matches the IFileProcessor interface signature.
-   */
   async writeTranslations(
-    segments: ISegment[], // Use full ISegment from DB
+    segments: ISegment[],
     originalFilePath: string,
     targetFilePath: string,
-    ...options: any[] // Added options parameter
+    ...options: any[]
   ): Promise<void> {
+    console.log('[writeTranslations] Starting...');
     logger.info(`Starting XLIFF translation writing for ${segments.length} segments to ${targetFilePath}.`);
     const isMemoQ = options.some(opt => opt && opt.isMemoQ === true);
     try {
@@ -197,74 +225,123 @@ export class XliffProcessor implements IFileProcessor {
         ...(isMemoQ && { 'm': 'http://www.memoq.com/memoq/xliff' })
       });
 
-      for (const segment of segments) {
+      const fragmentParser = new DOMParser(); 
+
+      for (const [index, segment] of segments.entries()) {
+          console.log(`[writeTranslations] Processing segment index: ${index}`);
+          // Get the unitId, don't assign a default value here
           const unitId = segment.metadata?.xliffId;
 
-          if (!unitId || typeof unitId !== 'string' || unitId.includes("'")) {
-               logger.warn(`Skipping segment with invalid or missing xliffId in metadata: segment index ${segment.index}`);
+          // Check if unitId is a valid non-empty string and doesn't contain quotes (potential XPath injection)
+          if (!unitId || typeof unitId !== 'string' || unitId.trim() === '' || unitId.includes("'") || unitId.includes('"')) {
+               logger.warn(`Skipping segment with invalid, missing, or potentially unsafe xliffId in metadata: segment index ${index}, xliffId: ${unitId}`);
                continue;
           }
 
+          // Now we know unitId is a valid string, proceed with finding the node
           const transUnitSelector = isMemoQ ? `//m:trans-unit[@id='${unitId}']` : `//xliff:trans-unit[@id='${unitId}']`;
           const transUnitNode = select(transUnitSelector, doc, true) as Node | null;
 
-          if (!transUnitNode || !(transUnitNode instanceof Element)) {
-            logger.warn(`Could not find trans-unit element with id '${unitId}' in original XLIFF file ${originalFilePath}.`);
+          if (!transUnitNode || transUnitNode.nodeType !== 1) {
+            logger.warn(`Could not find trans-unit element node with id '${unitId}' or it is not an Element in original XLIFF file ${originalFilePath}.`);
             continue;
           }
+          const transUnitElement = transUnitNode as Element;
 
           const targetSelector = isMemoQ ? 'm:target' : 'xliff:target';
-          let targetNode = select(targetSelector, transUnitNode, true) as Element | null;
+          let targetNode = select(targetSelector, transUnitElement, true) as Element | null;
 
           if (!targetNode) {
-            targetNode = doc.createElementNS(isMemoQ ? 'http://www.memoq.com/memoq/xliff' : 'urn:oasis:names:tc:xliff:document:1.2', 'target');
+            // Find and remove existing comment sibling of source, if any
             const sourceSelector = isMemoQ ? 'm:source' : 'xliff:source';
-            const sourceNode = select(sourceSelector, transUnitNode, true) as Node | null;
+            const sourceNode = select(sourceSelector, transUnitElement, true) as Node | null;
+            if (sourceNode) {
+              let sibling = sourceNode.nextSibling;
+              while (sibling) {
+                if (sibling.nodeType === 8 /* COMMENT_NODE */) {
+                  transUnitElement.removeChild(sibling);
+                  break; // Assume only one relevant comment to remove
+                }
+                sibling = sibling.nextSibling;
+              }
+            }
+            
+            // Create and append the new target node
+            const namespaceURI = isMemoQ ? 'http://www.memoq.com/memoq/xliff' : 'urn:oasis:names:tc:xliff:document:1.2';
+            targetNode = doc.createElementNS(namespaceURI, 'target');
             if (sourceNode && sourceNode.nextSibling) {
-                transUnitNode.insertBefore(targetNode, sourceNode.nextSibling);
+                transUnitElement.insertBefore(targetNode, sourceNode.nextSibling);
             } else {
-                transUnitNode.appendChild(targetNode);
+                transUnitElement.appendChild(targetNode);
             }
           }
 
           while (targetNode.firstChild) {
             targetNode.removeChild(targetNode.firstChild);
           }
+          
           const textToWrite = segment.finalText ?? segment.translation ?? '';
-          targetNode.appendChild(doc.createTextNode(textToWrite));
 
-          // Update state attribute based on segment status
+          if (textToWrite) {
+            console.log(`[writeTranslations] Attempting to parse fragment for unit ${unitId}`);
+            try {
+              const fragmentDoc = fragmentParser.parseFromString(`<dummy>${textToWrite}</dummy>`, 'text/xml');
+              console.log(`[writeTranslations] Parsed fragment for unit ${unitId}`);
+              const dummyRoot = fragmentDoc.documentElement;
+              const nodesToAppend = Array.from(dummyRoot.childNodes);
+              console.log(`[writeTranslations] Found ${nodesToAppend.length} nodes in fragment for unit ${unitId}`);
+              
+              // Iterate through the copied array
+              for (const node of nodesToAppend) {
+                 console.log(`[writeTranslations] Importing node type ${node.nodeType} for unit ${unitId}`);
+                 const importedNode = doc.importNode(node, true);
+                 console.log(`[writeTranslations] Appending imported node type ${importedNode.nodeType} for unit ${unitId}`);
+                 targetNode.appendChild(importedNode);
+                 console.log(`[writeTranslations] Successfully appended node for unit ${unitId}`);
+              }
+              
+              if (nodesToAppend.length > 0) {
+                  console.log(`[writeTranslations] Appended fragment children for unit ${unitId}`); 
+              }
+
+            } catch (parseError) {
+              console.log(`[writeTranslations] Fragment parse FAILED for unit ${unitId}`, parseError);
+              logger.warn(`Could not parse target text fragment for unit ${unitId}. Inserting as plain text. Error: ${parseError}`);
+              targetNode.appendChild(doc.createTextNode(textToWrite));
+            }
+          } else {
+             targetNode.appendChild(doc.createTextNode(''));
+          }
+
+          // Update state attributes
           const xliffState = this.mapStatusToXliffState(segment.status);
+          
+          // Remove old state attribute first, then set new one
+          targetNode.removeAttribute('state');
           targetNode.setAttribute('state', xliffState);
-          // Update state on trans-unit too, using correct namespace if MemoQ
-          transUnitNode.setAttribute(isMemoQ ? 'm:state' : 'state', xliffState); 
+          
+          // Do the same for the parent trans-unit element
+          const transUnitStateAttrName = isMemoQ ? 'm:state' : 'state';
+          transUnitElement.removeAttribute(transUnitStateAttrName);
+          transUnitElement.setAttribute(transUnitStateAttrName, xliffState);
       }
 
+      // Finished processing all segments in the loop
+      console.log('[writeTranslations] Finished loop, preparing to serialize...');
+
+      // Serialize the modified document
       const updatedContent = this.serializer.serializeToString(doc);
+      
+      console.log('[writeTranslations] Serialization complete, preparing to write file...');
+
+      // Write the updated content to the target file
       await writeFile(targetFilePath, updatedContent, 'utf-8');
+      console.log('[writeTranslations] Finished writing file.');
       logger.info(`Finished writing translations to XLIFF file: ${targetFilePath}.`);
 
     } catch (error) {
-      logger.error(`Error writing translations to XLIFF file ${targetFilePath}:`, error);
-      throw new Error(`Failed to write translations to XLIFF file ${targetFilePath}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  // Helper to map internal status to XLIFF state
-  private mapStatusToXliffState(status: SegmentStatus): string {
-    switch (status) {
-      case SegmentStatus.TRANSLATED:
-      case SegmentStatus.REVIEW_PENDING:
-      case SegmentStatus.REVIEW_IN_PROGRESS:
-        return 'translated'; 
-      case SegmentStatus.REVIEW_COMPLETED: 
-          return 'reviewed'; 
-      case SegmentStatus.COMPLETED: 
-        return 'final';
-      case SegmentStatus.PENDING:
-      case SegmentStatus.TRANSLATING:
-      default:
-        return 'needs-translation';
+      logger.error(`Error processing XLIFF file ${originalFilePath}:`, error);
+      throw new Error(`Failed to process XLIFF file ${originalFilePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
