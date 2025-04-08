@@ -81,8 +81,8 @@ const sampleXliffNoUnits = `<?xml version="1.0" encoding="UTF-8"?>
  <file original="empty.txt" source-language="en" target-language="ja" datatype="plaintext">
   <body>
     <!-- No trans-unit elements here -->
-  </body>
- </file>
+    </body>
+  </file>
 </xliff>`;
 
 describe('XliffProcessor', () => {

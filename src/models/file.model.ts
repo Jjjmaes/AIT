@@ -4,8 +4,11 @@ import { TranslationStatus } from '../types/translation.types';
 export enum FileStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
+  EXTRACTED = 'extracted',
+  TRANSLATING = 'translating',
   TRANSLATED = 'translated',
   REVIEWING = 'reviewing',
+  REVIEW_COMPLETED = 'review_completed',
   COMPLETED = 'completed',
   ERROR = 'error'
 }
@@ -34,12 +37,9 @@ export interface IFile extends Document {
   uploadedBy: Types.ObjectId;
   storageUrl: string;
   path: string;
-  metadata: {
-    sourceLanguage: string;
-    targetLanguage: string;
-    category?: string;
-    tags?: string[];
-  };
+  filePath: string;
+  fileType: FileType;
+  metadata?: Record<string, any>;
   progress?: {
     total: number;
     completed: number;
@@ -149,17 +149,17 @@ const fileSchema = new Schema<IFile>(
       type: String,
       required: true
     },
+    filePath: {
+      type: String,
+      required: true
+    },
+    fileType: {
+      type: String,
+      enum: Object.values(FileType),
+      required: true
+    },
     metadata: {
-      sourceLanguage: {
-        type: String,
-        required: true
-      },
-      targetLanguage: {
-        type: String,
-        required: true
-      },
-      category: String,
-      tags: [String]
+      type: Schema.Types.Mixed
     },
     progress: {
       total: Number,
@@ -168,7 +168,9 @@ const fileSchema = new Schema<IFile>(
       percentage: Number
     },
     error: String,
-    errorDetails: String,
+    errorDetails: {
+      type: String
+    },
     processingStartedAt: Date,
     processingCompletedAt: Date,
     segmentCount: {

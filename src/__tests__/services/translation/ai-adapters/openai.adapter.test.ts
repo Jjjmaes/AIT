@@ -20,8 +20,8 @@ describe('OpenAIAdapter', () => {
   let mockConfig: AIServiceConfig;
   // Define a simple mock client structure
   let mockSimpleClient: { 
-    chat: { 
-      completions: { 
+    chat: {
+      completions: {
         create: jest.Mock<() => Promise<OpenAIResources.Chat.Completions.ChatCompletion>> } 
     } 
   };
@@ -57,7 +57,7 @@ describe('OpenAIAdapter', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockConfig = { 
+    mockConfig = {
       provider: AIProvider.OPENAI,
       apiKey: 'test-key',
       aiModel: 'gpt-4-turbo'

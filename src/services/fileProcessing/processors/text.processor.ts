@@ -1,4 +1,4 @@
-import { IFileProcessor, FileProcessingResult } from '../types';
+import { IFileProcessor, FileProcessingResult, ExtractedSegmentData } from '../types';
 import { ISegment, SegmentStatus } from '../../../models/segment.model';
 import { readFile, writeFile } from 'fs/promises';
 import logger from '../../../utils/logger';
@@ -9,37 +9,29 @@ export class TextProcessor implements IFileProcessor {
     logger.info(`Extracting segments from TXT file: ${filePath}`);
     try {
       const content = await readFile(filePath, 'utf8');
-      
-      // Split by double line breaks to treat paragraphs as segments
-      // Adjust the regex if different segmentation logic is needed (e.g., single line break)
-      const rawSegments = content.split(/\r?\n\r?\n+/); 
-      
-      const segments: Partial<ISegment>[] = [];
+      const paragraphs = content.split(/\r?\n\r?\n/).filter(p => p.trim().length > 0);
+
+      // Type the array correctly
+      const segments: ExtractedSegmentData[] = [];
       let segmentIndex = 0;
-
-      for (const text of rawSegments) {
-          const trimmedText = text.trim();
-          if (trimmedText.length === 0) {
-              // Skip empty lines/paragraphs
-              continue;
-          }
-
+      for (const paragraph of paragraphs) {
           segments.push({
-              sourceText: trimmedText,
+              sourceText: paragraph.trim(),
               status: SegmentStatus.PENDING,
               index: segmentIndex++,
-              // No specific metadata for plain text usually
-              metadata: {}
+              // metadata is optional, no need to add empty
           });
       }
 
       logger.debug(`Found ${segments.length} segments in ${filePath}.`);
 
-      return {
-        segments,
-        metadata: {}, // No specific file metadata for plain text
+      // Create the result object explicitly matching FileProcessingResult
+      const result: FileProcessingResult = {
+        segments: segments,
+        metadata: {}, // FileProcessingResult requires metadata
         segmentCount: segments.length,
       };
+      return result;
 
     } catch (error) {
       logger.error(`Error extracting segments from TXT file ${filePath}:`, error);

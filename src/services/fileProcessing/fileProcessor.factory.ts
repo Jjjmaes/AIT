@@ -11,6 +11,9 @@ import { XliffProcessor } from './processors/xliff.processor'; // Uncomment impo
 // Remove import for non-existent JsonProcessor
 // import { JsonProcessor } from './processors/json.processor'; 
 
+// Define and export the supported file types
+export type SupportedFileType = 'xliff' | 'memoqxliff' | 'docx' | 'txt'; // Add other types as processors are added
+
 export class FileProcessorFactory {
   private static processors = new Map<FileType, IFileProcessor>();
 

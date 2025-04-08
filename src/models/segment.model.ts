@@ -6,6 +6,7 @@ export enum SegmentStatus {
   PENDING = 'pending',
   TRANSLATING = 'translating',
   TRANSLATED = 'translated',
+  TRANSLATION_FAILED = 'translation_failed',
   REVIEWING = 'reviewing',
   REVIEW_PENDING = 'review_pending', // 等待审校
   REVIEW_IN_PROGRESS = 'review_in_progress', // 审校中

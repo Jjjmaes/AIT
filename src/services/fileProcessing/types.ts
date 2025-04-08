@@ -1,9 +1,21 @@
+import { SegmentStatus } from '../../models/segment.model';
 import { ISegment } from '../../models/segment.model';
+
+// Define the data structure a processor should extract for each segment
+export interface ExtractedSegmentData {
+  index: number;
+  sourceText: string;
+  translation?: string; // Optional initial translation from file
+  status?: SegmentStatus; // Optional initial status from file
+  sourceLength?: number;
+  translatedLength?: number; // Optional length if translation exists
+  metadata?: Record<string, any>; // Processor-specific metadata (like xliffId)
+}
 
 // Interface for file processing results
 export interface FileProcessingResult {
-  segments: Partial<ISegment>[]; // Segments ready to be saved (without fileId initially)
-  metadata: Record<string, any>; // Any extracted file metadata (e.g., source/target lang from XLIFF)
+  segments: ExtractedSegmentData[];
+  metadata: Record<string, any>; // File-level metadata (lang, original name etc.)
   segmentCount: number;
 }
 
@@ -15,7 +27,7 @@ export interface IFileProcessor {
    * @param options - Optional additional parameters specific to the processor.
    * @returns A promise resolving to the extracted segments and metadata.
    */
-  extractSegments(filePath: string, ...options: any[]): Promise<FileProcessingResult>;
+  extractSegments(filePath: string, options?: any): Promise<FileProcessingResult>;
 
   /**
    * (Optional) Reconstructs the translated file from segments.
@@ -25,10 +37,10 @@ export interface IFileProcessor {
    * @param options - Optional additional parameters specific to the processor.
    * @returns A promise resolving when the file is written.
    */
-  writeTranslations?( 
+  writeTranslations?(
     segments: ISegment[], 
     originalFilePath: string,
-    targetFilePath: string, 
-    ...options: any[] 
+    targetFilePath: string,
+    options?: any
   ): Promise<void>;
 } 

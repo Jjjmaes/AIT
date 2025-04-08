@@ -1,16 +1,11 @@
 import { 
   ValidationError, 
-  NotFoundError, 
   ForbiddenError, 
   UnauthorizedError, 
-  ConflictError,
-  AppError
+  ConflictError
 } from './errors';
 import mongoose from 'mongoose';
 import logger from './logger';
-
-// 如果ServiceError不存在，使用AppError代替
-const ServiceError = AppError;
 
 /**
  * 标准化服务错误，统一错误处理
@@ -151,4 +146,25 @@ export function validateOwnership(
  */
 export function isTestEnvironment(): boolean {
   return process.env.NODE_ENV === 'test';
+}
+
+// Export NotFoundError class
+export class NotFoundError extends Error {
+  constructor(message: string = '资源未找到') {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+// Export AppError class
+export class AppError extends Error {
+  statusCode: number;
+
+  constructor(message: string, statusCode: number = 500) {
+    super(message);
+    this.name = 'AppError';
+    this.statusCode = statusCode;
+    // Ensure the prototype chain is correct
+    Object.setPrototypeOf(this, AppError.prototype);
+  }
 } 

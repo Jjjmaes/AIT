@@ -189,16 +189,16 @@ export class OpenAIAdapter extends BaseAIServiceAdapter {
       },
     ];
   }
-  
+
   async validateApiKey(): Promise<boolean> {
-      try {
+    try {
           // Make a simple, cheap API call to check if key is valid (e.g., list models)
           await this.openai.models.list(); 
-          return true;
-      } catch (error) {
+      return true;
+    } catch (error) {
           logger.error('OpenAI API key validation failed:', error);
-          return false;
-      }
+      return false;
+    }
   }
 
   // Add helper methods if they don't exist from Base class

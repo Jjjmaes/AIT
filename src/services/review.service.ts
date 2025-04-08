@@ -108,8 +108,8 @@ export class ReviewService /* implements IReviewService */ {
       }
       const promptContext = {
           promptTemplateId: reviewTemplateId,
-        sourceLanguage: file.metadata.sourceLanguage,
-        targetLanguage: file.metadata.targetLanguage,
+        sourceLanguage: file.metadata?.sourceLanguage ?? undefined,
+        targetLanguage: file.metadata?.targetLanguage ?? undefined,
           domain: project.domain,
           industry: project.industry,
       };

@@ -79,7 +79,7 @@ export class FileController {
             logger.error(`Failed to delete uploaded file ${req.file?.path} after error:`, unlinkErr)
         );
       }
-      next(error); 
+      next(error);
     }
   }
 
@@ -132,10 +132,10 @@ export class FileController {
 
            await fileManagementService.deleteFile(fileId, projectId, userId);
            res.status(200).json({ success: true, message: '文件已成功删除' });
-       } catch (error) {
+    } catch (error) {
            logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
-           next(error);
-       }
+      next(error);
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { IFileProcessor, FileProcessingResult } from '../types';
+import { IFileProcessor, FileProcessingResult, ExtractedSegmentData } from '../types';
 import { ISegment, SegmentStatus } from '../../../models/segment.model';
 import logger from '../../../utils/logger';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
@@ -122,8 +122,8 @@ export class XliffProcessor implements IFileProcessor {
     }
   }
 
-  async extractSegments(filePath: string, ...options: any[]): Promise<FileProcessingResult> {
-    const isMemoQ = options.some(opt => opt && opt.isMemoQ === true);
+  async extractSegments(filePath: string, options?: { isMemoQ?: boolean }): Promise<FileProcessingResult> {
+    const isMemoQ = options?.isMemoQ ?? false;
     logger.info(`Starting XLIFF segment extraction from file: ${filePath} (MemoQ: ${isMemoQ})`);
 
     try {
@@ -165,46 +165,43 @@ export class XliffProcessor implements IFileProcessor {
         return { segments: [], metadata: fileMetadata, segmentCount: 0 };
       }
 
-      const extractedSegments: Partial<ISegment>[] = [];
+      const extractedSegments: ExtractedSegmentData[] = [];
 
       for (const unitNode of transUnitsXml) {
-          if (!unitNode || typeof unitNode !== 'object' || !unitNode.nodeType) continue;
+          if (!unitNode || typeof unitNode !== 'object' || !('nodeType' in unitNode) || unitNode.nodeType !== 1) continue;
           const element = unitNode as Element;
 
           const id = element.getAttribute('id') ?? '';
-          const sourceSelector = isMemoQ ? './/m:source' : './/xliff:source';
-          const targetSelector = isMemoQ ? './/m:target' : './/xliff:target';
-
-          const sourceNode = select(sourceSelector, element, true) as Node | null;
-          const targetNode = select(targetSelector, element, true) as Node | null;
-          
+          const sourceNode = select(isMemoQ ? 'm:source' : 'xliff:source', element, true);
+          const targetNode = select(isMemoQ ? 'm:target' : 'xliff:target', element, true);
           const sourceText = this.getJoinedText(sourceNode);
           const targetText = this.getJoinedText(targetNode);
-
+          
           if (!id || !sourceText) {
             logger.warn(`Skipping trans-unit with missing id or source in ${filePath}. ID: ${id}`);
-            continue;
+              continue;
           }
 
           let segmentState = null;
           if (isMemoQ) {
-              segmentState = element.getAttribute('m:state'); 
+              segmentState = element.getAttribute('m:state');
           } else {
-              segmentState = targetNode?.nodeType === 1 ? (targetNode as Element).getAttribute('state') : null;
+              segmentState = (targetNode && typeof targetNode === 'object' && !Array.isArray(targetNode) && targetNode.nodeType === 1) 
+                ? (targetNode as Element).getAttribute('state') 
+                : null;
           }
           const status = this.mapXliffStateToStatus(segmentState, !!targetText);
 
-          const segmentData: Partial<ISegment> = {
+          const segmentData: ExtractedSegmentData = {
             index: extractedSegments.length,
-            sourceText: sourceText,
-            translation: targetText || '',
+              sourceText: sourceText,
+            translation: targetText || undefined,
             status: status,
             sourceLength: sourceText.length,
             translatedLength: targetText ? targetText.length : undefined,
-            metadata: { 
-                xliffId: id,
-                ...(isMemoQ && { memoqState: segmentState }), 
-                ...(!isMemoQ && { xliffState: segmentState })
+              metadata: {
+                  xliffId: id,
+                ...(isMemoQ ? { memoqState: segmentState } : { xliffState: segmentState })
             }
           };
           extractedSegments.push(segmentData);
@@ -213,7 +210,7 @@ export class XliffProcessor implements IFileProcessor {
       logger.info(`Successfully extracted ${extractedSegments.length} segments from XLIFF file: ${filePath}.`);
       return {
           segments: extractedSegments,
-          metadata: fileMetadata,
+        metadata: fileMetadata,
           segmentCount: extractedSegments.length
       };
 
@@ -224,13 +221,13 @@ export class XliffProcessor implements IFileProcessor {
   }
 
   async writeTranslations(
-    segments: ISegment[],
+    segments: ISegment[], 
     originalFilePath: string,
-    targetFilePath: string,
+    targetFilePath: string, 
     options?: { isMemoQ?: boolean }
   ): Promise<void> {
     logger.info(`Starting XLIFF translation writing for ${segments.length} segments to ${targetFilePath}.`);
-    const isMemoQ = options?.isMemoQ ?? false;
+      const isMemoQ = options?.isMemoQ ?? false;
     try {
       const originalFileContent = await readFile(originalFilePath, 'utf-8');
       const doc = this.parser.parseFromString(originalFileContent, 'text/xml');
@@ -260,11 +257,11 @@ export class XliffProcessor implements IFileProcessor {
 
           const targetSelector = isMemoQ ? 'm:target' : 'xliff:target';
           let targetNode = select(targetSelector, transUnitElement, true) as Element | null;
-
-          if (!targetNode) {
+                  
+                  if (!targetNode) {
             const sourceSelector = isMemoQ ? 'm:source' : 'xliff:source';
             const sourceNode = select(sourceSelector, transUnitElement, true) as Node | null;
-            if (sourceNode) {
+                      if (sourceNode) {
               let sibling = sourceNode.nextSibling;
               while (sibling) {
                 if (sibling.nodeType === 8) { 
@@ -279,14 +276,14 @@ export class XliffProcessor implements IFileProcessor {
             targetNode = doc.createElementNS(namespaceURI, 'target');
             if (sourceNode && sourceNode.nextSibling) {
                 transUnitElement.insertBefore(targetNode, sourceNode.nextSibling);
-            } else {
+                      } else {
                 transUnitElement.appendChild(targetNode);
-            }
-          }
+                      }
+                  }
 
-          while (targetNode.firstChild) {
-            targetNode.removeChild(targetNode.firstChild);
-          }
+                      while (targetNode.firstChild) {
+                          targetNode.removeChild(targetNode.firstChild);
+                      }
           
           const textToWrite = segment.finalText ?? segment.translation ?? '';
 
@@ -329,6 +326,6 @@ export class XliffProcessor implements IFileProcessor {
     } catch (error) {
       logger.error(`Error processing XLIFF file ${originalFilePath}:`, error);
       throw new Error(`Failed to process XLIFF file ${originalFilePath}: ${error instanceof Error ? error.message : String(error)}`);
-    }
+      }
   }
-}
+} 

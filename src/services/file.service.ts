@@ -367,12 +367,13 @@ export class FileService {
 
       if (format === 'json') {
         // JSON格式导出
+        const fileMetadata = file.metadata ?? {}; // Ensure metadata is an object
         const exportData = {
           fileInfo: {
             fileName: file.fileName,
             originalName: file.originalName,
-            sourceLanguage: file.metadata.sourceLanguage,
-            targetLanguage: file.metadata.targetLanguage,
+            sourceLanguage: fileMetadata.sourceLanguage,
+            targetLanguage: fileMetadata.targetLanguage,
             exportedAt: new Date().toISOString()
           },
           segments: segments.map(segment => ({
@@ -404,8 +405,10 @@ export class FileService {
         
         if (includeMetadata) {
           textContent += `文件名: ${file.originalName}\n`;
-          textContent += `源语言: ${file.metadata.sourceLanguage}\n`;
-          textContent += `目标语言: ${file.metadata.targetLanguage}\n\n`;
+          // Use nullish coalescing to handle potentially undefined metadata
+          const fileMetadata = file.metadata ?? {};
+          textContent += `源语言: ${fileMetadata.sourceLanguage}\n`;
+          textContent += `目标语言: ${fileMetadata.targetLanguage}\n\n`;
         }
 
         segments.forEach((segment, index) => {
