@@ -10,7 +10,7 @@ import logger from '../utils/logger';
 import { Project, IProject, ILanguagePair } from '../models/project.model';
 import { File, IFile, FileStatus } from '../models/file.model';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
-import { projectService } from './project.service';
+import { projectService, ProjectService } from './project.service';
 import { handleServiceError, validateId, validateEntityExists, validateOwnership } from '../utils/errorHandler';
 import { NotFoundError, AppError, ValidationError } from '../utils/errors';
 import { Types } from 'mongoose';
@@ -23,6 +23,9 @@ import { AIServiceFactory } from './translation/ai-adapters/ai-service.factory';
 import { AIProvider, AIServiceConfig } from '../types/ai-service.types';
 import { config } from '../config';
 import { BaseAIServiceAdapter } from './translation/ai-adapters/base.adapter';
+import { terminologyService, TerminologyService } from './terminology.service';
+import { ITermEntry } from '../models/terminology.model';
+import { translationMemoryService, TranslationMemoryService } from './translationMemory.service';
 
 // Define and export TranslationUnit interface needed by file processors
 export interface TranslationUnit {
@@ -35,9 +38,15 @@ export interface TranslationUnit {
 export class TranslationService {
   private serviceName = 'TranslationService';
   private aiServiceFactory: AIServiceFactory;
+  private terminologyService: TerminologyService;
+  private projectService: ProjectService;
+  private translationMemoryService: TranslationMemoryService;
 
   constructor() {
     this.aiServiceFactory = AIServiceFactory.getInstance();
+    this.terminologyService = terminologyService;
+    this.projectService = projectService;
+    this.translationMemoryService = translationMemoryService;
   }
 
   async translateSegment(
@@ -60,15 +69,76 @@ export class TranslationService {
 
       const file = await File.findById(segment.fileId).exec();
       validateEntityExists(file, '关联文件');
-      const project = await projectService.getProjectById(file.projectId.toString(), userId);
+      const project = await this.projectService.getProjectById(file.projectId.toString(), userId);
       validateEntityExists(project, '关联项目');
       
-      await segmentService.updateSegment(segmentId, { status: SegmentStatus.TRANSLATING });
-
-      // Use nullish coalescing to provide default empty object if metadata is undefined
+      // Use nullish coalescing for metadata
       const fileMetadata = file.metadata ?? {}; 
       const sourceLang = options?.sourceLanguage || fileMetadata.sourceLanguage;
       const targetLang = options?.targetLanguage || fileMetadata.targetLanguage;
+      
+      if (!sourceLang || !targetLang) {
+        throw new ValidationError('Source or target language missing for translation.');
+      }
+
+      // --- Check Translation Memory --- 
+      const tmMatches = await this.translationMemoryService.findMatches(
+          segment.sourceText,
+          sourceLang,
+          targetLang,
+          project._id.toString()
+      );
+      
+      const exactMatch = tmMatches.find(match => match.score === 100); // Check for 100% score
+
+      if (exactMatch) {
+          logger.info(`[${methodName}] Found 100% TM match for segment ${segmentId}.`);
+          const tmUpdateData: Partial<ISegment> = {
+              translation: exactMatch.entry.targetText,
+              status: SegmentStatus.TRANSLATED_TM, // New status
+              translatedLength: exactMatch.entry.targetText.length,
+              translationMetadata: {
+                  // Indicate source was TM
+                  aiModel: 'TM_100%', 
+                  // Optionally store TM entry ID?
+                  // promptTemplateId: exactMatch.entry._id, 
+                  tokenCount: 0, // No AI tokens used
+                  processingTime: 0 // Minimal processing time
+              },
+              translationCompletedAt: new Date(),
+              error: undefined
+          };
+          const updatedSegment = await segmentService.updateSegment(segmentId, tmUpdateData);
+          
+          // Update project file progress
+          projectService.updateFileProgress(file._id.toString(), userId).catch(err => {
+              logger.error(`Failed to update file progress for ${file._id} after TM match on segment ${segmentId}:`, err);
+          });
+          
+          logger.info(`Segment ${segmentId} translated successfully using TM.`);
+          return updatedSegment;
+      }
+      // --- End TM Check --- 
+
+      // --- If no 100% TM match, proceed with AI Translation ---
+      logger.debug(`[${methodName}] No 100% TM match found for segment ${segmentId}. Proceeding with AI.`);
+      
+      await segmentService.updateSegment(segmentId, { status: SegmentStatus.TRANSLATING });
+
+      // --- Fetch Terminology --- 
+      let terms: ITermEntry[] = [];
+      try {
+          if (project.terminology) {
+              const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());
+              if (terminologyList?.terms) {
+                  terms = terminologyList.terms;
+                  logger.info(`[${methodName}] Fetched ${terms.length} terms for project ${project._id}.`);
+              }
+          }
+      } catch (error) {
+          logger.error(`[${methodName}] Failed to fetch terminology for project ${project._id}. Proceeding without terms.`, { error });
+      }
+      // ---------------------------
       
       let effectivePromptTemplateId: string | Types.ObjectId | undefined;
       const projectTemplate = options?.promptTemplateId || project.translationPromptTemplate;
@@ -87,7 +157,7 @@ export class TranslationService {
           sourceLanguage: sourceLang,
           targetLanguage: targetLang,
           domain: options?.domain || project.domain,
-          terminology: project.terminology?.toString()
+          terms: terms 
       };
 
       const promptData = await promptProcessor.buildTranslationPrompt(
@@ -134,7 +204,7 @@ export class TranslationService {
           logger.error(`Failed to update file progress for ${file._id} after segment ${segmentId} translation:`, err);
       });
 
-      logger.info(`Segment ${segmentId} translated successfully.`);
+      logger.info(`Segment ${segmentId} translated successfully using AI.`);
       return updatedSegment;
 
     } catch (error) {
@@ -169,10 +239,6 @@ export class TranslationService {
       if (!targetLanguage || !sourceLanguage) {
           const missing = !targetLanguage && !sourceLanguage ? 'Source and target language' : !targetLanguage ? 'Target language' : 'Source language';
           logger.error(`[${this.serviceName}.${methodName}] ${missing} not found for file ${fileId}. Cannot translate.`);
-          // Although we set status/details, don't save here to ensure error is thrown
-          // file.status = FileStatus.ERROR; 
-          // file.errorDetails = `${missing} not specified in file metadata or options.`;
-          // await file.save(); // Temporarily removed due to test instability
           throw new AppError(`${missing} is required for translation.`, 400);
       }
 
@@ -195,6 +261,21 @@ export class TranslationService {
 
       logger.info(`[${this.serviceName}.${methodName}] Found ${segmentsToTranslate.length} segments to translate for file ${fileId}.`);
       
+      // --- Fetch terminology for the file before the loop --- 
+      let termsForFile: ITermEntry[] = [];
+      try {
+          if (project.terminology) {
+              const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());
+              if (terminologyList?.terms) {
+                  termsForFile = terminologyList.terms;
+                  logger.info(`[${this.serviceName}.${methodName}] Fetched ${termsForFile.length} terms for file ${fileId}.`);
+              }
+          } 
+      } catch (error) {
+          logger.error(`[${this.serviceName}.${methodName}] Error fetching terminology for file ${fileId}. Proceeding without terms.`, { error });
+      }
+      // --------------------------------------------------------
+
       // Update file status to TRANSLATING
       if (file.status === FileStatus.EXTRACTED) {
           file.status = FileStatus.TRANSLATING;
@@ -209,8 +290,16 @@ export class TranslationService {
           try {
               logger.debug(`Translating segment ${segment._id}...`);
               
-              // 1. Build Prompt
-              const promptData = buildTranslationPrompt(segment.sourceText, sourceLanguage!, targetLanguage!);
+              // 1. Build Prompt context and call builder
+              const promptContext: PromptBuildContext = {
+                  sourceLanguage: sourceLanguage!, 
+                  targetLanguage: targetLanguage!,
+                  // Include project/options details if needed by prompt builder 
+                  domain: options?.domain || project.domain,
+                  promptTemplateId: options?.promptTemplateId, // Pass template ID if available
+                  terms: termsForFile // Pass the fetched terms
+              };
+              const promptData = buildTranslationPrompt(segment.sourceText, promptContext);
 
               // Prepare full options for the adapter call
               const adapterOptions: TranslationOptions & { model?: string; temperature?: number } = {
@@ -220,31 +309,28 @@ export class TranslationService {
                   aiProvider: AIProvider.OPENAI, // Pass provider info
                   aiModel: options?.aiModel, // Pass model if specified
                   temperature: options?.temperature // Pass temperature if specified
-                  // Add other relevant fields from TranslationOptions if needed by adapter
               };
 
               // Call AI Adapter using this.aiServiceFactory and the correct config
-              // Need to define aiConfig within this method's scope or pass it
               const provider = AIProvider.OPENAI; // Assuming OpenAI for now
               const aiConfig: AIServiceConfig = { 
                   provider,
                   apiKey: config.openai.apiKey, 
                   defaultModel: options?.aiModel || config.openai.defaultModel
               };
-              const adapter = this.aiServiceFactory.createAdapter(aiConfig); // Use aiConfig here
+              const adapter = this.aiServiceFactory.createAdapter(aiConfig); 
 
               const translationResponse = await adapter.translateText(
                   segment.sourceText, 
                   promptData, 
-                  adapterOptions // Pass adapterOptions to translateText
+                  adapterOptions 
               );
               
               // 3. Update Segment
               segment.translation = translationResponse.translatedText;
               segment.status = SegmentStatus.TRANSLATED;
               segment.error = undefined; 
-              // TODO: Store translation metadata from translationResponse.modelInfo, tokenCount etc.
-              // segment.translationMetadata = { ... }; 
+              // TODO: Store translation metadata
               await segment.save();
               translatedCount++;
               logger.debug(`Segment ${segment._id} translated successfully.`);
@@ -338,142 +424,82 @@ export class TranslationService {
   async translateFileSegments(fileId: string, options?: TranslationOptions): Promise<void> {
     const methodName = 'translateFileSegments';
     validateId(fileId, '文件');
-    logger.info(`[${this.serviceName}.${methodName}] Starting translation for file ID: ${fileId}`);
+    logger.info(`[${this.serviceName}.${methodName}] Starting translation logic (now likely handled by worker calling translateSegment) for file ID: ${fileId}`);
 
     const file = await File.findById(fileId).exec();
     validateEntityExists(file, '文件');
-
-    // Check for required metadata *immediately* after getting the file
-    const targetLanguage = options?.targetLanguage || file.metadata?.targetLanguage;
-    const sourceLanguage = file.metadata?.sourceLanguage; 
-    if (!targetLanguage || !sourceLanguage) {
-        const missing = !targetLanguage && !sourceLanguage ? 'Source and target language' : !targetLanguage ? 'Target language' : 'Source language';
-        logger.error(`[${this.serviceName}.${methodName}] ${missing} not found for file ${fileId}. Cannot translate.`);
-        // Although we set status/details, don't save here to ensure error is thrown
-        // file.status = FileStatus.ERROR; 
-        // file.errorDetails = `${missing} not specified in file metadata or options.`;
-        // await file.save(); // Temporarily removed due to test instability
-        // logger.debug('[DEBUG] Saved file state, about to throw AppError for missing language...'); // Remove log
-        throw new AppError(`${missing} is required for translation.`, 400);
-    }
-    logger.info(`Translating from ${sourceLanguage} to ${targetLanguage}`);
-
-    // --- Check File Status BEFORE querying segments --- 
-    if (file.status !== FileStatus.EXTRACTED) {
-        // If status is not EXTRACTED, log a warning and stop.
-        logger.warn(`[${this.serviceName}.${methodName}] File ${fileId} is not in EXTRACTED status (current: ${file.status}). Skipping translation.`);
-        return; // Stop processing this file
-    }
-
-    // --- Set status to TRANSLATING (only if it was EXTRACTED) --- 
-    file.status = FileStatus.TRANSLATING;
-    await file.save();
-    logger.info(`[${this.serviceName}.${methodName}] Set file ${fileId} status to TRANSLATING.`);
-    // --- Now query for segments --- 
-    const segmentsToTranslate = await Segment.find({
-      fileId: file._id,
-      status: SegmentStatus.PENDING // Only translate pending segments
-    }).exec();
-
-    if (segmentsToTranslate.length === 0) {
-      logger.info(`[${this.serviceName}.${methodName}] No pending segments found for file ${fileId}.`);
-      // If no segments were found after setting status to TRANSLATING, 
-      // should we revert the status? Or perhaps set it to TRANSLATED if counts match?
-      // For now, just return. The final status update logic later might handle this.
-      return;
-    }
-
-    logger.info(`[${this.serviceName}.${methodName}] Found ${segmentsToTranslate.length} segments to translate for file ${fileId}.`);
     
-    // --- Get AI Adapter --- 
-    const provider = AIProvider.OPENAI; 
-    const aiConfig: AIServiceConfig = { 
-        provider,
-        apiKey: config.openai.apiKey, 
-        defaultModel: options?.aiModel || config.openai.defaultModel
-    };
-    // Use this.aiServiceFactory and remove @ts-expect-error
-    const adapter: BaseAIServiceAdapter = this.aiServiceFactory.createAdapter(aiConfig);
+    // The loop calling buildTranslationPrompt and adapter.translateText is removed 
+    // because the worker calls translateSegment individually.
+    // The status update logic at the end might still be relevant if called separately.
 
-    let translatedCount = 0;
-    let failedCount = 0;
-
-    for (const segment of segmentsToTranslate) {
-        try {
-            logger.debug(`Translating segment ${segment._id}...`);
-            
-            // Remove unused @ts-expect-error
-            const promptData = buildTranslationPrompt(segment.sourceText, sourceLanguage!, targetLanguage!);
-
-            // Remove unused @ts-expect-error
-            const adapterOptions: TranslationOptions & { model?: string; temperature?: number } = {
-                ...options, 
-                sourceLanguage: sourceLanguage!, 
-                targetLanguage: targetLanguage!,
-                aiProvider: provider, 
-                aiModel: options?.aiModel, 
-                temperature: options?.temperature 
-            };
-
-            const translationResponse = await adapter.translateText(
-                segment.sourceText, 
-                promptData, 
-                adapterOptions 
-            );
-            
-            // 3. Update Segment
-            segment.translation = translationResponse.translatedText;
-            segment.status = SegmentStatus.TRANSLATED;
-            segment.error = undefined; 
-            // TODO: Store translation metadata from translationResponse.modelInfo, tokenCount etc.
-            // segment.translationMetadata = { ... }; 
-            await segment.save();
-            translatedCount++;
-            logger.debug(`Segment ${segment._id} translated successfully.`);
-        } catch (error) {
-            failedCount++;
-            logger.error(`Failed to translate segment ${segment._id}:`, error);
-            segment.status = SegmentStatus.TRANSLATION_FAILED;
-            segment.error = error instanceof Error ? error.message : 'Unknown translation error';
-            await segment.save();
-        }
-    }
-
-    // --- Update File status and counts ---
+    // --- Update File status and counts (Keep this logic if method is still used for status updates) ---
     try {
-        file.translatedCount = await Segment.countDocuments({ fileId: file._id, status: SegmentStatus.TRANSLATED });
-        // Potentially count failed? Might need another field.
+        const translatedCount = await Segment.countDocuments({ fileId: file._id, status: SegmentStatus.TRANSLATED });
+        const failedCount = await Segment.countDocuments({ fileId: file._id, status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] } });
         
-        if (failedCount > 0) {
-            file.status = FileStatus.ERROR; // Or a new PARTIAL_TRANSLATION_FAILED status?
-            file.errorDetails = `${failedCount} segment(s) failed to translate.`;
-        } else if (file.translatedCount === file.segmentCount) {
-            file.status = FileStatus.TRANSLATED;
-            file.errorDetails = undefined;
+        // Check if total processed matches segment count
+        const totalProcessed = translatedCount + failedCount;
+        const expectedSegments = file.segmentCount || await Segment.countDocuments({ fileId: file._id }); // Fallback if segmentCount is not set
+
+        if (totalProcessed >= expectedSegments) { // Use >= in case counts are off slightly
+            if (failedCount > 0) {
+                file.status = FileStatus.ERROR; 
+                file.errorDetails = `${failedCount} segment(s) failed to translate during batch processing.`;
+            } else {
+                file.status = FileStatus.TRANSLATED;
+                file.errorDetails = undefined;
+            }
         } else {
-            // This case might indicate partial success, keep as TRANSLATING or introduce PARTIAL?
-             file.status = FileStatus.TRANSLATING; // Or PARTIALLY_TRANSLATED
-             logger.warn(`[${this.serviceName}.${methodName}] File ${fileId} translation partially complete. ${file.translatedCount}/${file.segmentCount} segments translated.`);
+             // If called before all segments are done, maybe keep TRANSLATING?
+             // Or introduce PARTIALLY_TRANSLATED?
+             // Let's assume it remains TRANSLATING until completion is detected.
+             // file.status = FileStatus.TRANSLATING; 
+             logger.warn(`[${this.serviceName}.${methodName}] File ${fileId} status update check: ${totalProcessed}/${expectedSegments} segments processed.`);
         }
         await file.save();
-        logger.info(`[${this.serviceName}.${methodName}] Finished translation attempt for file ID: ${fileId}. Final status: ${file.status}`);
+        logger.info(`[${this.serviceName}.${methodName}] Updated file status after check for file ID: ${fileId}. Final status: ${file.status}`);
     } catch (fileUpdateError) {
-         logger.error(`[${this.serviceName}.${methodName}] Failed to update file status after translation for file ID: ${fileId}:`, fileUpdateError);
+         logger.error(`[${this.serviceName}.${methodName}] Failed to update file status after translation check for file ID: ${fileId}:`, fileUpdateError);
     }
   }
 }
 
 export const translationService = new TranslationService(); 
 
-// Placeholder for prompt building logic - replace with actual implementation
+// Placeholder for prompt building logic - Now needs context object
 interface ProcessedPrompt {
     systemInstruction: string;
     userPrompt: string;
 }
-const buildTranslationPrompt = (sourceText: string, sourceLang: string, targetLang: string): ProcessedPrompt => {
-    // TODO: Implement actual prompt engineering logic
+interface PromptBuildContext {
+  promptTemplateId?: string | Types.ObjectId;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+  domain?: string;
+  terms?: ITermEntry[]; // Added terms
+}
+// Update buildTranslationPrompt to accept context and use terms
+const buildTranslationPrompt = (sourceText: string, context: PromptBuildContext): ProcessedPrompt => {
+    // Base instruction - incorporate language/domain from context if available
+    const sourceLang = context.sourceLanguage || '[Source Language]';
+    const targetLang = context.targetLanguage || '[Target Language]';
+    const domainInfo = context.domain ? ` Domain: ${context.domain}.` : '';
+    let systemInstruction = `Translate the following text from ${sourceLang} to ${targetLang}.${domainInfo} Respond only with the translation.`;
+
+    // Add terminology instruction if terms are provided in context
+    if (context.terms && context.terms.length > 0) {
+        const formattedTerms = context.terms.map(term => `[${term.source} -> ${term.target}]`).join(', ');
+        const terminologyInstruction = `\n\nStrictly adhere to the following terminology: ${formattedTerms}.`;
+        systemInstruction += terminologyInstruction;
+    }
+
+    // TODO: Add prompt template lookup/rendering using context.promptTemplateId
+    // For now, just using the built system instruction and source text
+    // This should eventually use promptProcessor.buildTranslationPrompt
+
     return {
-        systemInstruction: `Translate the following text from ${sourceLang} to ${targetLang}. Respond only with the translation.`,
-        userPrompt: sourceText,
+        systemInstruction: systemInstruction,
+        userPrompt: sourceText, // Placeholder - should use rendered template user prompt
     };
 }; 

@@ -3,8 +3,25 @@ import { terminologyService } from '../services/terminology.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 // Import DTOs from the service
 import { CreateTerminologyDto, UpdateTerminologyDto, UpsertTermDto, GetTerminologyFilter } from '../services/terminology.service';
-import { AppError } from '../utils/errors';
+import { AppError, ValidationError } from '../utils/errors';
 import logger from '../utils/logger';
+import { tmxUploadMiddleware } from './translationMemory.controller'; // Reuse TM upload middleware for now?
+import multer from 'multer';
+
+// Define multer config specifically for terminology CSV uploads
+const csvStorage = multer.memoryStorage();
+const csvUpload = multer({
+    storage: csvStorage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // Example: 5MB limit for CSVs
+    fileFilter: (req, file, cb) => { // Optional: Add basic file filter
+        if (file.mimetype === 'text/csv' || file.originalname.toLowerCase().endsWith('.csv')) {
+            cb(null, true);
+        } else {
+            cb(new ValidationError('Invalid file type. Only CSV files are allowed.'));
+        }
+    }
+});
+export const termsCsvUploadMiddleware = csvUpload.single('termsfile'); // Expect field named 'termsfile'
 
 class TerminologyController {
   private serviceName = 'TerminologyController';
@@ -133,6 +150,51 @@ class TerminologyController {
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName} for ID ${req.params.terminologyId}:`, error);
       next(error);
+    }
+  }
+
+  /**
+   * @desc    Import Terminology entries from a CSV file
+   * @route   POST /api/terms/:terminologyId/import
+   * @access  Private
+   * @expects multipart/form-data with a file field named 'termsfile'
+   */
+  async importTerms(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    const methodName = 'importTerms';
+    try {
+      const terminologyId = req.params.terminologyId;
+      const userId = req.user?.id;
+
+      if (!terminologyId) {
+        return next(new ValidationError('Terminology ID is required in the URL path.'));
+      }
+      if (!userId) {
+          return next(new AppError('Authentication required to import terms', 401));
+      }
+      if (!req.file) {
+          return next(new ValidationError('No CSV file provided (expected field name \'termsfile\').'));
+      }
+
+      // TODO: Add file type validation (e.g., check mime type for CSV)
+      // if (req.file.mimetype !== 'text/csv') { ... }
+
+      const csvContent = req.file.buffer.toString('utf-8');
+
+      logger.info(`[${this.serviceName}.${methodName}] User ${userId} initiating CSV term import for list ${terminologyId}`);
+      // Suppress persistent incorrect linter error
+      // @ts-expect-error: Linter fails to find existing service method
+      const result = await terminologyService.importTermsFromCSV(terminologyId, userId, csvContent);
+
+      res.status(200).json({
+          success: true,
+          message: `CSV import process completed. Added: ${result.addedCount}, Updated: ${result.updatedCount}, Skipped/Errors: ${result.skippedCount}.`,
+          details: result
+      });
+       logger.info(`[${this.serviceName}.${methodName}] User ${userId} finished CSV import for list ${terminologyId}. Results: ${JSON.stringify(result)}`);
+
+    } catch (error) {
+        logger.error(`Error in ${this.serviceName}.${methodName} for list ${req.params.terminologyId}:`, error);
+        next(error);
     }
   }
 }

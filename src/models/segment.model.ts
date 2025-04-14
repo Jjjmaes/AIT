@@ -3,17 +3,16 @@ import { IFile } from './file.model';
 import { IUser } from './user.model';
 
 export enum SegmentStatus {
-  PENDING = 'pending',
-  TRANSLATING = 'translating',
-  TRANSLATED = 'translated',
-  TRANSLATION_FAILED = 'translation_failed',
-  REVIEWING = 'reviewing',
-  REVIEW_PENDING = 'review_pending', // 等待审校
-  REVIEW_IN_PROGRESS = 'review_in_progress', // 审校中
-  REVIEW_FAILED = 'review_failed', // 审校失败，需重新提交
-  REVIEW_COMPLETED = 'review_completed', // 审校完成，待确认
-  COMPLETED = 'completed', // 审校确认，最终完成
-  ERROR = 'error'
+  PENDING = 'pending', // Initial state, awaiting translation
+  TRANSLATING = 'translating', // AI translation in progress
+  TRANSLATED = 'translated', // AI translation complete, awaiting review
+  TRANSLATED_TM = 'translated_tm', // Translated using 100% TM match
+  REVIEW_PENDING = 'review_pending', // Awaiting human review (replaces translated/translated_tm?)
+  REVIEWING = 'reviewing', // Human review in progress
+  REVIEW_COMPLETED = 'review_completed', // Review done, potentially needs final confirmation
+  CONFIRMED = 'confirmed', // Final approved state (replaces COMPLETED?)
+  ERROR = 'error', // Generic processing error
+  TRANSLATION_FAILED = 'translation_failed' // Specific error during AI translation step
 }
 
 export enum IssueType {
@@ -110,6 +109,8 @@ export interface ISegment extends Document {
   status: SegmentStatus;
   issues?: IIssue[];
   reviewer?: mongoose.Types.ObjectId;
+  aiScores?: IReviewScore[];
+  qualityScore?: number;
   translationMetadata?: {
     aiModel?: string;
     promptTemplateId?: mongoose.Types.ObjectId;
@@ -267,6 +268,12 @@ const segmentSchema = new Schema<ISegment>(
     reviewer: {
       type: Schema.Types.ObjectId,
       ref: 'User'
+    },
+    aiScores: [ReviewScoreSchema],
+    qualityScore: {
+        type: Number,
+        min: 0,
+        max: 100
     },
     translationMetadata: {
       aiModel: String,

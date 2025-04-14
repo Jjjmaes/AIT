@@ -1,18 +1,27 @@
 import { aiServiceFactory } from '../services/translation/aiServiceFactory';
-import { AIReviewService } from './ai-review.service';
+import aiReviewServiceInstance, { AIReviewService } from './ai-review.service';
 import { Segment, SegmentStatus, IssueType, ReviewScoreType, ISegment, IIssue, IssueSeverity, IssueStatus, IReviewScore } from '../models/segment.model';
 import { File, FileStatus, IFile } from '../models/file.model';
 import Project, { IProject } from '../models/project.model';
+import { IPromptTemplate } from '../models/promptTemplate.model';
 import { AppError, NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../utils/errors';
 import logger from '../utils/logger';
 import mongoose, { Types } from 'mongoose';
 import { AIProvider } from '../types/ai-service.types';
-import { ReviewAdapter, AIReviewResponse, AIReviewIssue } from './translation/ai-adapters/review.adapter';
+import { AIReviewResponse, AIReviewIssue } from './translation/ai-adapters/review.adapter';
 import { handleServiceError, validateId, validateEntityExists, validateOwnership } from '../utils/errorHandler';
 import User, { IUser } from '../models/user.model';
 import { promptProcessor } from '../utils/promptProcessor';
 import { config } from '../config';
-import OpenAI from 'openai';
+import { TranslationMemoryService, translationMemoryService } from './translationMemory.service';
+import { projectService } from './project.service';
+
+// Define criteria for batch resolving issues (moved outside class & EXPORTED)
+export interface BatchIssueCriteria {
+  type?: IssueType[];         // Match any of these types
+  severity?: IssueSeverity[]; // Match any of these severities
+  // TODO: Add other potential criteria? e.g., createdBy? suggestion text?
+}
 
 // Define structure for review submission data
 interface CompleteReviewData {
@@ -30,15 +39,12 @@ interface CompleteReviewData {
  */
 export class ReviewService /* implements IReviewService */ {
   private serviceName = 'ReviewService';
-  private aiServiceFactory: typeof aiServiceFactory;
-  private openaiClient: OpenAI;
+  private aiReviewService: AIReviewService;
+  private translationMemoryService: TranslationMemoryService;
 
-  constructor() {
-    this.aiServiceFactory = aiServiceFactory;
-    this.openaiClient = new OpenAI({
-      apiKey: config.openai.apiKey,
-      timeout: config.openai.timeout || 60000,
-    });
+  constructor(aiRevService: AIReviewService = aiReviewServiceInstance) {
+    this.aiReviewService = aiRevService;
+    this.translationMemoryService = translationMemoryService;
   }
 
   /**
@@ -49,6 +55,9 @@ export class ReviewService /* implements IReviewService */ {
     validateId(segmentId, '段落');
     validateId(userId, '用户');
     let segment: ISegment | null = null;
+    let file: IFile | null = null;
+    let project: (IProject & { reviewPromptTemplate?: IPromptTemplate | Types.ObjectId | string, defaultReviewPromptTemplate?: IPromptTemplate | Types.ObjectId | string }) | null = null;
+    let templateIdToUse: string | undefined = undefined;
 
     try {
       // 1. Fetch Segment & related data
@@ -56,7 +65,7 @@ export class ReviewService /* implements IReviewService */ {
       validateEntityExists(segment, '段落');
 
       // 2. Check status
-      if (segment.status !== SegmentStatus.TRANSLATED && segment.status !== SegmentStatus.REVIEW_FAILED) {
+      if (segment.status !== SegmentStatus.TRANSLATED && segment.status !== SegmentStatus.ERROR) {
         throw new ValidationError(`段落状态不允许审校，当前状态: ${segment.status}`);
       }
       if (!segment.translation) {
@@ -64,9 +73,9 @@ export class ReviewService /* implements IReviewService */ {
       }
 
       // 3. Get File & Project for context and permissions
-      const file = await File.findById(segment.fileId).exec();
+      file = await File.findById(segment.fileId).exec();
       validateEntityExists(file, '关联文件');
-      const project = await Project.findById(file.projectId).populate('reviewPromptTemplate').populate('defaultReviewPromptTemplate').exec();
+      project = await Project.findById(file.projectId).populate('reviewPromptTemplate').populate('defaultReviewPromptTemplate').exec();
       validateEntityExists(project, '关联项目');
 
       // 4. Check Permissions (Manager or assigned Reviewer?)
@@ -87,151 +96,105 @@ export class ReviewService /* implements IReviewService */ {
       segment.reviewMetadata = undefined;
       segment.issues = [];
       await segment.save();
-
+      
       // 6. Prepare Prompt Context & Build Prompt
-      const reviewTemplate = options?.promptTemplateId || project.reviewPromptTemplate || project.defaultReviewPromptTemplate;
-      let reviewTemplateId: string | Types.ObjectId | undefined;
-      let reviewTemplateObjectId: Types.ObjectId | undefined = undefined;
-      if (reviewTemplate) {
-          if (typeof reviewTemplate === 'string' && Types.ObjectId.isValid(reviewTemplate)) {
-              reviewTemplateId = reviewTemplate;
-              reviewTemplateObjectId = new Types.ObjectId(reviewTemplate);
-          }
-          else if (reviewTemplate instanceof Types.ObjectId) {
-              reviewTemplateId = reviewTemplate;
-              reviewTemplateObjectId = reviewTemplate;
-          }
-          else if (typeof reviewTemplate === 'object' && reviewTemplate._id) {
-              reviewTemplateId = reviewTemplate._id;
-              reviewTemplateObjectId = reviewTemplate._id;
-          }
+      if (options?.promptTemplateId) {
+        templateIdToUse = options.promptTemplateId;
+      } else if (project.reviewPromptTemplate) {
+        templateIdToUse = project.reviewPromptTemplate._id?.toString() ?? project.reviewPromptTemplate.toString();
+      } else if (project.defaultReviewPromptTemplate) {
+        templateIdToUse = project.defaultReviewPromptTemplate._id?.toString() ?? project.defaultReviewPromptTemplate.toString();
       }
       const promptContext = {
-          promptTemplateId: reviewTemplateId,
+        promptTemplateId: templateIdToUse,
         sourceLanguage: file.metadata?.sourceLanguage ?? undefined,
         targetLanguage: file.metadata?.targetLanguage ?? undefined,
-          domain: project.domain,
-          industry: project.industry,
+        domain: project.domain,
+        industry: project.industry,
       };
       const reviewPromptData = await promptProcessor.buildReviewPrompt(
-          segment.sourceText,
-          segment.translation!,
-          promptContext
+        segment.sourceText,
+        segment.translation!,
+        promptContext
       );
 
       // 7. Get AI Provider & Model
       const aiProvider = options?.aiProvider || AIProvider.OPENAI;
       const model = options?.aiModel || config.openai.defaultModel || 'gpt-4-turbo'; // Use config default
 
-      // 8. Execute AI review directly using OpenAI client
-      const startTime = Date.now();
-      let aiReviewResult: AIReviewResponse;
-      let processingTime: number = 0;
-
-      try {
-        logger.info(`Calling OpenAI ${model} for review...`);
-        const response = await this.openaiClient.chat.completions.create({
-            model: model,
-            messages: [
-              { role: 'system', content: reviewPromptData.systemInstruction },
-              { role: 'user', content: reviewPromptData.userPrompt }
-            ],
-            temperature: options?.temperature || 0.5,
-        });
-
-        processingTime = Date.now() - startTime;
-        const responseContent = response.choices[0]?.message?.content;
-        if (!responseContent) {
-            throw new AppError('OpenAI did not return content for review.', 500);
-        }
-
-        let parsedResponse: Partial<AIReviewResponse> = {};
-        try {
-            parsedResponse = JSON.parse(responseContent);
-        } catch (parseError) {
-            logger.error('Failed to parse OpenAI JSON response for review:', { responseContent, parseError });
-            parsedResponse.suggestedTranslation = responseContent.trim();
-            // Create AIReviewIssue without status
-            parsedResponse.issues = [{
-                type: IssueType.OTHER,
-                severity: IssueSeverity.HIGH,
-                description: 'AI response format error, could not parse JSON.'
-            } as AIReviewIssue];
-            parsedResponse.scores = [];
-        }
-
-        // Construct the full AIReviewResponse
-        aiReviewResult = {
-            suggestedTranslation: parsedResponse.suggestedTranslation || segment.translation!,
-            issues: parsedResponse.issues || [],
-            scores: parsedResponse.scores || [],
-            metadata: {
-                provider: AIProvider.OPENAI,
-                model: response.model || model,
-                processingTime: processingTime,
-                confidence: parsedResponse.metadata?.confidence || 0,
-                wordCount: (parsedResponse.suggestedTranslation || '').split(/\s+/).length,
-                characterCount: (parsedResponse.suggestedTranslation || '').length,
-                tokens: {
-                  input: response.usage?.prompt_tokens ?? 0,
-                  output: response.usage?.completion_tokens ?? 0,
-                },
-                modificationDegree: parsedResponse.metadata?.modificationDegree || 0,
-            }
-        };
-
-      } catch (aiError: any) {
-         logger.error('OpenAI审校调用失败', { segmentId, model, error: aiError?.message || aiError });
-         segment.status = SegmentStatus.REVIEW_FAILED;
-         segment.error = `AI审校失败: ${aiError?.message || 'Unknown OpenAI error'}`;
-         await segment.save();
-         throw new AppError(`AI审校调用失败: ${aiError?.message || 'Unknown OpenAI error'}`, 500);
-      }
+      // 8. Execute AI review using AIReviewService (NO direct client call)
+      logger.info(`[${methodName}] Calling AIReviewService for segment ${segmentId}`);
+      const reviewOptionsForAIService = {
+        sourceLanguage: file.metadata?.sourceLanguage ?? 'en',
+        targetLanguage: file.metadata?.targetLanguage ?? 'en',
+        provider: aiProvider,
+        model: model,
+        apiKey: options?.apiKey || undefined,
+        promptTemplateId: templateIdToUse,
+        projectId: project._id.toString(),
+        requestedScores: options?.requestedScores || undefined,
+        checkIssueTypes: options?.checkIssueTypes || undefined,
+        contextSegments: options?.contextSegments || undefined,
+        customPrompt: options?.customPrompt || undefined
+      };
+      const aiReviewResult: AIReviewResponse = await this.aiReviewService.reviewTranslation(
+        segment.sourceText,
+        segment.translation!,
+        reviewOptionsForAIService
+      );
+      logger.info(`[${methodName}] AIReviewService finished for segment ${segmentId}`);
 
       // 9. Process AI Issues (Map AIReviewIssue to IIssue)
       const userObjectIdForIssue = new Types.ObjectId(userId); // Reuse userObjectId from permission check
       const newIssues: IIssue[] = (aiReviewResult.issues || []).map((aiIssue: AIReviewIssue): IIssue => ({
-          type: aiIssue.type || IssueType.OTHER,
-          severity: aiIssue.severity || IssueSeverity.MEDIUM,
-          description: aiIssue.description || 'AI detected issue',
-          position: aiIssue.position,
-          suggestion: aiIssue.suggestion,
-          status: IssueStatus.OPEN,
-          createdAt: new Date(),
-          createdBy: userObjectIdForIssue
+        type: aiIssue.type || IssueType.OTHER,
+        severity: aiIssue.severity || IssueSeverity.MEDIUM,
+        description: aiIssue.description || 'AI detected issue',
+        position: aiIssue.position,
+        suggestion: aiIssue.suggestion,
+        status: IssueStatus.OPEN,
+            createdAt: new Date(),
+        createdBy: userObjectIdForIssue
       }));
 
-      // 10. Update Segment with Review Metadata and Issues
+      // 10. Update Segment with Review Metadata and Issues (Store AI Scores too)
       segment.review = aiReviewResult.suggestedTranslation; // Store AI suggestion in 'review' field
       segment.issues = newIssues;
+      // Store the AI scores received from the service
+      segment.aiScores = aiReviewResult.scores || []; 
+      let reviewTemplateObjectId: Types.ObjectId | undefined = undefined;
+      if (templateIdToUse && Types.ObjectId.isValid(templateIdToUse)) {
+          reviewTemplateObjectId = new Types.ObjectId(templateIdToUse);
+      }
       segment.reviewMetadata = {
           aiModel: aiReviewResult.metadata?.model,
           promptTemplateId: reviewTemplateObjectId,
           tokenCount: (aiReviewResult.metadata?.tokens?.input ?? 0) + (aiReviewResult.metadata?.tokens?.output ?? 0),
-          processingTime: processingTime,
+          processingTime: aiReviewResult.metadata?.processingTime || 0,
           acceptedChanges: false,
-          modificationDegree: aiReviewResult.metadata?.modificationDegree
+          modificationDegree: aiReviewResult.metadata?.modificationDegree || 0,
       };
       segment.status = SegmentStatus.REVIEW_PENDING;
       segment.error = undefined;
       segment.markModified('issues');
       segment.markModified('reviewMetadata');
+      segment.markModified('aiScores'); // Mark new field as modified
 
       await segment.save();
-      logger.info(`AI Review completed for segment ${segmentId}`);
+      logger.info(`AI Review results processed and saved for segment ${segmentId}`);
 
       // 11. Return updated segment
       return segment;
-
-    } catch (error) {
+      
+    } catch (error: any) {
       if (segment && segment.status === SegmentStatus.REVIEWING && !(error instanceof ForbiddenError || error instanceof ValidationError)) {
-          try {
-             segment.status = SegmentStatus.REVIEW_FAILED;
-             segment.error = `审校处理失败: ${error instanceof Error ? error.message : '未知错误'}`;
-             await segment.save();
-          } catch (failSaveError) {
-              logger.error(`Failed to mark segment ${segmentId} as REVIEW_FAILED after error:`, failSaveError);
-          }
+        try {
+          segment.status = SegmentStatus.ERROR;
+          segment.error = `审校处理失败: ${error instanceof Error ? error.message : '未知错误'}`;
+          await segment.save();
+        } catch (failSaveError) {
+          logger.error(`Failed to mark segment ${segmentId} as ERROR after review error:`, failSaveError);
+        }
       }
       logger.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
       throw handleServiceError(error, this.serviceName, methodName, 'AI审校');
@@ -257,7 +220,7 @@ export class ReviewService /* implements IReviewService */ {
 
       // 2. Check Status
       if (segment.status !== SegmentStatus.REVIEW_PENDING &&
-          segment.status !== SegmentStatus.REVIEW_FAILED &&
+          segment.status !== SegmentStatus.ERROR &&
           segment.status !== SegmentStatus.REVIEWING) {
           throw new ValidationError(`段落状态 (${segment.status}) 不允许完成审校`);
       }
@@ -455,7 +418,7 @@ export class ReviewService /* implements IReviewService */ {
       validateEntityExists(segment, '段落');
 
       // 2. Check status (allow adding issues during review phases or even completed)
-       if (![SegmentStatus.REVIEW_IN_PROGRESS, SegmentStatus.TRANSLATED, SegmentStatus.REVIEW_FAILED, SegmentStatus.REVIEW_PENDING, SegmentStatus.REVIEW_COMPLETED, SegmentStatus.COMPLETED].includes(segment.status)) {
+       if (![SegmentStatus.REVIEWING, SegmentStatus.TRANSLATED, SegmentStatus.ERROR, SegmentStatus.REVIEW_PENDING, SegmentStatus.REVIEW_COMPLETED, SegmentStatus.CONFIRMED].includes(segment.status)) {
          throw new ValidationError(`段落状态 (${segment.status}) 不允许添加问题`);
        }
 
@@ -523,7 +486,7 @@ export class ReviewService /* implements IReviewService */ {
         validateEntityExists(segment, '段落');
 
         if (segment.status !== SegmentStatus.REVIEW_PENDING &&
-            segment.status !== SegmentStatus.REVIEW_FAILED &&
+            segment.status !== SegmentStatus.ERROR &&
             segment.status !== SegmentStatus.REVIEWING) {
             throw new ValidationError(`无法在当前状态 (${segment.status}) 下解决问题`);
         }
@@ -607,16 +570,39 @@ export class ReviewService /* implements IReviewService */ {
             logger.warn(`Finalizing segment ${segmentId} with ${unresolvedIssues.length} unresolved issues.`);
         }
 
-      segment.status = SegmentStatus.COMPLETED;
+      // Calculate and set the final quality score
+      segment.qualityScore = this._calculateQualityScore(segment);
+      
+      segment.status = SegmentStatus.CONFIRMED;
         segment.error = undefined;
+        segment.markModified('qualityScore'); // Mark new field as modified
 
       await segment.save();
-        logger.info(`Segment ${segmentId} review finalized by manager ${userId}`);
+        logger.info(`Segment ${segmentId} review finalized by manager ${userId} with quality score ${segment.qualityScore}`);
 
         // Use file._id.toString() for the check
         this.checkFileCompletionStatus(file._id.toString()).catch(err => {
            logger.error(`Failed to check/update file completion status after finalizing segment ${segmentId}:`, err);
         });
+
+      // Add confirmed segment to Translation Memory
+      if (segment.finalText) {
+        try {
+          await this.translationMemoryService.addEntry({
+            sourceLanguage: file.metadata?.sourceLanguage,
+            targetLanguage: file.metadata?.targetLanguage,
+            sourceText: segment.sourceText,
+            targetText: segment.finalText,
+            projectId: file.projectId.toString(),
+            userId: userId
+          });
+          logger.info(`[${methodName}] Added confirmed segment ${segmentId} to TM.`);
+        } catch (tmError) {
+          logger.error(`[${methodName}] Failed to add confirmed segment ${segmentId} to TM:`, tmError);
+        }
+      } else {
+        logger.warn(`[${methodName}] Segment ${segmentId} confirmed but finalText was null/empty. Skipping TM add.`);
+      }
 
       return segment;
 
@@ -638,7 +624,7 @@ export class ReviewService /* implements IReviewService */ {
         const totalSegments = await Segment.countDocuments({ fileId: file._id });
         const completedSegments = await Segment.countDocuments({
             fileId: file._id,
-            status: SegmentStatus.COMPLETED
+            status: SegmentStatus.CONFIRMED
         });
 
         if (totalSegments > 0 && completedSegments === totalSegments) {
@@ -674,6 +660,61 @@ export class ReviewService /* implements IReviewService */ {
 
 
   // ===== Helper/Utility Methods =====
+
+  /** Calculate a final quality score based on resolved issues */
+  private _calculateQualityScore(segment: ISegment): number {
+      let score = 100;
+      const maxScore = 100;
+      const minScore = 0;
+
+      if (!segment.issues || segment.issues.length === 0) {
+          return maxScore; // No issues, perfect score
+      }
+
+      for (const issue of segment.issues) {
+          let deduction = 0;
+
+          // Only apply deductions for issues that were actually addressed or finalized
+          if (issue.status === IssueStatus.RESOLVED || issue.status === IssueStatus.REJECTED) {
+              const severity = issue.severity || IssueSeverity.MEDIUM; // Default severity if missing
+              const action = issue.resolution?.action;
+
+              if (issue.status === IssueStatus.RESOLVED) {
+                  // Smaller deductions for resolved issues
+                  switch (severity) {
+                      case IssueSeverity.LOW: deduction = 1; break;
+                      case IssueSeverity.MEDIUM: deduction = 3; break;
+                      case IssueSeverity.HIGH: deduction = 5; break;
+                      case IssueSeverity.CRITICAL: deduction = 10; break;
+                  }
+                  // Optional: slightly higher deduction if resolved by modification vs acceptance?
+                  // if (action === 'modify') deduction *= 1.2;
+              } else { // IssueStatus.REJECTED
+                  // Larger deductions for rejected issues
+                  switch (severity) {
+                      case IssueSeverity.LOW: deduction = 2; break;
+                      case IssueSeverity.MEDIUM: deduction = 5; break;
+                      case IssueSeverity.HIGH: deduction = 10; break;
+                      case IssueSeverity.CRITICAL: deduction = 20; break;
+                  }
+              }
+          } else if (issue.status === IssueStatus.OPEN || issue.status === IssueStatus.IN_PROGRESS) {
+              // Penalty for issues left open/in progress at finalization (treat as rejected?)
+               const severity = issue.severity || IssueSeverity.MEDIUM;
+               switch (severity) {
+                      case IssueSeverity.LOW: deduction = 2; break;
+                      case IssueSeverity.MEDIUM: deduction = 5; break;
+                      case IssueSeverity.HIGH: deduction = 10; break;
+                      case IssueSeverity.CRITICAL: deduction = 20; break;
+               }
+               logger.warn(`Applying penalty for unresolved issue (status: ${issue.status}) during quality score calculation for segment ${segment._id}`);
+          }
+
+          score -= deduction;
+      }
+
+      return Math.max(minScore, Math.min(maxScore, Math.round(score))); // Clamp between 0-100 and round
+  }
 
   /** Recalculate modification degree between two strings (simple implementation) */
   private calculateModificationDegree(original: string, modified: string): number {
@@ -755,6 +796,120 @@ export class ReviewService /* implements IReviewService */ {
 
     await project.save();
      logger.info(`Reviewer ${reviewerId} removed from project ${projectId}`);
+  }
+
+  /**
+   * Batch resolve open issues across all segments in a file based on criteria.
+   * Primarily intended for Project Managers.
+   */
+  async batchResolveIssues(
+    fileId: string,
+    criteria: BatchIssueCriteria,
+    resolution: IIssue['resolution'], // The resolution action to apply
+    userId: string
+  ): Promise<{ modifiedSegments: number, resolvedIssues: number }> {
+    const methodName = 'batchResolveIssues';
+    validateId(fileId, '文件');
+    validateId(userId, '用户');
+    if (!resolution || !resolution.action) {
+      throw new ValidationError('缺少问题解决方案或操作');
+    }
+    if (!criteria || (!criteria.type?.length && !criteria.severity?.length)) {
+      throw new ValidationError('至少需要提供一个筛选条件 (类型或严重性)');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    let modifiedSegmentsCount = 0;
+    let resolvedIssuesCount = 0;
+
+    try {
+      // 1. Fetch File and Project
+      const file = await File.findById(fileId).exec();
+      validateEntityExists(file, '文件');
+      const project = await Project.findById(file.projectId).exec();
+      validateEntityExists(project, '关联项目');
+
+      // 2. Check Permissions (Only Project Manager for now)
+      if (!project.manager || !project.manager.equals(userObjectId)) {
+        throw new ForbiddenError(`用户 (${userId}) 不是项目经理，无权执行批量解决操作`);
+      }
+
+      // 3. Build Query for Segments and Issues
+      const segmentQuery: mongoose.FilterQuery<ISegment> = {
+        fileId: file._id,
+        status: { $in: [
+          SegmentStatus.REVIEWING,
+          SegmentStatus.ERROR // Allow resolving issues even if review failed
+        ] },
+        'issues.status': IssueStatus.OPEN // Target only open issues within segments
+      };
+
+      // Add criteria to the query using $elemMatch on the issues array
+      const issueMatchCriteria: any = { status: IssueStatus.OPEN };
+      if (criteria.type?.length) {
+        issueMatchCriteria.type = { $in: criteria.type };
+      }
+      if (criteria.severity?.length) {
+        issueMatchCriteria.severity = { $in: criteria.severity };
+      }
+      segmentQuery.issues = { $elemMatch: issueMatchCriteria };
+
+      // Implementation using bulkWrite
+      const updateOperations: any[] = [];
+      const resolvedStatus = (resolution.action === 'reject') ? IssueStatus.REJECTED : IssueStatus.RESOLVED;
+
+      // Build array filter explicitly
+      const arrayFilterCriteria: any = { 'issue.status': IssueStatus.OPEN };
+      if (criteria.type?.length) {
+        arrayFilterCriteria['issue.type'] = { $in: criteria.type };
+      }
+      if (criteria.severity?.length) {
+        arrayFilterCriteria['issue.severity'] = { $in: criteria.severity };
+      }
+
+      // Use updateMany with arrayFilters to target specific issues
+      updateOperations.push({
+        updateMany: {
+          filter: segmentQuery, // Find segments with matching issues
+          update: {
+            $set: {
+              'issues.$[issue].status': resolvedStatus,
+              'issues.$[issue].resolution': resolution,
+              'issues.$[issue].resolvedAt': new Date(),
+              'issues.$[issue].resolvedBy': userObjectId,
+            }
+          },
+          arrayFilters: [ arrayFilterCriteria ] // Use the explicitly built filter
+        }
+      });
+
+      if (updateOperations.length > 0) {
+          logger.info(`[${methodName}] Preparing to execute bulkWrite for file ${fileId} with criteria: ${JSON.stringify(criteria)}`);
+          const bulkResult = await Segment.bulkWrite(updateOperations, { ordered: false }); // ordered: false for performance
+          logger.info(`[${methodName}] bulkWrite result:`, bulkResult);
+
+          modifiedSegmentsCount = bulkResult.modifiedCount ?? 0;
+          // Note: bulkWrite doesn't easily return the count of *array elements* modified.
+          // Reporting modified segment count instead.
+          resolvedIssuesCount = modifiedSegmentsCount; // Simplistic estimate, represents modified segments
+          logger.info(`[${methodName}] ${modifiedSegmentsCount} segments were modified containing matching issues.`);
+
+      } else {
+         logger.info(`[${methodName}] No update operations generated. This should not normally happen if criteria are valid.`);
+      }
+
+      // Placeholder: Find segments matching the criteria (inefficient for update)
+      // const segmentsToUpdate = await Segment.find(segmentQuery).exec();
+      // logger.info(`[${methodName}] Found ${segmentsToUpdate.length} segments with matching open issues.`);
+      // Actual update logic using bulkWrite needed here
+
+      // Return the number of modified segments and the estimated number of resolved issues
+      return { modifiedSegments: modifiedSegmentsCount, resolvedIssues: resolvedIssuesCount };
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName} for file ${fileId}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '批量解决问题');
+    }
   }
 }
 

@@ -153,7 +153,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
 
     // 更新段落状态为审校中
     const previousStatus = segment.status;
-    segment.status = SegmentStatus.REVIEW_IN_PROGRESS;
+    segment.status = SegmentStatus.REVIEWING; // Use REVIEWING
     await segment.save();
 
     try {
@@ -184,7 +184,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
       };
     } catch (error: any) {
       // 发生错误时更新段落状态
-      segment.status = SegmentStatus.REVIEW_FAILED;
+      segment.status = SegmentStatus.ERROR;
       segment.error = error.message;
       await segment.save();
       
@@ -314,8 +314,8 @@ export class ReviewTaskProcessor implements TaskProcessor {
         query.status = { 
           $nin: [
             SegmentStatus.REVIEW_COMPLETED, 
-            SegmentStatus.REVIEW_FAILED,
-            SegmentStatus.COMPLETED
+            SegmentStatus.ERROR,
+            SegmentStatus.CONFIRMED
           ] 
         };
       }
@@ -504,7 +504,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
     const validStatuses = [
       SegmentStatus.TRANSLATED, 
       SegmentStatus.REVIEW_PENDING, 
-      SegmentStatus.REVIEW_FAILED
+      SegmentStatus.ERROR
     ];
     
     return !validStatuses.includes(status);

@@ -12,6 +12,7 @@ import reviewRoutes from './routes/review.routes';
 import notificationRoutes from './routes/notification.routes';
 import promptTemplateRoutes from './routes/promptTemplate.routes';
 import terminologyRoutes from './routes/terminology.routes';
+import translationMemoryRoutes from './routes/translationMemory.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 // 创建Express应用
@@ -33,6 +34,7 @@ app.use('/api/review', reviewRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/prompts', promptTemplateRoutes);
 app.use('/api/terms', terminologyRoutes);
+app.use('/api/v1/tm', translationMemoryRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

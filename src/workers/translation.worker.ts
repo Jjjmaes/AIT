@@ -7,6 +7,7 @@ import { segmentService } from '../services/segment.service';
 import { projectService } from '../services/project.service';
 import { File } from '../models/file.model';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
+import { reviewQueueService } from '../services/reviewQueue.service';
 import 'dotenv/config'; // Load environment variables
 import mongoose from 'mongoose'; // Needed for DB connection
 
@@ -31,10 +32,9 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
   let processedSegments = 0;
   let erroredSegments = 0;
   const errors: string[] = [];
+  let segmentsToTranslate: { segmentId: string, fileId: string }[] = [];
 
   try {
-    const segmentsToTranslate: { segmentId: string, fileId: string }[] = [];
-
     if (type === 'file') {
       if (!fileId) throw new Error('Missing fileId for file translation job');
       const result = await segmentService.getSegmentsByFileId(fileId);
@@ -67,22 +67,44 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
       logger.info(`Job ${job.id}: Found ${totalSegments} total segments for project ${projectId}, ${segmentsToTranslate.length} need translation.`);
     }
 
-    // Process segments sequentially for simplicity, could be parallelized later
+    // Process segments
     for (const { segmentId, fileId: currentFileId } of segmentsToTranslate) {
+        let updatedSegment: ISegment | null = null; // Variable to hold result
         try {
-            await translationService.translateSegment(segmentId, userId, options);
+            // Call translateSegment and store the result
+            updatedSegment = await translationService.translateSegment(segmentId, userId, options);
             processedSegments++;
         } catch (error: any) {
             logger.error(`Job ${job.id}: Failed to translate segment ${segmentId} in file ${currentFileId}: ${error.message}`);
             erroredSegments++;
             errors.push(`Segment ${segmentId}: ${error.message}`);
-            // Optionally mark segment as error if translateSegment didn't do it
-            try {
-              await segmentService.updateSegment(segmentId, { status: SegmentStatus.ERROR, error: error.message });
-            } catch (updateErr) { 
-              logger.error(`Job ${job.id}: Failed to mark segment ${segmentId} as ERROR after translation failure:`, updateErr);
-            }
+            // Segment status should be updated within translateSegment's catch block
+            updatedSegment = null; // Ensure segment is null on error
         }
+
+        // --- Trigger AI Review if Translation Succeeded --- 
+        if (updatedSegment && updatedSegment.status === SegmentStatus.TRANSLATED) {
+            try {
+                // Add job to the review queue
+                const reviewJobId = await reviewQueueService.addSegmentReviewJob(segmentId, userId);
+                if (reviewJobId) {
+                     logger.info(`Job ${job.id}: Added segment ${segmentId} to AI review queue (Job ID: ${reviewJobId}).`);
+                }
+                // If reviewJobId is null, it means the job already existed
+            } catch (queueError: any) {
+                logger.error(`Job ${job.id}: Failed to add segment ${segmentId} to AI review queue: ${queueError.message}`, queueError);
+                // Do not fail the translation job if queuing review fails
+            }
+        } else if (updatedSegment && updatedSegment.status === SegmentStatus.TRANSLATED_TM) {
+            logger.info(`Job ${job.id}: Segment ${segmentId} was translated by TM, skipping AI review trigger.`);
+            // Decide if TM translated segments should also go to review queue?
+            // Maybe add an option? For now, skipping.
+        } else {
+             // Log if segment update failed or status wasn't TRANSLATED
+             logger.warn(`Job ${job.id}: Segment ${segmentId} not queued for review (Status: ${updatedSegment?.status || 'Update Failed'}).`);
+        }
+        // ---------------------------------------------------
+
         // Update progress (percentage)
         const progress = totalSegments > 0 ? Math.round(((processedSegments + erroredSegments) / totalSegments) * 100) : 100;
         await job.updateProgress(progress);

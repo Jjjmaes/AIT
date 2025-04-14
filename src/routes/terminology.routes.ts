@@ -1,7 +1,8 @@
 console.log('--- Loading terminology.routes.ts ---'); // Diagnostic log
 import { Router } from 'express';
 import { authenticateJwt } from '../middleware/auth.middleware';
-import { terminologyController } from '../controllers/terminology.controller';
+// Import controller and the new CSV upload middleware
+import { terminologyController, termsCsvUploadMiddleware } from '../controllers/terminology.controller';
 // Optional: Add validation middleware if needed
 // import { validateRequest } from '../middleware/validate.middleware';
 // import { terminologyValidator } from '../validators/terminologyValidator'; // Assuming validators exist
@@ -31,17 +32,24 @@ router.route('/:terminologyId')
 
 // Add/Update a specific term (using PUT or POST)
 // Using PUT for idempotency (upsert)
-router.put('/:terminologyId/terms', 
+router.put('/:terminologyId/terms',
     // validateRequest(terminologyValidator.upsertTerm), // Optional validation
-    terminologyController.upsertTerm      // PUT /api/terms/:terminologyId/terms 
+    terminologyController.upsertTerm      // PUT /api/terms/:terminologyId/terms
 );
 
 // Remove a specific term
 // Using DELETE with term identifier (source text) in the body
-router.delete('/:terminologyId/terms', 
+router.delete('/:terminologyId/terms',
     // validateRequest(terminologyValidator.removeTerm), // Optional validation
     terminologyController.removeTerm      // DELETE /api/terms/:terminologyId/terms
 );
 
-export default router;
+// --- Route for Importing Terms ---
+// POST /api/terms/:terminologyId/import
+router.post(
+    '/:terminologyId/import',
+    termsCsvUploadMiddleware,       // Handle CSV file upload (field 'termsfile')
+    terminologyController.importTerms // Process the import
+);
 
+export default router;

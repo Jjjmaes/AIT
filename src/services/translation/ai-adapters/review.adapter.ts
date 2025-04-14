@@ -14,6 +14,7 @@ import {
 import { BaseAIServiceAdapter, TranslationResponse } from './base.adapter';
 import logger from '../../../utils/logger';
 import { TranslationOptions } from '../../../types/translation.types';
+import { encoding_for_model, TiktokenModel } from 'tiktoken';
 
 // 审校选项接口
 export interface ReviewOptions extends TranslationOptions {
@@ -114,13 +115,32 @@ export class ReviewAdapter extends BaseAIServiceAdapter {
   }
 
   /**
-   * 计算文本中的token数量
-   * 这是一个简化的计算方法，实际上OpenAI使用的是基于BPE的tokenizer
-   * 在生产环境中，应该使用更准确的计算方法
+   * Calculate the number of tokens for a given text and model using tiktoken.
+   * Handles potential model name mismatches and falls back to a default if needed.
    */
-  private calculateTokens(text: string): number {
-    // 简单的估算方法：大约每4个字符为1个token
-    return Math.ceil(text.length / 4);
+  private calculateTokens(text: string, model: string): number {
+    try {
+      // Attempt to get encoding for the specific model
+      // Handle cases where the API model name might not directly match TiktokenModel
+      let encodingModel: TiktokenModel;
+      if (model.startsWith('gpt-4')) {
+          encodingModel = 'gpt-4'; // Use base model for encoding
+      } else if (model.startsWith('gpt-3.5-turbo')) {
+          encodingModel = 'gpt-3.5-turbo';
+      } else {
+           logger.warn(`Unsupported model ${model} for tiktoken calculation, falling back to gpt-3.5-turbo encoding.`);
+          encodingModel = 'gpt-3.5-turbo'; // Default fallback
+      }
+
+      const encoder = encoding_for_model(encodingModel);
+      const tokens = encoder.encode(text).length;
+      encoder.free(); // Free up memory
+      return tokens;
+    } catch (error) {
+      logger.error('Tiktoken calculation failed, falling back to estimation', { error, model });
+      // Fallback to rough estimation if tiktoken fails
+      return Math.ceil(text.length / 4);
+    }
   }
 
   /**
@@ -265,13 +285,14 @@ ${context}
     try {
       const { translatedContent } = options;
       const prompt = this.buildReviewPrompt(options);
+      const modelToUse = this.config.model; // Get the specific model being used
       
-      // 计算输入token数
-      const inputTokens = this.calculateTokens(prompt);
+      // 计算输入token数 using the specific model
+      const inputTokens = this.calculateTokens(prompt, modelToUse);
       
       // 调用OpenAI API
       const response = await this.client.chat.completions.create({
-        model: this.config.model,
+        model: modelToUse,
         messages: [
           { role: 'system', content: 'You are a professional translation reviewer. Respond only with valid JSON.' },
           { role: 'user', content: prompt }
@@ -297,7 +318,8 @@ ${context}
       }
       
       // 处理返回数据
-      const outputTokens = this.calculateTokens(content);
+      const outputTokens = response.usage?.completion_tokens ?? this.calculateTokens(content, modelToUse);
+      const actualInputTokens = response.usage?.prompt_tokens ?? inputTokens; // Prefer API response
       const processingTime = Date.now() - startTime;
       
       // 计算修改程度
@@ -305,21 +327,36 @@ ${context}
         translatedContent,
         reviewResult.suggestedTranslation
       );
+
+      // Filter results based on request options (fallback/safety measure)
+      let finalIssues = reviewResult.issues || [];
+      if (options.checkIssueTypes?.length) {
+        finalIssues = finalIssues.filter((issue: AIReviewIssue) => 
+          options.checkIssueTypes?.includes(issue.type)
+        );
+      }
       
-      // 构建响应
+      let finalScores = reviewResult.scores || [];
+      if (options.requestedScores?.length) {
+        finalScores = finalScores.filter((score: { type: ReviewScoreType; score: number; details?: string }) =>
+          options.requestedScores?.includes(score.type)
+        );
+      }
+      
+      // 构建响应 using actual/calculated tokens
       const result: AIReviewResponse = {
         suggestedTranslation: reviewResult.suggestedTranslation || translatedContent,
-        issues: reviewResult.issues || [],
-        scores: reviewResult.scores || [],
+        issues: finalIssues, 
+        scores: finalScores, 
         metadata: {
           provider: this.config.provider,
-          model: this.config.model,
+          model: modelToUse,
           processingTime,
-          confidence: 0.85, // 固定值，OpenAI不提供置信度
+          confidence: 0.85, 
           wordCount: this.countWords(translatedContent),
           characterCount: translatedContent.length,
           tokens: {
-            input: inputTokens,
+            input: actualInputTokens, // Use potentially more accurate count from API
             output: outputTokens
           },
           modificationDegree

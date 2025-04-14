@@ -2,9 +2,11 @@ import { Terminology, ITerminology, ITermEntry, ITerminologyLanguagePair } from 
 import User, { IUser } from '../models/user.model'; // Assuming User model for permissions
 import { Project, IProject } from '../models/project.model'; // Import Project for checks
 import { handleServiceError, validateId, validateEntityExists } from '../utils/errorHandler';
-import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
+import { NotFoundError, ForbiddenError, ValidationError, AppError } from '../utils/errors';
 import logger from '../utils/logger';
 import mongoose, { Types } from 'mongoose';
+// Try namespace import for types if direct import failed
+// import * as mongoosePaginate from 'mongoose-paginate-v2';
 
 // DTO for creating a new terminology list
 export interface CreateTerminologyDto { 
@@ -132,7 +134,7 @@ export class TerminologyService {
   /**
    * Get terminology lists based on filters
    */
-  async getTerminologies(filters: GetTerminologyFilter): Promise<{ data: ITerminology[], total: number, page: number, limit: number }> {
+  async getTerminologies(filters: GetTerminologyFilter) {
     const methodName = 'getTerminologies';
     try {
       const query: mongoose.FilterQuery<ITerminology> = {};
@@ -191,18 +193,16 @@ export class TerminologyService {
       
       const finalQuery = query;
 
-      const [terminologies, total] = await Promise.all([
-        Terminology.find(finalQuery)
-          .populate('createdBy', 'id username fullName')
-          .populate('project', 'id name') // Populate basic project info
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .exec(),
-        Terminology.countDocuments(finalQuery)
-      ]);
-
-      return { data: terminologies, total, page, limit };
+      // Assuming pagination plugin is mixed into the model
+      if (!(Terminology as any).paginate) {
+           logger.error(`[${this.serviceName}.${methodName}] Pagination is not configured on the Terminology model.`);
+           throw new AppError('Server configuration error: Pagination not available.', 500);
+       }
+       const options = { page: filters.page || 1, limit: filters.limit || 10, sort: { updatedAt: -1 }, populate: 'createdBy project' };
+       logger.debug(`[${this.serviceName}.${methodName}] Paginated query: ${JSON.stringify(query)}, Options: ${JSON.stringify(options)}`);
+       // Let TS infer the result type
+       const result = await (Terminology as any).paginate(query, options);
+       return result;
 
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -366,6 +366,7 @@ export class TerminologyService {
       }
       
       const termIndex = terminology.terms.findIndex(t => t.source === termData.source);
+      const now = new Date();
       
       if (termIndex > -1) {
           // Update existing term
@@ -373,15 +374,22 @@ export class TerminologyService {
           existingTerm.target = termData.target;
           existingTerm.domain = termData.domain;
           existingTerm.notes = termData.notes;
+          existingTerm.lastModifiedBy = userObjectId;
+          existingTerm.lastModifiedAt = now;
           logger.info(`Term '${termData.source}' updated in terminology ${terminologyId} by user ${userId}`);
       } else {
-          // Add new term
-          terminology.terms.push({
+          // Add new term - include required fields
+          const newTerm: ITermEntry = {
               source: termData.source,
               target: termData.target,
               domain: termData.domain,
-              notes: termData.notes
-          });
+              notes: termData.notes,
+              createdBy: userObjectId,
+              createdAt: now,
+              lastModifiedBy: userObjectId,
+              lastModifiedAt: now
+          };
+          terminology.terms.push(newTerm);
           logger.info(`Term '${termData.source}' added to terminology ${terminologyId} by user ${userId}`);
       }
       
@@ -446,6 +454,89 @@ export class TerminologyService {
       }
   }
 
+  private async upsertTermInternal(
+      terminology: ITerminology,
+      userId: string,
+      termData: UpsertTermDto
+  ): Promise<{ term: ITermEntry, status: 'added' | 'updated' }> {
+      const methodName = 'upsertTermInternal';
+      validateId(terminology._id, '术语表');
+      validateId(userId, '用户');
+      if (!termData || !termData.source || !termData.target) {
+          throw new ValidationError('Term data requires source and target.');
+      }
+
+      try {
+          const userObjectId = new Types.ObjectId(userId);
+          const creatorId = terminology.createdBy instanceof Types.ObjectId
+                   ? terminology.createdBy
+                   : (terminology.createdBy as IUser)?._id;
+          const isCreator = creatorId?.equals(userObjectId);
+          let isProjectMemberOrManager = false;
+          if (terminology.project && typeof terminology.project === 'object') {
+               const project = terminology.project as IProject;
+               isProjectMemberOrManager = project.manager?.equals(userObjectId) ||
+                                         project.members?.some((m: Types.ObjectId) => m.equals(userObjectId));
+          }
+
+          if (!isCreator && !isProjectMemberOrManager) {
+              throw new ForbiddenError(`User ${userId} does not have permission to modify terms in terminology ${terminology._id}`);
+          }
+          
+          const termIndex = terminology.terms.findIndex(t => t.source === termData.source);
+          
+          let termResult: ITermEntry;
+          let status: 'added' | 'updated' = 'added';
+          const now = new Date();
+
+          if (termIndex > -1) {
+              // Update existing term
+              const existingTerm = terminology.terms[termIndex];
+              existingTerm.target = termData.target;
+              existingTerm.domain = termData.domain;
+              existingTerm.notes = termData.notes;
+              existingTerm.lastModifiedBy = userObjectId;
+              existingTerm.lastModifiedAt = now;
+              termResult = existingTerm as ITermEntry;
+              status = 'updated';
+          } else {
+              // Add new term - include required fields
+              const newTerm: ITermEntry = {
+                  source: termData.source,
+                  target: termData.target,
+                  domain: termData.domain,
+                  notes: termData.notes,
+                  createdBy: userObjectId,
+                  createdAt: now,
+                  lastModifiedBy: userObjectId,
+                  lastModifiedAt: now
+              };
+              terminology.terms.push(newTerm);
+              termResult = newTerm;
+          }
+
+          // Save the parent document only if a term was added or updated
+          if (status === 'added' || (status === 'updated' && termResult.lastModifiedAt === now)) {
+              try {
+                terminology.updatedAt = now;
+                await terminology.save();
+              } catch (saveError) {
+                 logger.error(`[${this.serviceName}.${methodName}] Error saving terminology list ${terminology._id} after term upsert:`, saveError);
+                 throw new ValidationError(`Failed to save terminology list after upserting term '${termData.source}'`);
+              }
+          }
+          return { term: termResult, status };
+      } catch (error) {
+          logger.error(`Error in ${this.serviceName}.${methodName} for ID ${terminology._id}:`, error);
+          throw handleServiceError(error, this.serviceName, methodName, '添加/更新术语');
+      }
+  }
+
+  // Ensure findTermsForTranslation uses ITermEntry
+  async findTermsForTranslation(projectId: string, sourceLang: string, targetLang: string, texts: string[]): Promise<Map<string, ITermEntry[]>> {
+    // ... existing placeholder ...
+    return new Map<string, ITermEntry[]>();
+  }
 }
 
 // Export singleton instance

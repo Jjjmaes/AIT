@@ -8,6 +8,10 @@ export interface ITermEntry {
   target: string;
   domain?: string; // Optional domain specific to the term
   notes?: string;  // Optional notes about the term usage
+  createdBy: Types.ObjectId | IUser; // User who added the term
+  createdAt: Date;                // When the term was added
+  lastModifiedBy?: Types.ObjectId | IUser; // User who last modified
+  lastModifiedAt?: Date;               // When the term was last modified
 }
 
 // Interface representing a language pair for the terminology
@@ -51,9 +55,26 @@ const TermEntrySchema = new Schema<ITermEntry>(
       type: String,
       trim: true,
       maxlength: [500, '术语备注不能超过500个字符']
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      required: true,
+      default: Date.now
+    },
+    lastModifiedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    lastModifiedAt: {
+      type: Date
     }
   },
-  { _id: false } // No separate _id for embedded terms
+  { _id: false }
 );
 
 // Mongoose Schema for Terminology lists
@@ -78,26 +99,26 @@ const TerminologySchema = new Schema<ITerminology>(
         _id: false
       }
     ],
-    terms: [TermEntrySchema], // Embed the term schema
+    terms: [TermEntrySchema],
     project: {
       type: Schema.Types.ObjectId,
-      ref: 'Project', // Reference to the Project model
+      ref: 'Project',
       index: true,
-      default: null // Explicitly nullable
+      default: null
     },
     createdBy: {
       type: Schema.Types.ObjectId,
-      ref: 'User', // Reference to the User model
+      ref: 'User',
       required: true
     },
     isPublic: {
       type: Boolean,
-      default: false, // Terminology lists are private by default
+      default: false,
       index: true
     }
   },
   {
-    timestamps: true // Automatically add createdAt and updatedAt fields
+    timestamps: true
   }
 );
 

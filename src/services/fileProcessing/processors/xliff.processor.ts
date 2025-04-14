@@ -84,7 +84,7 @@ export class XliffProcessor implements IFileProcessor {
           case 'signed-off':
           case 'final':
           case 'confirmed':
-              return SegmentStatus.COMPLETED;
+              return SegmentStatus.CONFIRMED;
           default:
               logger.warn(`Unknown XLIFF state encountered: '${state}'. Defaulting to PENDING.`);
               return SegmentStatus.PENDING;
@@ -94,7 +94,7 @@ export class XliffProcessor implements IFileProcessor {
   // Maps internal SegmentStatus back to XLIFF state attributes
   private mapStatusToXliffState(status: SegmentStatus): string {
     switch (status) {
-        case SegmentStatus.COMPLETED:
+        case SegmentStatus.CONFIRMED:
             return 'final';
         case SegmentStatus.REVIEW_COMPLETED:
             return 'reviewed';
@@ -110,7 +110,7 @@ export class XliffProcessor implements IFileProcessor {
   // Maps internal SegmentStatus back to MemoQ m:state attributes
   private mapStatusToMemoQState(status: SegmentStatus): string {
     switch (status) {
-      case SegmentStatus.COMPLETED:
+      case SegmentStatus.CONFIRMED:
       case SegmentStatus.REVIEW_COMPLETED: // Both map to Confirmed in MemoQ
         return 'Confirmed';
       case SegmentStatus.TRANSLATED:
