@@ -4,22 +4,17 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ValidationError, UnauthorizedError } from '../utils/errors';
 import multer from 'multer';
-import { ProjectService } from '../services/project.service';
+import { ProjectService, CreateProjectDto, UpdateProjectDto } from '../services/project.service';
 import { validateRequest } from '../middleware/validate.middleware';
 import { createProjectSchema, updateProjectSchema, projectProgressSchema } from '../schemas/project.schema';
 import { fileUploadConfig } from '../config/upload.config';
 import logger from '../utils/logger';
 import { ProjectStatus } from '../models/project.model';
-import { 
-  ProjectPriority, 
-  CreateProjectDto, 
-  UpdateProjectDto,
-  IProjectProgress as ProjectProgressDto
-} from '../types/project.types';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
 import { UploadFileDto } from '../services/project.service';
 import { Types } from 'mongoose';
+import { IProjectProgress } from '../types/project.types';
 
 export const upload = multer(fileUploadConfig);
 
@@ -38,18 +33,33 @@ export default class ProjectController {
 
       const validationResult = createProjectSchema.safeParse(req.body);
       if (!validationResult.success) {
-        // Convert the flattened error object to a string for the message
         const errorMessage = JSON.stringify(validationResult.error.flatten());
-        throw new ValidationError(errorMessage); // Pass the string message
+        throw new ValidationError(errorMessage);
       }
       const validatedData = validationResult.data;
 
-      logger.info(`User ${userId} creating new project`);
-      
-      const project = await projectService.createProject({
-          ...validatedData,
-          manager: userId // Ensure manager is set from auth user
-      });
+      logger.info(`User ${userId} creating new project with data: ${JSON.stringify(validatedData)}`);
+
+      const createDto: CreateProjectDto = {
+        ...validatedData,
+        manager: new Types.ObjectId(userId),
+        reviewers: validatedData.reviewers?.map(id => new Types.ObjectId(id)),
+        defaultTranslationPromptTemplate: validatedData.defaultTranslationPromptTemplate 
+            ? new Types.ObjectId(validatedData.defaultTranslationPromptTemplate) 
+            : undefined,
+        defaultReviewPromptTemplate: validatedData.defaultReviewPromptTemplate 
+            ? new Types.ObjectId(validatedData.defaultReviewPromptTemplate) 
+            : undefined,
+        translationPromptTemplate: validatedData.translationPromptTemplate 
+            ? new Types.ObjectId(validatedData.translationPromptTemplate) 
+            : undefined,
+        reviewPromptTemplate: validatedData.reviewPromptTemplate 
+            ? new Types.ObjectId(validatedData.reviewPromptTemplate) 
+            : undefined,
+        deadline: validatedData.deadline ? new Date(validatedData.deadline) : undefined,
+      };
+
+      const project = await projectService.createProject(createDto);
       
       logger.info(`Project ${project.id} created successfully by user ${userId}`);
       
@@ -58,6 +68,7 @@ export default class ProjectController {
         data: { project }
       });
     } catch (error) {
+      logger.error(`Error in createProject controller:`, error);
       next(error);
     }
   }
@@ -97,13 +108,14 @@ export default class ProjectController {
   async getProject(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : [];
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
 
       const { projectId } = req.params;
       
-      const project = await projectService.getProjectById(projectId, userId);
+      const project = await projectService.getProjectById(projectId, userId, userRoles);
       
       res.status(200).json({
         success: true,
@@ -123,28 +135,51 @@ export default class ProjectController {
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
+      const { projectId } = req.params;
 
       const validationResult = updateProjectSchema.safeParse(req.body);
       if (!validationResult.success) {
-        // Convert the flattened error object to a string for the message
         const errorMessage = JSON.stringify(validationResult.error.flatten());
-        throw new ValidationError(errorMessage); // Pass the string message
+        throw new ValidationError(errorMessage);
       }
       const validatedData = validationResult.data;
 
-      const { projectId } = req.params;
+      logger.info(`User ${userId} updating project ${projectId} with data: ${JSON.stringify(validatedData)}`);
 
-      // Directly use validatedData as it matches UpdateProjectDto now
-      const updateData: UpdateProjectDto = validatedData;
+      const updateDto: UpdateProjectDto = {};
+      if (validatedData.name !== undefined) updateDto.name = validatedData.name;
+      if (validatedData.description !== undefined) updateDto.description = validatedData.description;
+      if (validatedData.languagePairs !== undefined) updateDto.languagePairs = validatedData.languagePairs;
+      if (validatedData.manager !== undefined) updateDto.manager = new Types.ObjectId(validatedData.manager);
+      if (validatedData.reviewers !== undefined) {
+        updateDto.reviewers = validatedData.reviewers.map(id => new Types.ObjectId(id));
+      }
+      if (validatedData.defaultTranslationPromptTemplate !== undefined) {
+        updateDto.defaultTranslationPromptTemplate = new Types.ObjectId(validatedData.defaultTranslationPromptTemplate);
+      }
+      if (validatedData.defaultReviewPromptTemplate !== undefined) {
+        updateDto.defaultReviewPromptTemplate = new Types.ObjectId(validatedData.defaultReviewPromptTemplate);
+      }
+      if (validatedData.translationPromptTemplate !== undefined) {
+        updateDto.translationPromptTemplate = new Types.ObjectId(validatedData.translationPromptTemplate);
+      }
+      if (validatedData.reviewPromptTemplate !== undefined) {
+        updateDto.reviewPromptTemplate = new Types.ObjectId(validatedData.reviewPromptTemplate);
+      }
+      if (validatedData.deadline !== undefined) {
+        updateDto.deadline = validatedData.deadline ? new Date(validatedData.deadline) : undefined;
+      }
+      if (validatedData.priority !== undefined) updateDto.priority = validatedData.priority;
+      if (validatedData.domain !== undefined) updateDto.domain = validatedData.domain;
+      if (validatedData.industry !== undefined) updateDto.industry = validatedData.industry;
+      if (validatedData.status !== undefined) updateDto.status = validatedData.status;
       
-      logger.info(`User ${userId} updating project ${projectId}`);
-      
-      if (Object.keys(updateData).length === 0) {
+      if (Object.keys(updateDto).length === 0) {
         logger.warn(`No valid fields provided for updating project ${projectId}`);
         return res.status(400).json({ success: false, message: '没有提供可更新的字段' });
       }
 
-      const project = await projectService.updateProject(projectId, userId, updateData);
+      const project = await projectService.updateProject(projectId, userId, updateDto);
       
       logger.info(`Project ${projectId} updated successfully by user ${userId}`);
       
@@ -153,6 +188,7 @@ export default class ProjectController {
         data: { project }
       });
     } catch (error) {
+      logger.error(`Error in updateProject controller:`, error);
       next(error);
     }
   }
@@ -230,21 +266,35 @@ export default class ProjectController {
    * 获取项目文件列表
    */
   async getProjectFiles(req: AuthRequest, res: Response, next: NextFunction) {
+    const methodName = 'getProjectFiles'; // For logging
+    const { projectId } = req.params; // Get projectId outside try for catch block access
+    let userIdForLog: string | undefined = req.user?.id; // Get userId outside for logging
+    
     try {
-      const userId = req.user?.id;
+      const userId = userIdForLog; // Assign inside try for consistency
+      const userRoles = req.user?.role ? [req.user.role] : [];
+      
+      // Log entry and parameters
+      logger.debug(`[Controller/${methodName}] ENTER - ProjectId: ${projectId}, UserId: ${userId}, Roles: ${JSON.stringify(userRoles)}`);
+
       if (!userId) {
+        logger.warn(`[Controller/${methodName}] Unauthorized access attempt - no userId.`);
         throw new UnauthorizedError('未授权的访问');
       }
-
-      const { projectId } = req.params;
       
-      const files = await projectService.getProjectFiles(projectId, userId);
+      const files = await projectService.getProjectFiles(projectId, userId, userRoles);
+      
+      // Log before sending response
+      logger.debug(`[Controller/${methodName}] SUCCESS - Found ${files.length} files. Sending response.`);
+      // logger.debug(`[Controller/${methodName}] Files data:`, files); // Optional: Log full file data if needed
       
       res.status(200).json({
         success: true,
         data: { files }
       });
     } catch (error) {
+      // Log the error before passing to next (use variables from outer scope)
+      logger.error(`[Controller/${methodName}] FAILED - ProjectId: ${projectId}, UserId: ${userIdForLog}. Error:`, error);
       next(error);
     }
   }
@@ -255,6 +305,7 @@ export default class ProjectController {
   async processFile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : [];
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
@@ -282,6 +333,7 @@ export default class ProjectController {
   async getFileSegments(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : [];
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
@@ -310,18 +362,14 @@ export default class ProjectController {
   async updateFileProgress(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : [];
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
-
       const { fileId } = req.params;
-      
-      logger.info(`User ${userId} updating file progress for file ${fileId}`);
-      
+
       await projectService.updateFileProgress(fileId, userId);
-      
-      logger.info(`File ${fileId} progress updated successfully`);
-      
+
       res.status(200).json({
         success: true,
         message: '文件进度更新成功'
@@ -337,24 +385,20 @@ export default class ProjectController {
   async updateProjectProgress(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : [];
+
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
+      const { projectId } = req.params;
 
       const validationResult = projectProgressSchema.safeParse(req.body);
       if (!validationResult.success) {
-        throw new ValidationError(validationResult.error.errors[0].message);
+        throw new ValidationError(JSON.stringify(validationResult.error.flatten()));
       }
 
-      const { projectId } = req.params;
-      const progressData: ProjectProgressDto = validationResult.data;
-      
-      logger.info(`User ${userId} updating progress for project ${projectId}`);
-      
-      await projectService.updateProjectProgress(projectId, userId, progressData);
-      
-      logger.info(`Project ${projectId} progress updated successfully`);
-      
+      const project = await projectService.updateProjectProgress(projectId, userId, validationResult.data);
+
       res.status(200).json({
         success: true,
         message: '项目进度更新成功'
@@ -373,18 +417,11 @@ export default class ProjectController {
       if (!userId) {
         throw new UnauthorizedError('未授权的访问');
       }
-
       const { projectId } = req.params;
       
-      const project = await projectService.getProjectById(projectId, userId);
-      const files = await projectService.getProjectFiles(projectId, userId);
-      
-      res.status(200).json({
-        success: true,
-        data: {
-          project,
-          files
-        }
+      res.status(501).json({
+        success: false,
+        message: 'Project stats endpoint not implemented yet.'
       });
     } catch (error) {
       next(error);

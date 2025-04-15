@@ -384,7 +384,8 @@ Third paragraph.`;
         mockProject._id.toString(),
         fileId.toString(),
         mockTranslationOptions,
-        new Types.ObjectId().toString() // Add missing userId
+        new Types.ObjectId().toString(), // Add missing userId
+        ['admin'] // Added mock requesterRoles
       );
       expect(jobId).toBeDefined();
     });

@@ -27,6 +27,7 @@ interface AIReviewOptions {
     translation: string;
   }>;
   userId?: string; // For permission checks when fetching project/terms
+  requesterRoles?: string[]; // Add roles for permission checks
 }
 
 /**
@@ -101,7 +102,12 @@ export class AIReviewService {
        let terms: ITermEntry[] = [];
        if (options.projectId && options.userId) { // Check for userId too
            try {
-               const project = await this.projectService.getProjectById(options.projectId, options.userId);
+               // Pass roles from options
+               const project = await this.projectService.getProjectById(
+                   options.projectId, 
+                   options.userId, 
+                   options.requesterRoles || [] // Pass roles, default to empty array
+               );
                validateEntityExists(project, '关联项目 for terminology');
                if (project.terminology) {
                    const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());

@@ -6,11 +6,19 @@ import logger from '../utils/logger';
 import { FileType } from '../models/file.model';
 import { validateFileType } from '../utils/fileUtils'; // Assuming validateFileType exists here
 import fs from 'fs/promises'; // Import fs for cleanup
+import { translationQueueService } from '../services/translationQueue.service'; // Import queue service
+import { projectService } from '../services/project.service'; // Import project service for validation
 
 // Assuming AuthRequest extends Request and includes user info
 // Define it here or import from auth middleware if defined there
+// Match the structure used in ProjectController
 interface AuthRequest extends Request {
-  user?: { id: string; /* other user props */ };
+  user?: {
+    id: string;
+    email: string;
+    username: string;
+    role: string;
+  };
 }
 
 export class FileController {
@@ -20,6 +28,7 @@ export class FileController {
     const methodName = 'uploadFile';
     const { projectId } = req.params;
     const userId = req.user?.id;
+    const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
     const { sourceLanguage, targetLanguage } = req.body;
 
     try {
@@ -61,7 +70,8 @@ export class FileController {
         userId,
         fileInfo,
         sourceLanguage,
-        targetLanguage
+        targetLanguage,
+        userRoles // Pass roles
       );
 
       res.status(201).json({
@@ -87,11 +97,13 @@ export class FileController {
       const methodName = 'getFiles';
       const { projectId } = req.params;
       const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
       try {
           validateId(projectId, '项目');
           if (!userId) return next(new AppError('认证失败', 401));
 
-          const files = await fileManagementService.getFilesByProjectId(projectId, userId);
+          // Pass roles
+          const files = await fileManagementService.getFilesByProjectId(projectId, userId, userRoles);
           // Return plain objects
           res.status(200).json({ success: true, data: files.map(f => f.toObject()) }); 
       } catch (error) {
@@ -104,12 +116,14 @@ export class FileController {
        const methodName = 'getFile';
        const { projectId, fileId } = req.params;
        const userId = req.user?.id;
+       const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
        try {
            validateId(projectId, '项目');
            validateId(fileId, '文件');
            if (!userId) return next(new AppError('认证失败', 401));
 
-           const file = await fileManagementService.getFileById(fileId, projectId, userId);
+           // Pass roles
+           const file = await fileManagementService.getFileById(fileId, projectId, userId, userRoles);
            if (!file) {
                return next(new NotFoundError('文件未找到'));
            }
@@ -125,15 +139,66 @@ export class FileController {
        const methodName = 'deleteFile';
        const { projectId, fileId } = req.params;
        const userId = req.user?.id;
+       const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
        try {
            validateId(projectId, '项目');
            validateId(fileId, '文件');
            if (!userId) return next(new AppError('认证失败', 401));
 
-           await fileManagementService.deleteFile(fileId, projectId, userId);
+           // Pass roles
+           await fileManagementService.deleteFile(fileId, projectId, userId, userRoles);
            res.status(200).json({ success: true, message: '文件已成功删除' });
     } catch (error) {
            logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      next(error);
+    }
+  }
+
+  // Placeholder for starting translation
+  async startTranslation(req: AuthRequest, res: Response, next: NextFunction) {
+    const methodName = 'startTranslation';
+    const { projectId, fileId } = req.params;
+    const userId = req.user?.id;
+    const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
+    // Extract options from request body if needed, otherwise use default/empty
+    const options = req.body.options || {}; 
+
+    try {
+      validateId(projectId, '项目');
+      validateId(fileId, '文件');
+      if (!userId) return next(new AppError('认证失败', 401));
+
+      // 1. Validate user permission (Example using projectService)
+      // This ensures the user triggering the job has access to the project
+      await projectService.getProjectById(projectId, userId, userRoles);
+      // Optionally add specific validation for the file itself if needed
+
+      logger.info(`User ${userId} (Roles: ${userRoles.join(',')}) queuing translation for file ${fileId} in project ${projectId}`);
+
+      // 2. Call QueueService to enqueue the job
+      // 3. Pass userId and userRoles to the job queue data
+      // Temporarily comment out adding job to queue
+      /*
+      const jobId = await translationQueueService.addFileTranslationJob(
+        projectId, 
+        fileId, 
+        options, 
+        userId, 
+        userRoles // Pass roles here
+      );
+      */
+      const fakeJobId = `temp-job-${fileId}-${Date.now()}`; // Generate fake ID for response
+      logger.warn(`TEMPORARY: Skipped adding translation job for file ${fileId} to queue.`);
+      
+      // Return job ID or success message
+      res.status(202).json({ 
+        success: true, 
+        message: 'Translation request received (queue disabled).',
+        jobId: fakeJobId // Return fake ID
+      });
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
       next(error);
     }
   }

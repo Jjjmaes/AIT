@@ -107,9 +107,15 @@ export class PromptTemplateService {
    */
   async getTemplates(userId: string, filters: GetTemplatesFilter = {}): Promise<{ data: IPromptTemplate[], total: number, page: number, limit: number }> {
     const methodName = 'getTemplates';
-    validateId(userId, '用户');
+    // Temporarily comment out validation to test flow
+    // validateId(userId, '用户'); 
+    logger.info(`[${methodName}] User ID validation skipped (debugging): ${userId}`); // Log after validation
+    logger.info(`[${methodName}] Service called by user: ${userId}, Filters: ${JSON.stringify(filters)}`); 
 
+    // Change log level and add log inside try
+    logger.info(`[${methodName}] About to enter main try block...`); // Changed to info
     try {
+      logger.info(`[${methodName}] Entered main try block.`); // Added log inside try
       const query: mongoose.FilterQuery<IPromptTemplate> = {};
       const page = filters.page || 1;
       const limit = filters.limit || 10;
@@ -140,6 +146,7 @@ export class PromptTemplateService {
       
       // Combine base query and permission query
       const finalQuery = { ...query, ...permissionQuery };
+      logger.debug(`[${methodName}] Final MongoDB Query: ${JSON.stringify(finalQuery)}`); // Log the final query
 
       const [templates, total] = await Promise.all([
         PromptTemplate.find(finalQuery)
@@ -150,6 +157,10 @@ export class PromptTemplateService {
           .exec(),
         PromptTemplate.countDocuments(finalQuery)
       ]);
+
+      logger.debug(`[${methodName}] Found ${total} total matching templates.`); // Log total count found
+      logger.debug(`[${methodName}] Returning ${templates.length} templates for page ${page}.`); // Log count for the page
+      // logger.debug(`[${methodName}] Template data being returned:`, templates); // Optional: Log full template data if needed, might be large
 
       return { data: templates, total, page, limit };
     } catch (error) {

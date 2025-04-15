@@ -155,8 +155,8 @@ describe('TranslationService', () => {
         save: segmentSaveMock, // Assuming segmentSaveMock is defined
         ...props,
     } as ISegment);
-
-    beforeEach(() => {
+  
+  beforeEach(() => {
     jest.clearAllMocks();
         saveSegmentStates = []; 
         saveFileStates = []; 

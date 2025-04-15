@@ -12,18 +12,18 @@ router.use(authenticateJwt);
 
 // Define routes
 router.route('/')
-  .get(promptTemplateController.getAll) // GET /api/prompts (with query filters)
+  .get(promptTemplateController.getAll.bind(promptTemplateController)) // GET /api/prompts (with query filters)
   .post(
     // validateRequest(promptTemplateValidator.create), // Optional validation
-    promptTemplateController.create // POST /api/prompts
+    promptTemplateController.create.bind(promptTemplateController) // POST /api/prompts
   );
 
 router.route('/:templateId')
-  .get(promptTemplateController.getById) // GET /api/prompts/:templateId
+  .get(promptTemplateController.getById.bind(promptTemplateController)) // GET /api/prompts/:templateId
   .put(
     // validateRequest(promptTemplateValidator.update), // Optional validation
-    promptTemplateController.update // PUT /api/prompts/:templateId
+    promptTemplateController.update.bind(promptTemplateController) // PUT /api/prompts/:templateId
    )
-  .delete(promptTemplateController.delete); // DELETE /api/prompts/:templateId
+  .delete(promptTemplateController.delete.bind(promptTemplateController)); // DELETE /api/prompts/:templateId
 
 export default router; // Make sure this export exists!

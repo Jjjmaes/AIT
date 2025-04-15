@@ -68,10 +68,10 @@ export interface UploadFileDto {
 
 export interface ProjectService {
   getProject(projectId: string): Promise<IProject>;
-  getProjectFiles(projectId: string, userId: string): Promise<IFile[]>;
-  updateProjectProgress(projectId: string, userId: string, progress: IProjectProgress): Promise<IProject>;
-  updateProjectStatus(projectId: string, userId: string, status: ProjectStatus): Promise<void>;
-  updateProject(projectId: string, userId: string, data: UpdateProjectDto): Promise<IProject>;
+  getProjectFiles(projectId: string, userId: string, requesterRoles: string[]): Promise<IFile[]>;
+  updateProjectProgress(projectId: string, userId: string, progress: IProjectProgress, requesterRoles: string[]): Promise<IProject>;
+  updateProjectStatus(projectId: string, userId: string, status: ProjectStatus, requesterRoles: string[]): Promise<void>;
+  updateProject(projectId: string, userId: string, data: UpdateProjectDto, requesterRoles: string[]): Promise<IProject>;
   createProject(data: CreateProjectDto): Promise<IProject>;
   getUserProjects(userId: string, options: {
     status?: ProjectStatus;
@@ -80,7 +80,8 @@ export interface ProjectService {
     page?: number;
     limit?: number;
   }): Promise<{ projects: IProject[], pagination: { total: number, page: number, limit: number, totalPages: number } }>;
-  getProjectById(projectId: string, userId: string): Promise<IProject>;
+  getProjectById(projectId: string, userId: string, requesterRoles: string[]): Promise<IProject>;
+  deleteProject(projectId: string, userId: string, requesterRoles: string[]): Promise<{ success: boolean }>;
   deleteProject(projectId: string, userId: string): Promise<{ success: boolean }>;
   uploadProjectFile(projectId: string, userId: string, fileData: UploadFileDto): Promise<IFile>;
   processFile(fileId: string, userId: string): Promise<void>;
@@ -116,9 +117,13 @@ export class ProjectService implements ProjectService {
           if (!lp.source || !lp.target) throw new ValidationError('语言对必须包含源语言和目标语言');
       });
       
+      // Ensure manager is ObjectId
+      const managerId = new Types.ObjectId(data.manager); 
+
       const project = new Project({
         ...data,
-        manager: new Types.ObjectId(data.manager), // Ensure manager is ObjectId
+        owner: managerId, // Set owner to the manager who creates the project
+        manager: managerId, 
         reviewers: data.reviewers?.map(id => new Types.ObjectId(id)),
         // Ensure prompt template IDs are ObjectIds if provided as strings
         defaultTranslationPromptTemplate: data.defaultTranslationPromptTemplate ? new Types.ObjectId(data.defaultTranslationPromptTemplate) : undefined,
@@ -127,11 +132,12 @@ export class ProjectService implements ProjectService {
         reviewPromptTemplate: data.reviewPromptTemplate ? new Types.ObjectId(data.reviewPromptTemplate) : undefined,
         status: ProjectStatus.ACTIVE, // Default status from model
         priority: data.priority, // Already number
+        deadline: data.deadline,
         // files: [] // Let schema default handle this
       });
 
       await project.save();
-      logger.info(`Project created: ${project.id} by manager ${data.manager}`);
+      logger.info(`Project created: ${project.id} by owner/manager ${managerId}`);
       return project;
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -192,7 +198,7 @@ export class ProjectService implements ProjectService {
   /**
    * 获取项目详情
    */
-  async getProjectById(projectId: string, userId: string): Promise<IProject> {
+  async getProjectById(projectId: string, userId: string, requesterRoles: string[]): Promise<IProject> {
     const methodName = 'getProjectById';
     validateId(projectId, '项目');
     validateId(userId, '用户');
@@ -200,7 +206,7 @@ export class ProjectService implements ProjectService {
     const project = await Project.findById(projectId).populate('manager', 'username email').populate('reviewers', 'username email').exec();
     validateEntityExists(project, '项目');
 
-    validateOwnership(project.manager, userId, '查看项目'); 
+    validateOwnership(project.manager, userId, '查看项目', true, requesterRoles); 
 
     return project;
   }
@@ -505,17 +511,26 @@ export class ProjectService implements ProjectService {
   /**
    * 获取项目文件列表
    */
-  async getProjectFiles(projectId: string, userId: string): Promise<IFile[]> {
+  async getProjectFiles(projectId: string, userId: string, requesterRoles: string[]): Promise<IFile[]> {
     const methodName = 'getProjectFiles';
+    logger.debug(`[Service/${methodName}] ENTER - ProjectId: ${projectId}, UserId: ${userId}, Roles: ${JSON.stringify(requesterRoles)}`); // Log entry
     validateId(projectId, '项目');
     validateId(userId, '用户');
 
     try { 
-      const project = await this.getProjectById(projectId, userId); // Validates access
+      // Pass requesterRoles to getProjectById for proper access validation
+      logger.debug(`[Service/${methodName}] Calling getProjectById...`);
+      const project = await this.getProjectById(projectId, userId, requesterRoles);
+      logger.debug(`[Service/${methodName}] getProjectById returned project: ${project?._id}`);
+      
+      logger.debug(`[Service/${methodName}] Calling File.find({ projectId: ${project._id} })...`);
       const files = await File.find({ projectId: project._id }).sort({ createdAt: -1 }).exec();
+      logger.debug(`[Service/${methodName}] File.find returned ${files.length} files.`);
+      
       return files;
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName} for project ${projectId}:`, error);
+      logger.error(`[Service/${methodName}] FAILED - ProjectId: ${projectId}, UserId: ${userId}. Error:`, error);
+      // Re-throw handled error
       throw handleServiceError(error, this.serviceName, methodName, '获取项目文件列表');
     }
   }

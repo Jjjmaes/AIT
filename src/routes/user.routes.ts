@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateJwt } from '../middleware/auth.middleware';
 import authController from '../controllers/auth.controller';
+import { userController } from '../controllers/user.controller';
 import { validateUpdateUser, validateChangePassword } from '../validators/userValidator';
 import { validateRequest } from '../middleware/validate.middleware';
 
@@ -14,5 +15,10 @@ router.put('/profile', authenticateJwt, validateRequest(validateUpdateUser), aut
 
 // 修改密码
 router.put('/password', authenticateJwt, validateRequest(validateChangePassword), authController.changePassword);
+
+// 获取用户列表 (e.g., for selecting reviewers)
+// Add appropriate authentication/authorization middleware here
+// For now, just require login
+router.get('/', authenticateJwt, userController.getAllUsers);
 
 export default router; 

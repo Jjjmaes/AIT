@@ -2,20 +2,23 @@
 // src/middleware/validate.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject } from 'zod';
+import { AnyZodObject, ZodError } from 'zod';
 import { ValidationError } from '../utils/errors';
 
 export const validateRequest = (schema: AnyZodObject) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await schema.parseAsync({
-        body: req.body,
-        query: req.query,
-        params: req.params
-      });
+      // Assume schema primarily validates the body for POST/PUT/PATCH
+      // If validation needs query/params too, this needs adjustment based on schema structure
+      await schema.parseAsync(req.body); 
       next();
     } catch (error) {
-      next(new ValidationError('请求参数验证失败'));
+      if (error instanceof ZodError) {
+        const errorMessage = JSON.stringify(error.flatten());
+        next(new ValidationError(errorMessage));
+      } else {
+        next(error);
+      }
     }
   };
 }; 

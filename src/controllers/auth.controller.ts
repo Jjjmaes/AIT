@@ -30,10 +30,11 @@ class AuthController {
     try {
       const userData = req.body;
       logger.info(`${this.serviceName}.${methodName} - Attempting registration for: ${userData.email}`);
-      const newUser = await userService.registerUser(userData);
+      const newUserDoc = await userService.registerUser(userData);
       
-      // Exclude password from response
-      const { password, ...userResponse } = newUser.toObject(); 
+      // Exclude password from response in the controller
+      const userResponse = newUserDoc.toObject(); // Convert to plain object here
+      delete userResponse.password; // Remove password before sending
       
       res.status(201).json({
         success: true,

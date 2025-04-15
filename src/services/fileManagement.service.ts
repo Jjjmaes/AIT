@@ -31,6 +31,7 @@ class FileManagementService {
      * @param fileInfo Information about the uploaded file from middleware.
      * @param sourceLang Source language code.
      * @param targetLang Target language code.
+     * @param requesterRoles Roles of the user requesting the operation
      * @returns The created IFile document.
      */
     async processUploadedFile(
@@ -38,7 +39,8 @@ class FileManagementService {
         userId: string,
         fileInfo: UploadedFileInfo,
         sourceLang: string,
-        targetLang: string
+        targetLang: string,
+        requesterRoles: string[] = []
     ): Promise<IFile> {
         const methodName = 'processUploadedFile';
         validateId(projectId, '项目');
@@ -48,7 +50,7 @@ class FileManagementService {
 
         try {
             // 1. Validate Project and User Permissions (implicitly via projectService)
-            const project = await projectService.getProjectById(projectId, userId);
+            const project = await projectService.getProjectById(projectId, userId, requesterRoles);
             validateEntityExists(project, '项目');
 
             // 2. Create File Record in DB (initially PENDING)
@@ -141,14 +143,14 @@ class FileManagementService {
         }
     }
 
-    async getFileById(fileId: string, projectId: string, userId: string): Promise<IFile | null> {
+    async getFileById(fileId: string, projectId: string, userId: string, requesterRoles: string[] = []): Promise<IFile | null> {
         const methodName = 'getFileById';
         validateId(fileId, '文件');
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
              // Ensure user has access to the project first
-            await projectService.getProjectById(projectId, userId);
+            await projectService.getProjectById(projectId, userId, requesterRoles);
             const file = await File.findOne({ _id: new mongoose.Types.ObjectId(fileId), projectId: new mongoose.Types.ObjectId(projectId) }).exec();
             validateEntityExists(file, '文件');
             return file;
@@ -158,13 +160,13 @@ class FileManagementService {
         }
     }
 
-    async getFilesByProjectId(projectId: string, userId: string): Promise<IFile[]> {
+    async getFilesByProjectId(projectId: string, userId: string, requesterRoles: string[] = []): Promise<IFile[]> {
         const methodName = 'getFilesByProjectId';
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
              // Ensure user has access to the project first
-            await projectService.getProjectById(projectId, userId);
+            await projectService.getProjectById(projectId, userId, requesterRoles);
             const files = await File.find({ projectId: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 }).exec();
             return files;
         } catch (error) {
@@ -173,14 +175,14 @@ class FileManagementService {
         }
     }
 
-    async deleteFile(fileId: string, projectId: string, userId: string): Promise<void> {
+    async deleteFile(fileId: string, projectId: string, userId: string, requesterRoles: string[] = []): Promise<void> {
         const methodName = 'deleteFile';
         validateId(fileId, '文件');
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
             // Ensure user has access and get the file record
-            const file = await this.getFileById(fileId, projectId, userId); 
+            const file = await this.getFileById(fileId, projectId, userId, requesterRoles); 
             if (!file) {
                 throw new NotFoundError('无法找到要删除的文件'); // Should be caught by getFileById, but double check
             }

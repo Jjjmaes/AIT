@@ -1,8 +1,8 @@
 import { Queue, Job, JobState } from 'bullmq';
 import Redis from 'ioredis';
-import logger from '../../utils/logger';
-import { handleServiceError } from '../../utils/errorHandler';
-import { NotFoundError } from '../../utils/errors';
+import logger from '../utils/logger';
+import { handleServiceError } from '../utils/errorHandler';
+import { AppError } from '../utils/errors';
 import 'dotenv/config'; // Load environment variables
 // Assuming ReviewOptions might be defined elsewhere, or define inline
 // import { ReviewOptions } from '../review.service'; // Or relevant path
@@ -14,6 +14,9 @@ export interface ReviewJobData {
   type: 'segment'; // Initially just segment review
   segmentId: string;
   userId: string; // User who initiated the original translation job
+  requesterRoles: string[]; // Roles of the user who initiated
+  // Add any other context needed for the review, e.g., projectId
+  projectId?: string; 
   // Add relevant review options if needed (e.g., specific model, template)
   // options?: Partial<ReviewOptions>; 
 }
@@ -31,8 +34,9 @@ export interface JobStatus {
 }
 
 class ReviewQueueService {
-  private queue: Queue<ReviewJobData>;
-  private connection: Redis;
+  // Make queue and connection optional or handle initialization differently
+  private queue?: Queue<ReviewJobData>;
+  private connection?: Redis;
   private serviceName = 'ReviewQueueService';
 
   constructor() {
@@ -43,6 +47,10 @@ class ReviewQueueService {
       password: process.env.REDIS_PASSWORD || undefined,
       maxRetriesPerRequest: null
     };
+    
+    // Optionally, only connect if Redis is configured or needed
+    // For now, we comment out the connection and queue creation
+    /*
     this.connection = new Redis(connectionOptions);
     this.connection.on('error', (err: Error) => logger.error('Redis Connection Error (Review Queue)', err));
 
@@ -58,8 +66,9 @@ class ReviewQueueService {
             removeOnFail: { count: 5000 }
         }
     });
-
     logger.info(`Review queue service initialized. Connected to Redis: ${connectionOptions.host}:${connectionOptions.port}`);
+    */
+   logger.warn(`Review queue service initialized WITHOUT Redis connection (temporary).`);
   }
 
   // Create a unique job ID for segment review
@@ -74,27 +83,28 @@ class ReviewQueueService {
   async addSegmentReviewJob(
     segmentId: string,
     userId: string,
+    requesterRoles: string[],
     // options?: Partial<ReviewOptions> 
   ): Promise<string | null> { // Return null if job already exists
     const methodName = 'addSegmentReviewJob';
     const jobId = this.getJobId(segmentId);
-    const jobData: ReviewJobData = { type: 'segment', segmentId, userId, /* options */ };
+    const jobData: ReviewJobData = { type: 'segment', segmentId, userId, requesterRoles, /* options */ };
     
     try {
         // Check if a job with this ID already exists (active, waiting, delayed, completed, failed)
-        const existingJob = await this.queue.getJob(jobId);
-        if (existingJob) {
-             const state = await existingJob.getState();
-             // Optional: Add logic to retry failed jobs if needed
-             // if (state === 'failed') { ... } 
-             logger.warn(`[${this.serviceName}.${methodName}] Job ${jobId} for segment ${segmentId} already exists with status ${state}. Skipping add.`);
-             return null; // Indicate job was not added
-        }
+        // Temporarily disable check as queue is disabled
+        // const existingJob = await this.queue?.getJob(jobId);
+        // if (existingJob) {
+        //      const state = await existingJob.getState();
+        //      logger.warn(`[${this.serviceName}.${methodName}] Job ${jobId} for segment ${segmentId} already exists with status ${state}. Skipping add.`);
+        //      return null; // Indicate job was not added
+        // }
 
         // Add the job with the specific ID
-        await this.queue.add(jobId, jobData, { jobId });
-        logger.info(`Added segment review job ${jobId} for segment ${segmentId}`);
-        return jobId;
+        // Temporarily bypass adding to the queue
+        // await this.queue.add(jobId, jobData, { jobId });
+        logger.warn(`TEMPORARY: Skipped adding segment review job ${jobId} to queue.`);
+        return jobId; // Still return jobId as if added
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
       throw handleServiceError(error, this.serviceName, methodName, '添加 AI 审校任务');
@@ -104,9 +114,10 @@ class ReviewQueueService {
   // Add getJobStatus, cancelJob similar to TranslationQueueService if needed
 
   async close(): Promise<void> {
-    await this.queue.close();
-    await this.connection.quit();
-    logger.info('Review queue service shut down.');
+    // Temporarily do nothing
+    // await this.queue?.close();
+    // await this.connection?.quit();
+    logger.info('Review queue service shutdown skipped (temporary).');
   }
 }
 

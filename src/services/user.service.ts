@@ -20,6 +20,7 @@ import logger from '../utils/logger';
 import { validateId, validateEntityExists } from '../utils/errorHandler';
 import bcrypt from 'bcryptjs';
 import { handleServiceError } from '../utils/errorHandler';
+import mongoose from 'mongoose';
 
 interface LoginResponse {
   token: string;
@@ -30,6 +31,12 @@ interface LoginResponse {
     role: string;
     fullName?: string;
   };
+}
+
+// Options for filtering users
+export interface GetUsersOptions {
+  role?: string;
+  // Add other potential filters: search, pagination etc.
 }
 
 export class UserService {
@@ -77,9 +84,10 @@ export class UserService {
       };
       
       logger.info(`User registered: ${user._id}`);
-      const userToReturn = user.toObject();
-      delete userToReturn.password;
-      return userToReturn as IUser;
+      // const userToReturn = user.toObject();
+      // delete userToReturn.password;
+      // Return the Mongoose document itself
+      return user;
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
       if ((error as any).code === 11000) {
@@ -96,14 +104,35 @@ export class UserService {
     const methodName = 'loginUser';
     try {
       // 查找用户
-      const user = await User.findOne({ email: data.email }).select('+password');
-      if (!user) {
-        throw new UnauthorizedError('邮箱或密码不正确');
-      }
+      logger.debug(`[${methodName}] Attempting to find user with email: ${data.email}`);
+      // Find user, explicitly requesting password
+      const user = await User.findOne({ email: data.email }).select('+password').exec(); 
       
-      // 验证密码
-      const isPasswordValid = await bcrypt.compare(data.password, user.password!);
+      // --- Separate Checks --- 
+      if (!user) { // First, check if user was found at all
+        logger.warn(`[${methodName}] User not found for email: ${data.email}`);
+        throw new UnauthorizedError('邮箱或密码不正确 (User not found)'); // More specific error internally
+      } 
+      logger.debug(`[${methodName}] User found. ID: ${user._id}. Checking password field...`);
+
+      if (!user.password) { // Then, check if password field exists on the found user
+        logger.error(`[${methodName}] Password field missing from user object despite using .select('+password')! User ID: ${user._id}`);
+        throw new AppError('Internal server error during login (password field missing).', 500); // Indicate internal issue
+      }
+      // ----------------------
+      
+      // --- More Detailed Password Comparison Logging --- 
+      const providedPassword = data.password;
+      const storedHash = user.password; // Now we know user and user.password exist
+      logger.debug(`[${methodName}] Comparing Provided Password: [${providedPassword}] (Length: ${providedPassword?.length})`);
+      logger.debug(`[${methodName}] With Stored Hash: [${storedHash}] (Length: ${storedHash?.length})`);
+      
+      const isPasswordValid = await bcrypt.compare(providedPassword, storedHash);
+      logger.debug(`[${methodName}] Password comparison result (isPasswordValid): ${isPasswordValid}`); 
+      // ------------------------------------------
+      
       if (!isPasswordValid) {
+        logger.warn(`[${methodName}] Password validation failed for user ${user._id}.`);
         throw new UnauthorizedError('邮箱或密码不正确');
       }
       
@@ -235,6 +264,32 @@ export class UserService {
     } catch (error) {
          logger.error(`Error in ${this.serviceName}.${methodName} for user ${userId}:`, error);
          throw handleServiceError(error, this.serviceName, methodName, '修改密码');
+    }
+  }
+
+  /**
+   * Get a list of users, optionally filtered.
+   * @param options - Filtering options.
+   */
+  async getUsers(options: GetUsersOptions = {}): Promise<IUser[]> {
+    const methodName = 'getUsers';
+    const { role } = options;
+
+    try {
+      const query: mongoose.FilterQuery<IUser> = {};
+
+      if (role) {
+        query.role = role;
+      }
+
+      // Exclude password field from results
+      const users = await User.find(query).select('-password').exec();
+      logger.info(`Fetched ${users.length} users with filter: ${JSON.stringify(options)}`);
+      return users;
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '获取用户列表');
     }
   }
 }

@@ -31,14 +31,13 @@ class PromptTemplateController {
 
   // --- Get All Templates (Filtered) ---
   async getAll(req: AuthRequest, res: Response, next: NextFunction) {
-    const methodName = 'getAll';
+    const methodName = 'getAll'; // Define methodName for logging
     try {
         const userId = req.user?.id;
         if (!userId) {
             return next(new AppError('Authentication required', 401));
         }
         // Extract filters from query parameters
-        // Add proper parsing/validation for page, limit, isPublic etc.
         const filters: GetTemplatesFilter = {
             taskType: req.query.taskType as any,
             domain: req.query.domain as string,
@@ -49,10 +48,23 @@ class PromptTemplateController {
         };
         logger.info(`Fetching prompt templates for user ${userId} with filters:`, filters);
         const result = await promptTemplateService.getTemplates(userId, filters);
-        res.status(200).json({ success: true, ...result });
+
+        // Format response to match frontend expectation { success: true, data: { templates: [...] } }
+        res.status(200).json({
+            success: true,
+            data: {
+                templates: result.data,
+                pagination: { // Include pagination info if needed by frontend
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit
+                }
+            }
+        });
     } catch (error) {
+        // Corrected logger call in catch block
         logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
-        next(error);
+        next(error); // Pass to central error handler
     }
   }
 

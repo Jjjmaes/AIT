@@ -13,8 +13,7 @@ import { handleServiceError, validateId, validateEntityExists, validateOwnership
 import User, { IUser } from '../models/user.model';
 import { promptProcessor } from '../utils/promptProcessor';
 import { config } from '../config';
-import { TranslationMemoryService, translationMemoryService } from './translationMemory.service';
-import { projectService } from './project.service';
+import { TranslationMemoryService } from './translationMemory.service';
 
 // Define criteria for batch resolving issues (moved outside class & EXPORTED)
 export interface BatchIssueCriteria {
@@ -44,13 +43,14 @@ export class ReviewService /* implements IReviewService */ {
 
   constructor(aiRevService: AIReviewService = aiReviewServiceInstance) {
     this.aiReviewService = aiRevService;
-    this.translationMemoryService = translationMemoryService;
+    this.translationMemoryService = new TranslationMemoryService();
   }
 
   /**
    * 开始AI审校
    */
-  async startAIReview(segmentId: string, userId: string, options?: any): Promise<ISegment> {
+    async startAIReview(segmentId: string, userId: string, requesterRoles: string[] = [], options?: any): Promise<ISegment> {
+    // Define methodName for logging
     const methodName = 'startAIReview';
     validateId(segmentId, '段落');
     validateId(userId, '用户');
@@ -79,19 +79,11 @@ export class ReviewService /* implements IReviewService */ {
       validateEntityExists(project, '关联项目');
 
       // 4. Check Permissions (Manager or assigned Reviewer?)
-      const userObjectId = new Types.ObjectId(userId);
-      // Use correct manager field
-      const isManager = project.manager?.equals(userObjectId);
-      const isReviewer = project.reviewers?.some((r: Types.ObjectId) => r.equals(userObjectId));
-      // Removed check for non-existent segment.translator
-      if (!isManager && !isReviewer) {
-        // Adjusted error message as translator role isn't checked here
-        throw new ForbiddenError(`用户 (${userId}) 不是项目经理或审校员，无权审校项目 (${project._id}) 中的段落`);
-      }
+      validateOwnership(project.manager, userId, '开始AI审校', true, requesterRoles);
 
       // 5. Update segment status to REVIEWING
       segment.status = SegmentStatus.REVIEWING;
-      segment.reviewer = userObjectId;
+      segment.reviewer = project.manager;
       segment.reviewCompletedAt = undefined;
       segment.reviewMetadata = undefined;
       segment.issues = [];
@@ -135,7 +127,9 @@ export class ReviewService /* implements IReviewService */ {
         requestedScores: options?.requestedScores || undefined,
         checkIssueTypes: options?.checkIssueTypes || undefined,
         contextSegments: options?.contextSegments || undefined,
-        customPrompt: options?.customPrompt || undefined
+        customPrompt: options?.customPrompt || undefined,
+        userId: userId,
+        requesterRoles: requesterRoles
       };
       const aiReviewResult: AIReviewResponse = await this.aiReviewService.reviewTranslation(
         segment.sourceText,
@@ -145,7 +139,7 @@ export class ReviewService /* implements IReviewService */ {
       logger.info(`[${methodName}] AIReviewService finished for segment ${segmentId}`);
 
       // 9. Process AI Issues (Map AIReviewIssue to IIssue)
-      const userObjectIdForIssue = new Types.ObjectId(userId); // Reuse userObjectId from permission check
+      const userObjectIdForIssue = project.manager; // Reuse manager from permission check
       const newIssues: IIssue[] = (aiReviewResult.issues || []).map((aiIssue: AIReviewIssue): IIssue => ({
         type: aiIssue.type || IssueType.OTHER,
         severity: aiIssue.severity || IssueSeverity.MEDIUM,
@@ -230,7 +224,7 @@ export class ReviewService /* implements IReviewService */ {
       validateEntityExists(file, '关联文件');
       const project = await Project.findById(file.projectId).exec();
       validateEntityExists(project, '关联项目');
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = new Types.ObjectId(userId); // Check against the requesting user
       // Use correct manager field
       const isManager = project.manager?.equals(userObjectId);
       const isAssignedReviewer = segment.reviewer?.equals(userObjectId);
@@ -343,7 +337,7 @@ export class ReviewService /* implements IReviewService */ {
       validateEntityExists(project, '关联项目');
 
       // 3. Check Permissions (Manager or assigned Reviewer)
-      const userObjectId = new Types.ObjectId(userId);
+      const userObjectId = project.manager;
       // Use correct manager field
       const isManager = project.manager?.equals(userObjectId);
       const isReviewer = project.reviewers?.some((r: Types.ObjectId) => r.equals(userObjectId));
@@ -425,15 +419,14 @@ export class ReviewService /* implements IReviewService */ {
       // 3. Get project and check permissions (Manager or Reviewer)
       const file = await File.findById(segment.fileId);
       validateEntityExists(file, '关联文件');
-      const projectForPermission = await Project.findById(file.projectId);
+      const projectForPermission = await Project.findById(file.projectId).exec();
       validateEntityExists(projectForPermission, '关联项目');
-      const reviewerIds = projectForPermission.reviewers?.map(id => id.toString());
+      const requesterRoles = projectForPermission.reviewers?.map(id => id.toString());
       // Use correct manager field
-      const managerIdStr = projectForPermission.manager?.toString();
-      validateOwnership(managerIdStr, userId, '添加段落问题', true, reviewerIds);
+      const userObjectId = new Types.ObjectId(userId); // The user adding the issue
+      validateOwnership(projectForPermission.manager, userId, '添加问题', true, requesterRoles);
 
       // 4. Create the new issue object, ensuring defaults/required fields
-      const userObjectId = new Types.ObjectId(userId);
       const newIssue: IIssue = {
         ...issueData, // Spread provided data
         status: issueData.status || IssueStatus.OPEN, // Ensure status
@@ -495,8 +488,8 @@ export class ReviewService /* implements IReviewService */ {
         validateEntityExists(file, '关联文件');
       const project = await Project.findById(file.projectId).exec();
         validateEntityExists(project, '关联项目');
-        const userObjectId = new Types.ObjectId(userId);
-        const isManager = project.manager?.equals(userObjectId); // Use manager
+        const userObjectId = new Types.ObjectId(userId); // User resolving the issue
+        const isManager = project.manager?.equals(userObjectId);
         const isAssignedReviewer = segment.reviewer?.equals(userObjectId);
 
         if (!isManager && !isAssignedReviewer) {
@@ -508,7 +501,7 @@ export class ReviewService /* implements IReviewService */ {
         }
 
         const issue = segment.issues[issueIndex];
-        if (issue.status !== IssueStatus.OPEN && issue.status !== IssueStatus.IN_PROGRESS) {
+        if (issue.status !== IssueStatus.OPEN && issue.status === IssueStatus.IN_PROGRESS) {
             logger.warn(`Issue at index ${issueIndex} for segment ${segmentId} is not open or in progress (status: ${issue.status}). Skipping resolution.`);
             return segment;
         }
@@ -557,8 +550,7 @@ export class ReviewService /* implements IReviewService */ {
         validateEntityExists(file, '关联文件');
       const project = await Project.findById(file.projectId).exec();
         validateEntityExists(project, '关联项目');
-        const userObjectId = new Types.ObjectId(userId);
-
+        const userObjectId = new Types.ObjectId(userId); // User finalizing
         if (!project.manager || !project.manager.equals(userObjectId)) {
             throw new ForbiddenError(`用户 (${userId}) 不是项目经理，无权确认审校`);
         }
@@ -584,25 +576,6 @@ export class ReviewService /* implements IReviewService */ {
         this.checkFileCompletionStatus(file._id.toString()).catch(err => {
            logger.error(`Failed to check/update file completion status after finalizing segment ${segmentId}:`, err);
         });
-
-      // Add confirmed segment to Translation Memory
-      if (segment.finalText) {
-        try {
-          await this.translationMemoryService.addEntry({
-            sourceLanguage: file.metadata?.sourceLanguage,
-            targetLanguage: file.metadata?.targetLanguage,
-            sourceText: segment.sourceText,
-            targetText: segment.finalText,
-            projectId: file.projectId.toString(),
-            userId: userId
-          });
-          logger.info(`[${methodName}] Added confirmed segment ${segmentId} to TM.`);
-        } catch (tmError) {
-          logger.error(`[${methodName}] Failed to add confirmed segment ${segmentId} to TM:`, tmError);
-        }
-      } else {
-        logger.warn(`[${methodName}] Segment ${segmentId} confirmed but finalText was null/empty. Skipping TM add.`);
-      }
 
       return segment;
 
@@ -911,7 +884,62 @@ export class ReviewService /* implements IReviewService */ {
       throw handleServiceError(error, this.serviceName, methodName, '批量解决问题');
     }
   }
+
+  /**
+   * Mark a whole file as finalized after review.
+   * This might involve checking if all segments are confirmed.
+   */
+  async finalizeFileReview(fileId: string, userId: string): Promise<IFile> {
+    const methodName = 'finalizeFileReview';
+    validateId(fileId, '文件');
+    validateId(userId, '用户');
+
+    try {
+      // 1. Fetch File and Project
+      const file = await File.findById(fileId).exec();
+      validateEntityExists(file, '文件');
+      const project = await Project.findById(file.projectId).exec();
+      validateEntityExists(project, '关联项目');
+
+      // 2. Check Permissions (Manager?)
+      const userObjectId = new Types.ObjectId(userId); // User finalizing
+      if (!project.manager || !project.manager.equals(userObjectId)) {
+          throw new ForbiddenError(`用户 (${userId}) 不是项目经理，无权最终确认文件审校`);
+      }
+
+      // 3. Check File Status (Must be REVIEWING or similar?)
+      if (file.status !== FileStatus.REVIEWING && file.status !== FileStatus.TRANSLATED) {
+          // Allow finalizing from TRANSLATED if no explicit review phase is used?
+          // Or should we enforce REVIEWING status?
+          logger.warn(`[${methodName}] Finalizing file ${fileId} which is in status ${file.status}. Consider enforcing REVIEWING status.`);
+          // Optional: Throw error if status is not REVIEWING
+          // throw new ValidationError(`文件状态 (${file.status}) 不允许最终确认`);
+      }
+
+      // 4. Check if all segments are CONFIRMED (using existing helper)
+      await this.checkFileCompletionStatus(fileId); 
+      // Re-fetch file to get potentially updated status
+      const updatedFile = await File.findById(fileId).exec();
+      validateEntityExists(updatedFile, '更新后的文件');
+      
+      if (updatedFile.status !== FileStatus.COMPLETED) {
+          const incompleteCount = await Segment.countDocuments({ fileId: file._id, status: { $ne: SegmentStatus.CONFIRMED } });
+          logger.warn(`[${methodName}] Attempted to finalize file ${fileId}, but ${incompleteCount} segments are not confirmed. File status remains ${updatedFile.status}.`);
+          // Decide: Throw an error or just return the current file state?
+          // Throwing error might be clearer feedback.
+           throw new ValidationError(`无法最终确认文件，仍有 ${incompleteCount} 个段落未确认`);
+      }
+
+      // 5. Log and Return
+      logger.info(`[${methodName}] File ${fileId} review finalized by manager ${userId}. Status set to ${updatedFile.status}.`);
+      return updatedFile;
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName} for file ${fileId}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '最终确认文件审校');
+    }
+  }
 }
 
 // 创建并导出默认实例
-export const reviewService = new ReviewService(); 
+export const reviewService = new ReviewService();

@@ -26,6 +26,9 @@ projectFilesRouter.get('/:fileId', fileCtrl.getFile);
 // DELETE /api/projects/:projectId/files/:fileId - Delete a file
 projectFilesRouter.delete('/:fileId', fileCtrl.deleteFile);
 
+// POST /api/projects/:projectId/files/:fileId/translate - Start translation job
+projectFilesRouter.post('/:fileId/translate', fileCtrl.startTranslation);
+
 // Example of integrating into a main project router:
 // mainProjectRouter.use('/:projectId/files', projectFilesRouter);
 

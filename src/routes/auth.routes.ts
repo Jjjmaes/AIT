@@ -10,16 +10,16 @@ import { validateRequest } from '../middleware/validate.middleware';
 const authRouter = express.Router();
 
 // 用户注册
-authRouter.post('/register', validateRequest(validateRegister), authController.register);
+authRouter.post('/register', validateRequest(validateRegister), authController.register.bind(authController));
 
 // 用户登录
-authRouter.post('/login', validateRequest(validateLogin), authController.login);
+authRouter.post('/login', validateRequest(validateLogin), authController.login.bind(authController));
 
 // 用户登出
-authRouter.post('/logout', authController.logout);
+authRouter.post('/logout', authController.logout.bind(authController));
 
 // GET /api/auth/profile (Protected route)
-authRouter.get('/profile', authenticateJwt, authController.getProfile);
+authRouter.get('/profile', authenticateJwt, authController.getProfile.bind(authController));
 
 // TODO: Add routes for password reset, email verification, etc.
 

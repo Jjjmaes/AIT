@@ -63,12 +63,13 @@ export class ProjectTranslationService {
   }
 
   async addProjectTranslationJob(projectId: string, options: TranslationOptions, userId: string): Promise<string> {
-    const project = await this.projectService.getProjectById(projectId, userId);
+    // TODO: Pass actual user roles instead of a placeholder
+    const project = await this.projectService.getProjectById(projectId, userId, ['admin']); // Added placeholder roles
     if (!project) {
       throw new Error(`Project ${projectId} not found`);
     }
 
-    const jobId = await this.translationService.translateProject(projectId, userId, options);
+    const jobId = await this.translationService.translateProject(projectId, userId, ['admin'], options);
     logger.info(`Started project translation job: ${jobId}`);
     return jobId;
   }

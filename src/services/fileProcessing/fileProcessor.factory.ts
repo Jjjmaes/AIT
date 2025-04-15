@@ -20,7 +20,7 @@ export class FileProcessorFactory {
   // Static initialization block to register processors (alternative to constructor)
   static {
     // Register processors here when they are implemented
-    // this.registerProcessor('docx', new DocxProcessor());
+    this.registerProcessor(FileType.DOCX, new DocxProcessor()); // Uncomment and fix registration
     this.registerProcessor(FileType.TXT, new TextProcessor()); // Uncomment registration
     // Uncomment registration for XLIFF and MemoQ XLIFF
     this.registerProcessor(FileType.XLIFF, new XliffProcessor()); 

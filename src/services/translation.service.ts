@@ -52,6 +52,7 @@ export class TranslationService {
   async translateSegment(
     segmentId: string,
     userId: string,
+    requesterRoles: string[] = [],
     options?: TranslationOptions
   ): Promise<ISegment> {
     const methodName = 'translateSegment';
@@ -69,7 +70,7 @@ export class TranslationService {
 
       const file = await File.findById(segment.fileId).exec();
       validateEntityExists(file, '关联文件');
-      const project = await this.projectService.getProjectById(file.projectId.toString(), userId);
+      const project = await this.projectService.getProjectById(file.projectId.toString(), userId, requesterRoles);
       validateEntityExists(project, '关联项目');
       
       // Use nullish coalescing for metadata
@@ -222,6 +223,7 @@ export class TranslationService {
     projectId: string,
     fileId: string,
     userId: string,
+    requesterRoles: string[] = [],
     options: TranslationOptions
   ): Promise<string> {
     const methodName = 'translateFile';
@@ -229,7 +231,7 @@ export class TranslationService {
     validateId(fileId, '文件');
     validateId(userId, '用户');
     try {
-      const project = await projectService.getProjectById(projectId, userId);
+      const project = await projectService.getProjectById(projectId, userId, requesterRoles);
       const file = await File.findOne({ _id: new Types.ObjectId(fileId), projectId: project._id }).exec();
       validateEntityExists(file, '文件');
       
@@ -365,7 +367,7 @@ export class TranslationService {
            logger.error(`[${this.serviceName}.${methodName}] Failed to update file status after translation for file ID: ${fileId}:`, fileUpdateError);
       }
 
-      return await translationQueueService.addFileTranslationJob(projectId, fileId, options, userId);
+      return await translationQueueService.addFileTranslationJob(projectId, fileId, options, userId, requesterRoles);
     } catch (error) {
        logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
        throw handleServiceError(error, this.serviceName, methodName, '文件翻译任务');
@@ -375,20 +377,21 @@ export class TranslationService {
   async translateProject(
     projectId: string,
     userId: string,
+    requesterRoles: string[] = [],
     options: TranslationOptions
   ): Promise<string> {
     const methodName = 'translateProject';
     validateId(projectId, '项目');
     validateId(userId, '用户');
     try {
-      const project = await projectService.getProjectById(projectId, userId);
+      const project = await projectService.getProjectById(projectId, userId, requesterRoles);
       
       const files = await File.find({ projectId: project._id }).exec();
       if (!files || files.length === 0) {
          throw new ValidationError('项目没有要翻译的文件');
       }
       
-      return await translationQueueService.addProjectTranslationJob(projectId, options, userId);
+      return await translationQueueService.addProjectTranslationJob(projectId, options, userId, requesterRoles);
     } catch (error) {
        logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
        throw handleServiceError(error, this.serviceName, methodName, '项目翻译任务');

@@ -11,7 +11,8 @@
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts src/ --fix",
     "test:auth": "ts-node tests/integration/auth-test.ts",
-    "test:script": "ts-node scripts/test-auth.ts"
+    "test:script": "ts-node scripts/test-auth.ts",
+    "db:seed": "ts-node src/db/seed.ts"
   },
   "keywords": [
     "translation",

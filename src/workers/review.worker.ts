@@ -21,7 +21,8 @@ const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/translati
 
 // This function processes a single review job
 async function processReviewJob(job: Job<ReviewJobData>): Promise<any> {
-  const { type, segmentId, userId /*, options */ } = job.data; // Extract data
+  // Extract roles from job data
+  const { type, segmentId, userId, requesterRoles, projectId /*, options */ } = job.data; 
   const jobId = job.id || `review-segment-${segmentId}`; // Use job ID if available
   logger.info(`Processing ${type} review job ${jobId} for segment ${segmentId}, initiated by user ${userId}`);
 
@@ -32,7 +33,11 @@ async function processReviewJob(job: Job<ReviewJobData>): Promise<any> {
       const resultSegment = await reviewService.startAIReview(
           segmentId, 
           userId, // Pass the user who initiated the original translation
-          { /* Pass any review options from job.data.options if implemented */ } 
+          requesterRoles, // Pass the roles
+          {
+              projectId: projectId, // Pass projectId if available in job data
+               /* Pass any other review options from job.data.options if implemented */ 
+          } 
       );
 
       logger.info(`Job ${jobId}: AI Review processed successfully for segment ${segmentId}. Final status: ${resultSegment.status}`);
@@ -103,4 +108,5 @@ async function setupWorker() {
   });
 }
 
-setupWorker();
+// Temporarily comment out worker setup to disable Redis dependency
+// setupWorker();

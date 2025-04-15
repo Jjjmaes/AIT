@@ -162,7 +162,7 @@ describe('XliffProcessor', () => {
         index: 3,
         sourceText: 'Segment with <g id="1" xmlns="urn:oasis:names:tc:xliff:document:1.2">inline</g> tag.',
         translation: 'Segment avec tag <g id="1" xmlns="urn:oasis:names:tc:xliff:document:1.2">inline</g>.',
-        status: SegmentStatus.COMPLETED,
+        status: SegmentStatus.CONFIRMED,
         metadata: { 
           xliffId: '4',
           xliffState: 'final' 
@@ -205,7 +205,7 @@ describe('XliffProcessor', () => {
         index: 1,
         sourceText: 'Source text 2',
         translation: 'Zieltext 2',
-        status: SegmentStatus.COMPLETED, // Maps from 'final' target state
+        status: SegmentStatus.CONFIRMED, // Maps from 'final' target state
         metadata: { 
           xliffId: '2',
           memoqState: 'Confirmed' // Check memoq specific state was stored
@@ -306,7 +306,7 @@ describe('XliffProcessor', () => {
           sourceText: 'Hello World',
           translation: 'Bonjour le monde Changed',
           finalText: 'Bonjour le monde Final',
-          status: SegmentStatus.COMPLETED, 
+          status: SegmentStatus.CONFIRMED, 
           metadata: { xliffId: '1' }
         } as unknown as ISegment, // Cast to unknown first
         // Segment 2: No final text, status is REVIEW_COMPLETED
@@ -345,7 +345,7 @@ describe('XliffProcessor', () => {
           index: 4, 
           sourceText: 'Skipped', 
           translation: 'Skipped', 
-          status: SegmentStatus.COMPLETED, 
+          status: SegmentStatus.CONFIRMED, 
           metadata: {} 
         } as unknown as ISegment, // Cast to unknown first
       ];
@@ -403,7 +403,7 @@ describe('XliffProcessor', () => {
         // Segment 1: Status COMPLETED -> m:state="Confirmed", state="final"
         { 
           _id: new Types.ObjectId(), index: 0, sourceText: 'Source text 1', 
-          finalText: 'Zieltext 1 Final', status: SegmentStatus.COMPLETED, 
+          finalText: 'Zieltext 1 Final', status: SegmentStatus.CONFIRMED, 
           metadata: { xliffId: '1' } 
         } as unknown as ISegment,
         // Segment 2: Status REVIEW_COMPLETED -> m:state="Confirmed", state="reviewed"
@@ -421,7 +421,7 @@ describe('XliffProcessor', () => {
          // Segment with missing xliffId (should be skipped)
          { 
           _id: new Types.ObjectId(), index: 3, sourceText: 'Skipped', 
-          finalText: 'Skipped', status: SegmentStatus.COMPLETED, 
+          finalText: 'Skipped', status: SegmentStatus.CONFIRMED, 
           metadata: {} 
         } as unknown as ISegment,
       ];
@@ -502,7 +502,7 @@ describe('XliffProcessor', () => {
         // Minimal segment data needed to pass initial checks
         { 
           _id: new Types.ObjectId(), index: 0, sourceText: 'Hello World', 
-          finalText: 'Bonjour Final', status: SegmentStatus.COMPLETED, 
+          finalText: 'Bonjour Final', status: SegmentStatus.CONFIRMED, 
           metadata: { xliffId: '1' } 
         } as unknown as ISegment,
       ];

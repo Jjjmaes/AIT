@@ -213,8 +213,8 @@ describe('FileTranslationService', () => {
   it('should add a file translation job to the queue', async () => {
     mockQueueAddJob.mockResolvedValue('job-123');
 
-    await translationQueueService.addFileTranslationJob(projectId.toString(), fileId.toString(), mockTranslationOptions, userId);
+    await translationQueueService.addFileTranslationJob(projectId.toString(), fileId.toString(), mockTranslationOptions, userId, ['admin']);
 
-    expect(mockQueueAddJob).toHaveBeenCalledWith(projectId.toString(), fileId.toString(), mockTranslationOptions, userId);
+    expect(mockQueueAddJob).toHaveBeenCalledWith(projectId.toString(), fileId.toString(), mockTranslationOptions, userId, ['admin']);
   });
 }); 

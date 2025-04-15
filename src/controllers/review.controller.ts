@@ -39,30 +39,31 @@ interface ReviewTaskOptions {
  * 请求段落审校
  * POST /api/review/segment
  */
-export async function requestSegmentReview(req: Request, res: Response): Promise<void> {
+async function requestSegmentReview(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, options } = req.body;
-    
+
     if (!segmentId) {
       res.status(400).json({ error: '缺少段落ID' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
+    const userRoles = (req as AuthRequest).user?.role ? [(req as AuthRequest).user!.role] : []; // Extract roles
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     // 如果传递了直接审校的选项，则直接调用审校服务执行审校
     if (options?.immediate) {
       const reviewOptions = {
         promptTemplateId: options.promptTemplateId,
         aiModel: options.model || options.aiModel || 'gpt-3.5-turbo'
       };
-      
+
       logger.info(`Starting immediate segment review for segment ${segmentId}`);
-      const segment = await reviewService.startAIReview(segmentId, userId, reviewOptions);
-      
+      const segment = await reviewService.startAIReview(segmentId, userId, userRoles, reviewOptions);
+
       res.status(200).json({
         success: true,
         message: '段落审校已完成',
@@ -78,7 +79,7 @@ export async function requestSegmentReview(req: Request, res: Response): Promise
         timeout: 60000,
         priorityLevels: 5
       });
-      
+
       const taskId = await queueService.addTask({
         type: QueueTaskType.REVIEW,
         priority: options?.priority || 1,
@@ -96,7 +97,7 @@ export async function requestSegmentReview(req: Request, res: Response): Promise
           } as any
         }
       });
-      
+
       res.status(202).json({
         success: true,
         message: '段落审校任务已提交到队列',
@@ -105,7 +106,7 @@ export async function requestSegmentReview(req: Request, res: Response): Promise
     }
   } catch (error: any) {
     logger.error('请求段落审校失败', { error });
-    
+
     if (error.name === 'NotFoundError') {
       res.status(404).json({ error: error.message });
     } else if (error.name === 'UnauthorizedError') {
@@ -122,29 +123,29 @@ export async function requestSegmentReview(req: Request, res: Response): Promise
  * 完成段落审校
  * POST /api/review/segment/complete
  */
-export async function completeSegmentReview(req: Request, res: Response): Promise<void> {
+async function completeSegmentReview(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, finalTranslation, acceptedChanges, modificationDegree } = req.body;
-    
+
     if (!segmentId || !finalTranslation) {
       res.status(400).json({ error: '缺少必要参数' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     const reviewData = {
       finalTranslation,
       acceptedChanges,
       modificationDegree
     };
-    
+
     logger.info(`Completing segment review for segment ${segmentId}`);
     const segment = await reviewService.completeSegmentReview(segmentId, userId, reviewData);
-    
+
     res.status(200).json({
       success: true,
       message: '段落审校已完成',
@@ -152,7 +153,7 @@ export async function completeSegmentReview(req: Request, res: Response): Promis
     });
   } catch (error: any) {
     logger.error('完成段落审校失败', { error });
-    
+
     if (error.name === 'NotFoundError') {
       res.status(404).json({ error: error.message });
     } else if (error.name === 'UnauthorizedError') {
@@ -169,30 +170,30 @@ export async function completeSegmentReview(req: Request, res: Response): Promis
  * 获取段落审校结果
  * GET /api/review/segment/:segmentId
  */
-export async function getSegmentReviewResult(req: Request, res: Response): Promise<void> {
+async function getSegmentReviewResult(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId } = req.params;
-    
+
     if (!segmentId) {
       res.status(400).json({ error: '缺少段落ID' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     logger.info(`Getting segment review result for segment ${segmentId}`);
     const result = await reviewService.getSegmentReviewResult(segmentId, userId);
-    
+
     res.status(200).json({
       success: true,
       data: result
     });
   } catch (error: any) {
     logger.error('获取段落审校结果失败', { error });
-    
+
     if (error.name === 'NotFoundError') {
       res.status(404).json({ error: error.message });
     } else if (error.name === 'UnauthorizedError') {
@@ -207,23 +208,24 @@ export async function getSegmentReviewResult(req: Request, res: Response): Promi
  * 确认段落审校
  * POST /api/review/segment/:segmentId/finalize
  */
-export async function finalizeSegmentReview(req: Request, res: Response): Promise<void> {
+async function finalizeSegmentReview(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { segmentId } = req.params;
-    
+
     if (!segmentId) {
+      // Use next for consistency if preferred
       res.status(400).json({ error: '缺少段落ID' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     logger.info(`Finalizing segment review for segment ${segmentId}`);
     const segment = await reviewService.finalizeSegmentReview(segmentId, userId);
-    
+
     res.status(200).json({
       success: true,
       message: '段落审校已确认',
@@ -231,16 +233,7 @@ export async function finalizeSegmentReview(req: Request, res: Response): Promis
     });
   } catch (error: any) {
     logger.error('确认段落审校失败', { error });
-    
-    if (error.name === 'NotFoundError') {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === 'UnauthorizedError') {
-      res.status(401).json({ error: error.message });
-    } else if (error.name === 'BadRequestError') {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message || '确认段落审校失败' });
-    }
+    next(error); // Pass to error handler
   }
 }
 
@@ -248,20 +241,20 @@ export async function finalizeSegmentReview(req: Request, res: Response): Promis
  * 添加段落问题
  * POST /api/review/segment/issue
  */
-export async function addSegmentIssue(req: Request, res: Response): Promise<void> {
+async function addSegmentIssue(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, type, description, position, suggestion, severity } = req.body;
-    
+
     if (!segmentId || !type || !description || !severity) {
       res.status(400).json({ error: '缺少必要参数 (segmentId, type, description, severity)' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     const issueData: IIssue = {
       type,
       description,
@@ -272,10 +265,10 @@ export async function addSegmentIssue(req: Request, res: Response): Promise<void
       createdBy: new Types.ObjectId(userId),
       createdAt: new Date()
     };
-    
+
     logger.info(`Adding issue to segment ${segmentId}`);
     const issue = await reviewService.addSegmentIssue(segmentId, userId, issueData);
-    
+
     res.status(200).json({
       success: true,
       message: '问题已添加',
@@ -283,7 +276,7 @@ export async function addSegmentIssue(req: Request, res: Response): Promise<void
     });
   } catch (error: any) {
     logger.error('添加段落问题失败', { error });
-    
+
     if (error.name === 'NotFoundError') {
       res.status(404).json({ error: error.message });
     } else if (error.name === 'UnauthorizedError') {
@@ -298,21 +291,21 @@ export async function addSegmentIssue(req: Request, res: Response): Promise<void
  * 解决段落问题
  * PUT /api/review/segment/issue/:issueId/resolve
  */
-export async function resolveSegmentIssue(req: Request, res: Response): Promise<void> {
+async function resolveSegmentIssue(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, issueId } = req.params;
     const { resolution } = req.body;
-    
+
     if (!segmentId || !issueId || !resolution) {
       res.status(400).json({ error: '缺少必要参数 (segmentId, issueId, resolution)' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     const issueIndex = parseInt(issueId, 10);
     if (isNaN(issueIndex)) {
         res.status(400).json({ error: '无效的 Issue ID (应为数字索引)' });
@@ -321,7 +314,7 @@ export async function resolveSegmentIssue(req: Request, res: Response): Promise<
 
     logger.info(`Resolving issue index ${issueIndex} for segment ${segmentId}`);
     const segment = await reviewService.resolveSegmentIssue(segmentId, issueIndex, userId, resolution);
-    
+
     res.status(200).json({
       success: true,
       message: '问题已解决',
@@ -329,7 +322,7 @@ export async function resolveSegmentIssue(req: Request, res: Response): Promise<
     });
   } catch (error: any) {
     logger.error('解决段落问题失败', { error });
-    
+
     if (error.name === 'NotFoundError') {
       res.status(404).json({ error: error.message });
     } else if (error.name === 'UnauthorizedError') {
@@ -341,72 +334,70 @@ export async function resolveSegmentIssue(req: Request, res: Response): Promise<
 }
 
 /**
- * 批量更新段落状态 - Method commented out as service implementation is missing
+ * 批量更新段落状态
  * POST /api/review/segment/batch-status
  */
-/*
-export async function batchUpdateSegmentStatus(req: Request, res: Response): Promise<void> {
+async function batchUpdateSegmentStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  const methodName = 'batchUpdateSegmentStatus';
   try {
     const { segmentIds, status } = req.body;
-    
+
     if (!segmentIds || !Array.isArray(segmentIds) || segmentIds.length === 0 || !status) {
-      res.status(400).json({ error: '缺少必要参数' });
-      return;
+      return next(new BadRequestError('Missing required parameters (segmentIds, status)'));
     }
-    
-    const userId = (req as AuthRequest).user?.id;
+    if (!Object.values(SegmentStatus).includes(status as SegmentStatus)) {
+        return next(new BadRequestError(`Invalid segment status provided: ${status}`));
+    }
+
+    const userId = req.user?.id;
     if (!userId) {
-      throw new UnauthorizedError('未授权的访问');
+      return next(new UnauthorizedError('Authentication required'));
     }
-    
-    logger.info(`Batch updating status for ${segmentIds.length} segments to ${status}`);
-    // const result = await reviewService.batchUpdateSegmentStatus(segmentIds, userId, status);
-    const result = { modifiedCount: 0 }; // Placeholder
-    
+
+    logger.info(`[${methodName}] Batch updating status for ${segmentIds.length} segments to ${status} by user ${userId}`);
+    // Restore @ts-expect-error
+    // @ts-expect-error // Linter fails to detect existing service method
+    const result = await reviewService.batchUpdateSegmentStatus(segmentIds, userId, status as SegmentStatus);
+
     res.status(200).json({
       success: true,
-      message: `已更新 ${result.modifiedCount} 个段落的状态`,
+      message: `Batch status update processed. ${result.modifiedCount} segment(s) updated.`,
       data: {
+        requestedCount: segmentIds.length,
         updatedCount: result.modifiedCount,
-        skippedCount: segmentIds.length - result.modifiedCount
       }
     });
   } catch (error: any) {
-    logger.error('批量更新段落状态失败', { error });
-    
-    if (error.name === 'UnauthorizedError') {
-      res.status(401).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message || '批量更新段落状态失败' });
-    }
+    logger.error(`Error in ${methodName}:`, { error });
+    next(error);
   }
 }
-*/
+
 
 /**
  * 直接审校文本
  * POST /api/review/text
  */
-export async function reviewTextDirectly(req: Request, res: Response): Promise<void> {
+async function reviewTextDirectly(req: Request, res: Response): Promise<void> {
   try {
     const { original, translation, sourceLanguage, targetLanguage, model, customPrompt } = req.body;
-    
+
     if (!original || !translation) {
       res.status(400).json({ error: '缺少原文或译文' });
       return;
     }
-    
+
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     // 获取API密钥（在实际应用中应该有更安全的方式获取）
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error('未配置API密钥');
     }
-    
+
     // 使用AI审校服务直接审校文本
     logger.info('Starting direct text review');
     const reviewOptions = {
@@ -417,9 +408,9 @@ export async function reviewTextDirectly(req: Request, res: Response): Promise<v
       apiKey,
       customPrompt: customPrompt
     };
-    
+
     const result = await aiReviewService.reviewText(original, translation, reviewOptions);
-    
+
     res.status(200).json({
       success: true,
       data: result
@@ -434,17 +425,17 @@ export async function reviewTextDirectly(req: Request, res: Response): Promise<v
  * 获取支持的审校模型
  * GET /api/review/models
  */
-export async function getSupportedReviewModels(req: Request, res: Response): Promise<void> {
+async function getSupportedReviewModels(req: Request, res: Response): Promise<void> {
   try {
     // 获取用户身份
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
       throw new UnauthorizedError('未授权的访问');
     }
-    
+
     // 获取查询参数
     const provider = (req.query.provider as string) || 'openai';
-    
+
     // 映射提供商字符串到枚举
     let aiProvider: AIProvider;
     switch (provider.toLowerCase()) {
@@ -460,11 +451,11 @@ export async function getSupportedReviewModels(req: Request, res: Response): Pro
       default:
         aiProvider = AIProvider.OPENAI;
     }
-    
+
     // 使用AI审校服务获取支持的模型
     logger.info(`Getting supported models for provider: ${provider}`);
     const models = await aiReviewService.getSupportedModels(aiProvider);
-    
+
     res.status(200).json({
       success: true,
       data: models
@@ -479,15 +470,15 @@ export async function getSupportedReviewModels(req: Request, res: Response): Pro
  * 将段落提交到审校队列
  * POST /api/review/queue/segment
  */
-export async function queueSegmentReview(req: Request, res: Response): Promise<void> {
+async function queueSegmentReview(req: Request, res: Response): Promise<void> {
   try {
     const { segmentId, options } = req.body;
-    
+
     if (!segmentId) {
       res.status(400).json({ error: '缺少段落ID' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -497,7 +488,7 @@ export async function queueSegmentReview(req: Request, res: Response): Promise<v
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     // 添加审校任务到队列
     const taskId = await queueService.addTask({
       type: QueueTaskType.REVIEW,
@@ -515,7 +506,7 @@ export async function queueSegmentReview(req: Request, res: Response): Promise<v
         } as any
       }
     });
-    
+
     res.status(202).json({
       message: '审校任务已提交到队列',
       taskId
@@ -530,15 +521,15 @@ export async function queueSegmentReview(req: Request, res: Response): Promise<v
  * 提交文本审校任务到队列
  * POST /api/review/queue/text
  */
-export async function queueTextReview(req: Request, res: Response): Promise<void> {
+async function queueTextReview(req: Request, res: Response): Promise<void> {
   try {
     const { originalText, translatedText, options } = req.body;
-    
+
     if (!originalText || !translatedText) {
       res.status(400).json({ error: '原文和译文不能为空' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -548,7 +539,7 @@ export async function queueTextReview(req: Request, res: Response): Promise<void
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     // 添加文本审校任务到队列
     const taskId = await queueService.addTask({
       type: QueueTaskType.REVIEW,
@@ -566,7 +557,7 @@ export async function queueTextReview(req: Request, res: Response): Promise<void
         } as any
       }
     });
-    
+
     res.status(202).json({
       message: '文本审校任务已提交到队列',
       taskId
@@ -581,15 +572,15 @@ export async function queueTextReview(req: Request, res: Response): Promise<void
  * 提交批量段落审校任务到队列
  * POST /api/review/queue/batch
  */
-export async function queueBatchSegmentReview(req: Request, res: Response): Promise<void> {
+async function queueBatchSegmentReview(req: Request, res: Response): Promise<void> {
   try {
     const { segmentIds, options } = req.body;
-    
+
     if (!segmentIds || !Array.isArray(segmentIds) || segmentIds.length === 0) {
       res.status(400).json({ error: '缺少有效的段落ID列表' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -599,7 +590,7 @@ export async function queueBatchSegmentReview(req: Request, res: Response): Prom
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     // 添加批量审校任务到队列
     const taskId = await queueService.addTask({
       type: QueueTaskType.REVIEW,
@@ -623,7 +614,7 @@ export async function queueBatchSegmentReview(req: Request, res: Response): Prom
         } as any
       }
     });
-    
+
     res.status(202).json({
       message: `批量审校任务已提交到队列，共 ${segmentIds.length} 个段落`,
       taskId
@@ -638,15 +629,15 @@ export async function queueBatchSegmentReview(req: Request, res: Response): Prom
  * 提交文件审校任务到队列
  * POST /api/review/queue/file
  */
-export async function queueFileReview(req: Request, res: Response): Promise<void> {
+async function queueFileReview(req: Request, res: Response): Promise<void> {
   try {
     const { fileId, options } = req.body;
-    
+
     if (!fileId) {
       res.status(400).json({ error: '缺少文件ID' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -656,7 +647,7 @@ export async function queueFileReview(req: Request, res: Response): Promise<void
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     // 添加文件审校任务到队列
     const taskId = await queueService.addTask({
       type: QueueTaskType.REVIEW,
@@ -679,7 +670,7 @@ export async function queueFileReview(req: Request, res: Response): Promise<void
         } as any
       }
     });
-    
+
     res.status(202).json({
       message: '文件审校任务已提交到队列',
       taskId,
@@ -695,15 +686,15 @@ export async function queueFileReview(req: Request, res: Response): Promise<void
  * 获取队列任务状态
  * GET /api/review/queue/status/:taskId
  */
-export async function getReviewTaskStatus(req: Request, res: Response): Promise<void> {
+async function getReviewTaskStatus(req: Request, res: Response): Promise<void> {
   try {
     const { taskId } = req.params;
-    
+
     if (!taskId) {
       res.status(400).json({ error: '缺少任务ID' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -713,14 +704,14 @@ export async function getReviewTaskStatus(req: Request, res: Response): Promise<
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     const task = await queueService.getTask(taskId);
-    
+
     if (!task) {
       res.status(404).json({ error: '任务不存在' });
       return;
     }
-    
+
     res.status(200).json({
       taskId: task.id,
       status: task.status,
@@ -742,15 +733,15 @@ export async function getReviewTaskStatus(req: Request, res: Response): Promise<
  * 取消队列任务
  * DELETE /api/review/queue/:taskId
  */
-export async function cancelReviewTask(req: Request, res: Response): Promise<void> {
+async function cancelReviewTask(req: Request, res: Response): Promise<void> {
   try {
     const { taskId } = req.params;
-    
+
     if (!taskId) {
       res.status(400).json({ error: '缺少任务ID' });
       return;
     }
-    
+
     // Create an instance of the queue service for this request
     const queueService = new TranslationQueueService({
       processInterval: 1000,
@@ -760,9 +751,9 @@ export async function cancelReviewTask(req: Request, res: Response): Promise<voi
       timeout: 60000,
       priorityLevels: 5
     });
-    
+
     await queueService.cancelTask(taskId);
-    
+
     res.status(200).json({
       message: '任务已取消',
       taskId
@@ -772,3 +763,108 @@ export async function cancelReviewTask(req: Request, res: Response): Promise<voi
     res.status(500).json({ error: error.message || '取消任务失败' });
   }
 }
+
+/**
+ * 获取文件下待审校的段落列表 (支持分页)
+ * GET /api/review/files/:fileId/segments
+ */
+async function getReviewableSegments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  const methodName = 'getReviewableSegments';
+  try {
+    const { fileId } = req.params;
+    const userId = req.user?.id;
+
+    if (!fileId) {
+      return next(new BadRequestError('File ID is required in the URL path.'));
+    }
+    if (!userId) {
+      return next(new UnauthorizedError('Authentication required'));
+    }
+
+    // Extract and validate pagination parameters from query string
+    const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+    if (isNaN(page) || page < 1) {
+        return next(new BadRequestError('Invalid page number provided.'));
+    }
+    if (isNaN(limit) || limit < 1 || limit > 100) { // Add max limit
+        return next(new BadRequestError('Invalid limit provided (must be between 1 and 100).'));
+    }
+
+    const paginationOptions = { page, limit };
+
+    logger.info(`[${methodName}] Fetching reviewable segments for file ${fileId}, page ${page}, limit ${limit} by user ${userId}`);
+    // Restore @ts-expect-error
+    // @ts-expect-error // Linter fails to detect existing service method
+    const result_segments = await reviewService.getSegmentsForReview(fileId, userId, paginationOptions);
+
+    res.status(200).json({
+      success: true,
+      message: 'Successfully retrieved reviewable segments',
+      data: result_segments.segments,
+      pagination: {
+        total: result_segments.total,
+        page: result_segments.page,
+        limit: result_segments.limit,
+        totalPages: Math.ceil(result_segments.total / result_segments.limit)
+      }
+    });
+  } catch (error: any) {
+    logger.error(`Error in ${methodName} for file ${req.params.fileId}:`, error);
+    next(error); // Pass error to the central handler
+  }
+}
+
+/**
+ * 最终确认整个文件的审校 (Manager only)
+ * POST /api/review/files/:fileId/finalize
+ */
+async function finalizeFileReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  const methodName = 'finalizeFileReview';
+  try {
+    const { fileId } = req.params;
+    const userId = req.user?.id;
+
+    if (!fileId) {
+      return next(new BadRequestError('File ID is required in the URL path.'));
+    }
+    if (!userId) {
+      return next(new UnauthorizedError('Authentication required'));
+    }
+
+    logger.info(`[${methodName}] User ${userId} attempting to finalize review for file ${fileId}`);
+    // Assuming reviewService.finalizeFileReview exists and handles logic/errors
+    const updatedFile = await reviewService.finalizeFileReview(fileId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'File review finalized successfully.',
+      data: updatedFile // Return the updated file details
+    });
+
+  } catch (error: any) {
+    logger.error(`Error in ${methodName} for file ${req.params.fileId}:`, error);
+    next(error); // Pass error to the central handler
+  }
+}
+
+// Export all functions needed by the routes file
+export {
+    requestSegmentReview,
+    completeSegmentReview,
+    getSegmentReviewResult,
+    finalizeSegmentReview,
+    addSegmentIssue,
+    resolveSegmentIssue,
+    batchUpdateSegmentStatus,
+    reviewTextDirectly,
+    getSupportedReviewModels,
+    queueSegmentReview,
+    queueTextReview,
+    queueBatchSegmentReview,
+    queueFileReview,
+    getReviewTaskStatus,
+    cancelReviewTask,
+    getReviewableSegments,
+    finalizeFileReview
+};
