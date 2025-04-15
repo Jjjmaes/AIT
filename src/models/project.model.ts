@@ -58,6 +58,7 @@ export interface IProject extends Document {
   domain?: string;
   industry?: string;
   terminology?: Types.ObjectId;
+  translationAIConfigId?: Types.ObjectId;
   status: ProjectStatus;
   priority?: number;
   deadline?: Date;
@@ -115,6 +116,7 @@ const projectSchema = new Schema<IProject>(
     domain: { type: String },
     industry: { type: String },
     terminology: { type: Schema.Types.ObjectId, ref: 'Terminology' },
+    translationAIConfigId: { type: Schema.Types.ObjectId, ref: 'AIProviderConfig', required: false },
     status: { 
         type: String, 
         enum: Object.values(ProjectStatus),

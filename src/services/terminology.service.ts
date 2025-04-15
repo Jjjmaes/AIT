@@ -79,11 +79,23 @@ export class TerminologyService {
         isPublic: data.isPublic ?? false,
       });
 
-      await newTerminology.save();
+      // Explicitly handle potential save error
+      try {
+          await newTerminology.save();
+          // Log success only if save() doesn't throw
+          logger.info(`[${this.serviceName}.${methodName}] Mongoose save() completed successfully for ID: ${newTerminology._id}`); 
+      } catch (saveError) {
+          // Log the specific save error immediately
+          logger.error(`[${this.serviceName}.${methodName}] Mongoose save() FAILED! Error:`, saveError);
+          throw saveError; // Re-throw to be caught by outer catch block
+      }
+
+      // This log should only be reached if save() completed without throwing
       logger.info(`Terminology '${newTerminology.name}' created by user ${userId}`);
       return newTerminology;
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      // Outer catch should handle validation errors or re-thrown save errors
+      logger.error(`Error in ${this.serviceName}.${methodName} (outer catch):`, error);
       throw handleServiceError(error, this.serviceName, methodName, '创建术语表');
     }
   }
@@ -536,6 +548,63 @@ export class TerminologyService {
   async findTermsForTranslation(projectId: string, sourceLang: string, targetLang: string, texts: string[]): Promise<Map<string, ITermEntry[]>> {
     // ... existing placeholder ...
     return new Map<string, ITermEntry[]>();
+  }
+
+  /**
+   * Get all terms within a specific terminology list.
+   * @param terminologyId The ID of the list.
+   * @returns A promise resolving to an array of terms.
+   * @throws {AppError} If the list is not found or fetching fails.
+   */
+  async getTermsByListId(terminologyId: string): Promise<any[]> { throw new Error('Not implemented'); }
+
+  /**
+   * Export terminology list to CSV format
+   */
+  async exportTerminology(terminologyId: string, userId: string): Promise<string> {
+    const methodName = 'exportTerminology';
+    validateId(terminologyId, '术语表');
+    validateId(userId, '用户');
+
+    try {
+      // Use getById to leverage existing permission checks
+      const terminology = await this.getTerminologyById(terminologyId, userId);
+
+      if (!terminology || !Array.isArray(terminology.terms)) {
+        logger.warn(`[${this.serviceName}.${methodName}] No terms found or invalid format for terminology ${terminologyId}`);
+        return ''; // Return empty string if no terms
+      }
+
+      // Basic CSV Formatting (Consider using a library like 'csv-stringify' for robustness)
+      const header = 'source,target,domain,notes\n'; // Define CSV header
+      const rows = terminology.terms.map(term => {
+        // Escape commas and quotes within fields (basic implementation)
+        const escapeCsv = (field: string | undefined | null) => {
+          if (field === null || field === undefined) return '';
+          const str = String(field);
+          // If field contains comma, newline, or double quote, enclose in double quotes and escape existing quotes
+          if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+        return [
+          escapeCsv(term.source),
+          escapeCsv(term.target),
+          escapeCsv(term.domain),
+          escapeCsv(term.notes)
+        ].join(',');
+      });
+
+      const csvContent = header + rows.join('\n');
+      logger.info(`[${this.serviceName}.${methodName}] Exported ${terminology.terms.length} terms for terminology ${terminologyId}`);
+      return csvContent;
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName} for ID ${terminologyId}:`, error);
+      // Re-throw using handleServiceError to ensure consistent error handling
+      throw handleServiceError(error, this.serviceName, methodName, '导出术语表');
+    }
   }
 }
 

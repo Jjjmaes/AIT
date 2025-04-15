@@ -1,3 +1,4 @@
+import 'reflect-metadata'; // Needs to be imported once at the very top
 // src/index.ts - 处理服务器启动
 
 import mongoose from 'mongoose';

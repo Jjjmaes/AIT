@@ -60,4 +60,11 @@ router.delete(
   fileController.deleteFile
 );
 
+// Add route to start translation for a file
+router.post(
+  '/projects/:projectId/files/:fileId/translate',
+  authenticateJwt,
+  fileController.startTranslation
+);
+
 export default router; 

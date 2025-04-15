@@ -21,4 +21,7 @@ router.put('/password', authenticateJwt, validateRequest(validateChangePassword)
 // For now, just require login
 router.get('/', authenticateJwt, userController.getAllUsers);
 
+// 获取当前用户的统计信息
+router.get('/stats', authenticateJwt, userController.getUserStats);
+
 export default router; 

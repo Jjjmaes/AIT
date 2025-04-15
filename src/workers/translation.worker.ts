@@ -5,11 +5,13 @@ import { TranslationJobData } from '../services/translationQueue.service';
 import { translationService } from '../services/translation.service';
 import { segmentService } from '../services/segment.service';
 import { projectService } from '../services/project.service';
-import { File } from '../models/file.model';
+import { File, FileStatus } from '../models/file.model';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
 import { reviewQueueService } from '../services/reviewQueue.service';
 import 'dotenv/config'; // Load environment variables
 import mongoose from 'mongoose'; // Needed for DB connection
+import { aiConfigService } from '../services/aiConfig.service';
+import { AppError } from '../utils/errors';
 
 const QUEUE_NAME = 'translation-jobs';
 

@@ -21,6 +21,7 @@ import { validateId, validateEntityExists } from '../utils/errorHandler';
 import bcrypt from 'bcryptjs';
 import { handleServiceError } from '../utils/errorHandler';
 import mongoose from 'mongoose';
+import Project from '../models/project.model';
 
 interface LoginResponse {
   token: string;
@@ -141,14 +142,21 @@ export class UserService {
         throw new UnauthorizedError('用户账号已被禁用');
       }
       
-      // 生成JWT令牌
+      // Generate JWT令牌 with richer payload
+      const payload = {
+        id: user._id.toString(), // Use id instead of sub for clarity
+        email: user.email,
+        role: user.role,
+        username: user.username,
+        // Add other relevant non-sensitive fields if needed
+      };
       const token = jwt.sign(
-        { sub: user._id },
+        payload, // Use the richer payload
         process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '1d' }
+        { expiresIn: '1d' } // Consider a shorter expiry for security
       );
-      
-      // 移除密码后返回用户数据
+
+      // The user data sent back in the login response body remains the same
       const userData = {
         id: user._id,
         email: user.email,
@@ -156,7 +164,7 @@ export class UserService {
         role: user.role,
         fullName: user.fullName
       };
-      
+
       logger.info(`User logged in: ${user._id}`);
       return { token, user: userData };
     } catch (error) {
@@ -268,25 +276,82 @@ export class UserService {
   }
 
   /**
-   * Get a list of users, optionally filtered.
-   * @param options - Filtering options.
+   * Get statistics for a specific user.
+   * Calculates counts based on projects associated with the user.
+   */
+  async getUserStats(userId: string) {
+    const methodName = 'getUserStats';
+    validateId(userId, '用户');
+    const userObjectId = new Types.ObjectId(userId);
+
+    try {
+      // Basic stats: total projects managed or assigned
+      const totalProjects = await Project.countDocuments({
+        $or: [
+          { manager: userObjectId },
+          { reviewers: userObjectId }
+          // Add other roles if needed (e.g., assigned translator)
+        ]
+      });
+
+      // Pending reviews (count projects/files assigned to user that are in review state)
+      // This might require more complex aggregation or separate queries on files/segments
+      // Simple approximation: Count projects assigned for review that are 'InProgress' or specific review status
+      const pendingReviewsCount = await Project.countDocuments({
+        reviewers: userObjectId,
+        status: { $in: ['InProgress', 'Review', 'PendingReview'] } // Adjust statuses based on your workflow
+      });
+
+      // Completed files/projects (count projects assigned to user that are 'Completed')
+      const completedProjectsCount = await Project.countDocuments({
+        $or: [
+          { manager: userObjectId },
+          { reviewers: userObjectId }
+        ],
+        status: 'Completed'
+      });
+
+      // Overall Progress (Placeholder - requires detailed file/segment progress tracking)
+      // For now, returning a placeholder or average progress of assigned projects
+      const overallProgress = 50; // Placeholder value
+
+      const stats = {
+        totalProjects: totalProjects,
+        pendingReviews: pendingReviewsCount,
+        // Placeholder for completed files - needs File model interaction
+        completedFiles: completedProjectsCount, // Using completed projects as placeholder
+        overallProgress: overallProgress, 
+      };
+
+      logger.info(`Stats retrieved for user ${userId}: ${JSON.stringify(stats)}`);
+      return stats;
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '获取用户统计');
+    }
+  }
+
+  /**
+   * Get a list of users, potentially filtered.
    */
   async getUsers(options: GetUsersOptions = {}): Promise<IUser[]> {
     const methodName = 'getUsers';
-    const { role } = options;
-
     try {
-      const query: mongoose.FilterQuery<IUser> = {};
-
-      if (role) {
-        query.role = role;
+      const query: any = {};
+      if (options.role) {
+        // Validate role if necessary
+        if (!Object.values(UserRole).includes(options.role as UserRole)) {
+          throw new ValidationError('无效的用户角色');
+        }
+        query.role = options.role;
       }
 
-      // Exclude password field from results
-      const users = await User.find(query).select('-password').exec();
-      logger.info(`Fetched ${users.length} users with filter: ${JSON.stringify(options)}`);
-      return users;
+      // Add other filters here based on `options`
 
+      // Exclude password from the result
+      const users = await User.find(query).select('-password');
+      return users;
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
       throw handleServiceError(error, this.serviceName, methodName, '获取用户列表');

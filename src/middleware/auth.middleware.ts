@@ -40,18 +40,32 @@ export const authenticateJwt = async (
       throw new Error('JWT Secret not configured');
     }
 
-    const payload = jwt.verify(token, jwtSecret) as { sub: string };
-    logger.debug('JWT Payload verified:', payload);
+    // Define the expected payload interface based on how token is created
+    interface JwtPayload {
+      id: string;
+      email: string;
+      role: string;
+      username: string;
+      // Add iat and exp if needed, verify automatically handles them
+      iat?: number;
+      exp?: number;
+    }
 
-    const user = await User.findById(payload.sub).select('-password');
+    // Verify the token and assert the new payload structure
+    const payload = jwt.verify(token, jwtSecret) as JwtPayload;
+    logger.debug('JWT Payload verified (new structure):', payload);
+
+    // Use payload.id (from the new token structure) to find the user
+    const user = await User.findById(payload.id).select('-password');
     if (!user) {
-      logger.warn(`User not found for token sub: ${payload.sub}`);
+      logger.warn(`User not found for token id: ${payload.id}`);
       throw new UnauthorizedError('无效的令牌 - 用户不存在');
     }
 
     logger.info(`Authenticated user: ${user.username} (ID: ${user._id}, Role: ${user.role})`);
+    // Populate req.user with verified data
     req.user = {
-      id: user._id.toString(),
+      id: user._id.toString(), // Use database ID for consistency
       email: user.email,
       username: user.username,
       role: user.role

@@ -9,15 +9,16 @@ const { Search } = Input;
 const { TabPane } = Tabs;
 
 interface TermBase {
+  _id: string;
   id: string;
   name: string;
   description: string;
-  sourceLanguage: string;
-  targetLanguages: string[];
+  languagePairs: { source: string; target: string }[];
   domain: string;
-  termCount: number;
+  terms: any[];
+  isPublic: boolean;
   createdAt: string;
-  lastUpdated: string;
+  updatedAt: string;
 }
 
 interface Term {
@@ -53,9 +54,27 @@ const TerminologyPage: React.FC = () => {
     setLoading(true);
     try {
       // Replace with actual API call
-      const response = await api.get('/term-bases');
+      const response = await api.get('/terms');
+      console.log("Raw response from GET /terms:", response); // Log raw response
       if (response.data?.success || response.status === 200) {
-        setTermBases(response.data.termBases || response.data || []);
+        // Safely extract the array, ensuring it's always an array
+        const terminologiesData = response.data?.data?.terminologies;
+        const dataArray = Array.isArray(terminologiesData)
+          ? terminologiesData
+          : Array.isArray(response.data?.data?.docs) // Check for common pagination structure
+          ? response.data.data.docs
+          : Array.isArray(response.data?.data) 
+          ? response.data.data
+          : Array.isArray(response.data?.docs) // Check for direct pagination structure
+          ? response.data.docs
+          : []; // Default to empty array if none match
+        console.log("Data array passed to setTermBases:", dataArray); // Log the extracted array
+        if (dataArray.length > 0) {
+          console.log("Structure of the FIRST term base object:", dataArray[0]);
+        } else {
+          console.log("Fetched data array is empty.");
+        }
+        setTermBases(dataArray);
       } else {
         throw new Error(response.data?.message || 'Failed to fetch term bases');
       }
@@ -72,9 +91,9 @@ const TerminologyPage: React.FC = () => {
     setTermsLoading(true);
     try {
       // Replace with actual API call
-      const response = await api.get(`/term-bases/${termBaseId}/terms`);
+      const response = await api.get(`/terms/${termBaseId}/terms`);
       if (response.data?.success || response.status === 200) {
-        setTerms(response.data.terms || response.data || []);
+        setTerms(response.data?.data?.terms || []);
       } else {
         throw new Error(response.data?.message || 'Failed to fetch terms');
       }
@@ -97,10 +116,24 @@ const TerminologyPage: React.FC = () => {
   }, [selectedTermBase]);
 
   const handleOpenModal = (mode: 'create' | 'edit', termBase?: TermBase) => {
+    console.log('Opening modal in mode:', mode, 'with record:', termBase);
     setModalMode(mode);
     setCurrentTermBase(termBase || null);
     if (mode === 'edit' && termBase) {
-      form.setFieldsValue(termBase);
+      const formData = {
+        name: termBase.name,
+        description: termBase.description,
+        domain: termBase.domain,
+        isPublic: termBase.isPublic,
+        sourceLanguage: Array.isArray(termBase.languagePairs) && termBase.languagePairs.length > 0 
+                          ? termBase.languagePairs[0].source 
+                          : undefined,
+        targetLanguages: Array.isArray(termBase.languagePairs) 
+                          ? termBase.languagePairs.map((p: { target: string }) => p.target) 
+                          : [],
+      };
+      console.log('Setting form values for edit:', formData);
+      form.setFieldsValue(formData);
     } else {
       form.resetFields();
     }
@@ -122,18 +155,41 @@ const TerminologyPage: React.FC = () => {
   };
 
   const handleSubmit = async (values: any) => {
+    console.log('[handleSubmit] Term Base modal submitted with values:', values);
     try {
+      // Transform frontend form values to match backend expectation
+      const payload = {
+        name: values.name,
+        description: values.description,
+        domain: values.domain,
+        isPublic: values.isPublic ?? false, // Assuming a default if not provided
+        languagePairs: values.targetLanguages.map((targetLang: string) => ({
+          source: values.sourceLanguage,
+          target: targetLang,
+        })),
+      };
+      
+      console.log('[handleSubmit] Transformed payload being sent:', payload);
+
       if (modalMode === 'create') {
         // Replace with actual API call
-        const response = await api.post('/term-bases', values);
+        console.log('[handleSubmit] Calling api.post to /terms with payload:', payload);
+        const response = await api.post('/terms', payload); // Send transformed payload
+        console.log('Full response from POST /terms:', response); // Log the full response
         if (response.data?.success || response.status === 201) {
           message.success('术语库创建成功');
         } else {
           throw new Error(response.data?.message || 'Failed to create term base');
         }
       } else if (modalMode === 'edit' && currentTermBase) {
-        // Replace with actual API call
-        const response = await api.put(`/term-bases/${currentTermBase.id}`, values);
+        const termBaseId = currentTermBase._id;
+        console.log(`Editing TermBase with ID: ${termBaseId}`);
+        if (!termBaseId) {
+          message.error('无法获取术语库ID进行更新');
+          return;
+        }
+        console.log(`[handleSubmit] Calling api.put to /terms/${termBaseId} with payload:`, payload);
+        const response = await api.put(`/terms/${termBaseId}`, payload);
         if (response.data?.success || response.status === 200) {
           message.success('术语库更新成功');
         } else {
@@ -144,6 +200,7 @@ const TerminologyPage: React.FC = () => {
       fetchTermBases();
     } catch (error) {
       console.error('Error saving term base:', error);
+      console.error('Error saving term base (full error object):', error); // Log full error object
       message.error('保存术语库失败');
     }
   };
@@ -152,15 +209,16 @@ const TerminologyPage: React.FC = () => {
     try {
       if (modalMode === 'create') {
         // Replace with actual API call
-        const response = await api.post('/terms', values);
-        if (response.data?.success || response.status === 201) {
+        if (!values.termBaseId) throw new Error('Term base ID is required');
+        const response = await api.put(`/terms/${values.termBaseId}/terms`, values);
+        if (response.data?.success || response.status === 201 || response.status === 200) {
           message.success('术语创建成功');
         } else {
           throw new Error(response.data?.message || 'Failed to create term');
         }
       } else if (modalMode === 'edit' && currentTerm) {
         // Replace with actual API call
-        const response = await api.put(`/terms/${currentTerm.id}`, values);
+        const response = await api.put(`/terms/${currentTerm.termBaseId}/terms`, values);
         if (response.data?.success || response.status === 200) {
           message.success('术语更新成功');
         } else {
@@ -178,9 +236,15 @@ const TerminologyPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    console.log('handleDelete called with ID:', id);
+    if (!id) {
+      console.error('handleDelete called with invalid ID!');
+      message.error('无法删除：无效的ID');
+      return;
+    }
     try {
       // Replace with actual API call
-      const response = await api.delete(`/term-bases/${id}`);
+      const response = await api.delete(`/terms/${id}`);
       if (response.data?.success || response.status === 200) {
         message.success('术语库删除成功');
         fetchTermBases();
@@ -200,7 +264,8 @@ const TerminologyPage: React.FC = () => {
   const handleDeleteTerm = async (id: string) => {
     try {
       // Replace with actual API call
-      const response = await api.delete(`/terms/${id}`);
+      if (!selectedTermBase) throw new Error('No term base selected');
+      const response = await api.delete(`/terms/${selectedTermBase}/terms`, { data: { source: id } });
       if (response.data?.success || response.status === 200) {
         message.success('术语删除成功');
         if (selectedTermBase) {
@@ -215,13 +280,109 @@ const TerminologyPage: React.FC = () => {
     }
   };
 
+  // Function to handle exporting a term base
+  const handleExport = async (terminologyId: string) => {
+    if (!terminologyId) {
+      message.error('无法导出：无效的ID');
+      return;
+    }
+    try {
+      message.loading({ content: '正在准备导出文件...', key: 'exporting' });
+      const response = await api.get(`/terms/${terminologyId}/export`, {
+        responseType: 'blob', // Important to handle binary file data
+      });
+
+      // Extract filename from content-disposition header if available
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `terminology_${terminologyId}.csv`; // Default filename
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+        if (filenameMatch && filenameMatch.length === 2) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create a Blob from the response data
+      const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/octet-stream' });
+
+      // Create a temporary link to trigger the download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      message.success({ content: '文件导出成功！', key: 'exporting', duration: 2 });
+
+    } catch (error: any) {
+      console.error('Error exporting term base:', error);
+      message.error({ 
+        content: `导出失败: ${error.response?.data?.message || error.message || '未知错误'}`,
+        key: 'exporting',
+        duration: 3 
+      });
+    } 
+  };
+
+  // Custom request function for Ant Design Upload component
+  const handleCustomRequest = async (options: any) => {
+    const { onSuccess, onError, file, action } = options;
+    console.log('handleCustomRequest options:', { onSuccess: !!onSuccess, onError: !!onError, file, action }); // Log options
+    const token = localStorage.getItem('authToken');
+
+    if (!token) {
+      message.error('未找到认证令牌，请重新登录。');
+      onError(new Error('Authorization token not found'));
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file); // Use 'file' or match backend expected field name
+
+    try {
+      console.log(`[CustomRequest] Posting to action: ${action}`); // Log action
+      const response = await api.post(action, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: () => {
+          // options.onProgress({ percent: (event.loaded / event.total * 100) }); // Optional progress
+        },
+      });
+      console.log('[CustomRequest] API call successful, response data:', response.data); // Log response data
+      console.log('[CustomRequest] Calling onSuccess...'); // Log before onSuccess
+      onSuccess(response.data, file);
+      message.success(`${file.name} 上传并处理成功: ${response.data?.message || ''}`);
+      fetchTermBases(); // Refresh list after successful import/processing
+      if (action.includes('/terms/') && action.includes('/import')) {
+        const parts = action.split('/');
+        const termBaseId = parts[parts.length - 2]; // Extract termBaseId if importing terms
+        if (termBaseId && termBaseId !== 'import') {
+             fetchTerms(termBaseId);
+        }
+      }
+
+    } catch (err: any) {
+      console.error('Custom request failed:', err); // Log raw error
+      console.log('[CustomRequest] Calling onError...'); // Log before onError
+      const errorMsg = err.response?.data?.message || err.message || '上传失败';
+      message.error(`${file.name} 上传失败: ${errorMsg}`);
+      onError(err);
+    }
+  };
+
   const termBaseColumns = [
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: TermBase) => (
-        <a onClick={() => {setSelectedTermBase(record.id); setActiveTab('terms');}}>
+      render: (text: string, record: any) => (
+        <a onClick={() => {setSelectedTermBase(record._id); setActiveTab('terms');}}>
           {text}
         </a>
       ),
@@ -234,18 +395,23 @@ const TerminologyPage: React.FC = () => {
     },
     {
       title: '源语言',
-      dataIndex: 'sourceLanguage',
+      dataIndex: 'languagePairs',
       key: 'sourceLanguage',
+      render: (pairs: { source: string, target: string }[]) => (
+        Array.isArray(pairs) && pairs.length > 0 ? pairs[0].source : '-'
+      ),
     },
     {
       title: '目标语言',
-      dataIndex: 'targetLanguages',
+      dataIndex: 'languagePairs',
       key: 'targetLanguages',
-      render: (languages: string[]) => (
+      render: (pairs: { source: string, target: string }[] | null | undefined) => (
         <>
-          {languages.map(lang => (
-            <Tag key={lang}>{lang}</Tag>
-          ))}
+          {Array.isArray(pairs)
+            ? pairs.map(pair => (
+                <Tag key={`${pair.source}-${pair.target}`}>{pair.target}</Tag>
+              ))
+            : '-'}
         </>
       ),
     },
@@ -256,36 +422,41 @@ const TerminologyPage: React.FC = () => {
     },
     {
       title: '术语数量',
-      dataIndex: 'termCount',
+      dataIndex: 'terms',
       key: 'termCount',
-      sorter: (a: TermBase, b: TermBase) => a.termCount - b.termCount,
+      render: (terms: any[]) => (
+        Array.isArray(terms) ? terms.length : 0
+      ),
+      sorter: (a: any, b: any) => 
+        (Array.isArray(a.terms) ? a.terms.length : 0) - 
+        (Array.isArray(b.terms) ? b.terms.length : 0),
     },
     {
       title: '最后更新',
-      dataIndex: 'lastUpdated',
+      dataIndex: 'updatedAt',
       key: 'lastUpdated',
-      render: (date: string) => new Date(date).toLocaleDateString(),
-      sorter: (a: TermBase, b: TermBase) => 
-        new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime(),
+      render: (date: string) => date ? new Date(date).toLocaleDateString() : '-',
+      sorter: (a: any, b: any) =>
+        new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime(),
     },
     {
       title: '操作',
       key: 'action',
       render: (_: any, record: TermBase) => (
         <Space size="middle">
-          <Tooltip title="编辑">
+          <Tooltip title="编辑" key={`edit-${record._id}`}>
             <Button icon={<EditOutlined />} onClick={() => handleOpenModal('edit', record)} />
           </Tooltip>
-          <Tooltip title="导出">
-            <Button 
-              icon={<DownloadOutlined />} 
-              onClick={() => window.location.href = `${api.defaults.baseURL}/term-bases/${record.id}/export`} 
+          <Tooltip title="导出" key={`export-${record._id}`}>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => handleExport(record._id)}
             />
           </Tooltip>
-          <Tooltip title="删除">
+          <Tooltip title="删除" key={`delete-${record._id}`}>
             <Popconfirm
               title="确认删除这个术语库?"
-              onConfirm={() => handleDelete(record.id)}
+              onConfirm={() => handleDelete(record._id)}
               okText="确认"
               cancelText="取消"
             >
@@ -366,18 +537,12 @@ const TerminologyPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <Title level={3}>术语库列表</Title>
         <Space>
+          {/* Use customRequest for '导入术语库' */}
           <Upload
             name="file"
-            action={`${api.defaults.baseURL}/term-bases/import`}
-            headers={{ authorization: `Bearer ${localStorage.getItem('token')}` }}
-            onChange={info => {
-              if (info.file.status === 'done') {
-                message.success(`${info.file.name} 上传成功`);
-                fetchTermBases();
-              } else if (info.file.status === 'error') {
-                message.error(`${info.file.name} 上传失败`);
-              }
-            }}
+            customRequest={(options) => handleCustomRequest({...options, action: `${api.defaults.baseURL}/terms/import`})}
+            accept=".csv,.xlsx,.json"
+            showUploadList={false}
           >
             <Button icon={<UploadOutlined />}>导入术语库</Button>
           </Upload>
@@ -401,7 +566,7 @@ const TerminologyPage: React.FC = () => {
         columns={termBaseColumns} 
         dataSource={termBases} 
         loading={loading} 
-        rowKey="id"
+        rowKey="_id"
       />
     </>
   );
@@ -418,18 +583,12 @@ const TerminologyPage: React.FC = () => {
         <Space>
           {selectedTermBase ? (
             <>
+              {/* Use customRequest for '导入术语' */}
               <Upload
                 name="file"
-                action={`${api.defaults.baseURL}/term-bases/${selectedTermBase}/import-terms`}
-                headers={{ authorization: `Bearer ${localStorage.getItem('token')}` }}
-                onChange={info => {
-                  if (info.file.status === 'done') {
-                    message.success(`${info.file.name} 上传成功`);
-                    fetchTerms(selectedTermBase);
-                  } else if (info.file.status === 'error') {
-                    message.error(`${info.file.name} 上传失败`);
-                  }
-                }}
+                customRequest={(options) => handleCustomRequest({...options, action: `${api.defaults.baseURL}/terms/${selectedTermBase}/import`})}
+                accept=".csv,.xlsx,.json"
+                showUploadList={false}
               >
                 <Button icon={<UploadOutlined />}>导入术语</Button>
               </Upload>

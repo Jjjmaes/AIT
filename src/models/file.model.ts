@@ -126,15 +126,16 @@ const fileSchema = new Schema<IFile>(
       type: String,
       required: true
     },
-    type: {
-      type: String,
-      enum: Object.values(FileType),
-      required: true
-    },
+    // type: {  // Comment out duplicate 'type'
+    //   type: String,
+    //   enum: Object.values(FileType),
+    //   required: true
+    // },
     status: {
       type: String,
       enum: Object.values(FileStatus),
-      default: FileStatus.PENDING
+      default: FileStatus.PENDING,
+      required: true
     },
     uploadedBy: {
       type: Schema.Types.ObjectId,
@@ -145,10 +146,11 @@ const fileSchema = new Schema<IFile>(
       type: String,
       required: true
     },
-    path: {
-      type: String,
-      required: true
-    },
+    // Correctly comment out the duplicate 'path' field
+    // path: {
+    //   type: String,
+    //   required: true
+    // },
     filePath: {
       type: String,
       required: true

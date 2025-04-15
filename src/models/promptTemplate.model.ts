@@ -1,97 +1,93 @@
-import mongoose, { Schema, Document, Types } from 'mongoose';
-import { IUser } from './user.model'; // Assuming user model exists for createdBy
+import mongoose, { Schema, Document } from 'mongoose';
 
-// Enum for the task type the prompt is designed for
-export enum PromptTaskType {
-  TRANSLATION = 'translation',
-  REVIEW = 'review'
+// Enum for prompt types (optional but recommended)
+export enum PromptTemplateType {
+    TRANSLATION = 'translation',
+    REVIEW = 'review',
+    // Add other types as needed (e.g., summarization, terminology extraction)
 }
 
-// Interface representing a language pair for the template
-export interface IPromptLanguagePair {
-  source: string; // Language code (e.g., 'en', 'fr')
-  target: string; // Language code
+// Enum for output formats (optional but recommended)
+export enum OutputFormat {
+    TEXT = 'text',
+    MARKDOWN = 'markdown',
+    JSON = 'json',
+    // Add others like XML, YAML if needed
 }
 
-// Interface describing a Prompt Template document in MongoDB
-// Add export here
 export interface IPromptTemplate extends Document {
-  name: string;
-  description?: string;
-  systemInstruction: string; // The system prompt or instruction
-  userPrompt: string;        // The user-facing prompt template (with placeholders like {{input}})
-  domain?: string;           // Optional domain specification (e.g., 'medical', 'legal')
-  languagePairs?: IPromptLanguagePair[]; // Specific language pairs this template is suitable for
-  taskType: PromptTaskType;  // Specifies if it's for translation or review
-  createdBy: Types.ObjectId | IUser; // User who created the template
-  isPublic: boolean;         // Whether the template is available to others (based on permissions)
-  createdAt: Date;
-  updatedAt: Date;
+    name: string;
+    description: string;
+    type: PromptTemplateType;
+    content: string;
+    outputFormat: string;
+    variables: string[]; // e.g., ['sourceText', 'targetLang']
+    modelIdentifier: string; // Identifier linking to AI Config + Model, e.g., "OpenAI-gpt-4"
+    isActive: boolean;
+    createdBy?: mongoose.Types.ObjectId; // Optional: Link to user who created it
+    createdAt: Date;
+    updatedAt: Date;
 }
 
-// Mongoose Schema for Prompt Templates
-const PromptTemplateSchema = new Schema<IPromptTemplate>(
-  {
-    name: {
-      type: String,
-      required: [true, '模板名称不能为空'],
-      trim: true,
-      maxlength: [100, '模板名称不能超过100个字符'],
-      index: true
+const promptTemplateSchema = new Schema<IPromptTemplate>(
+    {
+        name: {
+            type: String,
+            required: [true, 'Template name is required'],
+            trim: true,
+            unique: true, // Ensure names are unique
+        },
+        description: {
+            type: String,
+            required: [true, 'Template description is required'],
+            trim: true,
+        },
+        type: {
+            type: String,
+            required: [true, 'Template type is required'],
+            enum: Object.values(PromptTemplateType), // Use enum values
+            default: PromptTemplateType.TRANSLATION,
+        },
+        content: {
+            type: String,
+            required: [true, 'Prompt content is required'],
+            trim: true,
+        },
+        outputFormat: {
+            type: String,
+            required: [true, 'Output format description is required'],
+            trim: true,
+        },
+        variables: {
+            type: [String],
+            default: [], // Default to empty array
+        },
+        modelIdentifier: {
+            type: String,
+            required: [true, 'AI model identifier is required'],
+            trim: true,
+            // Example: "OpenAI-gpt-4o", "Grok-grok-3-latest"
+            // Validation could be added later to check against available AI models
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+        createdBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User', // Reference the User model if you have one
+            // required: true, // Make required if needed
+        },
     },
-    description: {
-      type: String,
-      trim: true,
-      maxlength: [500, '模板描述不能超过500个字符']
-    },
-    systemInstruction: {
-      type: String,
-      required: [true, '系统指令不能为空'],
-      trim: true
-    },
-    userPrompt: {
-      type: String,
-      required: [true, '用户提示模板不能为空'],
-      trim: true
-    },
-    domain: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      index: true
-    },
-    languagePairs: [
-      {
-        source: { type: String, required: true, trim: true, lowercase: true },
-        target: { type: String, required: true, trim: true, lowercase: true },
-        _id: false // Don't create separate IDs for language pairs in the array
-      }
-    ],
-    taskType: {
-      type: String,
-      enum: Object.values(PromptTaskType),
-      required: [true, '任务类型不能为空'],
-      index: true
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User', // Reference to the User model
-      required: true
-    },
-    isPublic: {
-      type: Boolean,
-      default: false, // Templates are private by default
-      index: true
+    {
+        timestamps: true, // Adds createdAt and updatedAt automatically
     }
-  },
-  {
-    timestamps: true // Automatically add createdAt and updatedAt fields
-  }
 );
 
-// Indexing for common query patterns
-PromptTemplateSchema.index({ createdBy: 1, name: 1 });
-PromptTemplateSchema.index({ taskType: 1, domain: 1, isPublic: 1 });
+// Indexes for performance
+promptTemplateSchema.index({ name: 1 });
+promptTemplateSchema.index({ type: 1 });
+promptTemplateSchema.index({ isActive: 1 });
+promptTemplateSchema.index({ modelIdentifier: 1 });
 
-// Export the Mongoose model
-export const PromptTemplate = mongoose.model<IPromptTemplate>('PromptTemplate', PromptTemplateSchema);
+export const PromptTemplate = mongoose.model<IPromptTemplate>('PromptTemplate', promptTemplateSchema);

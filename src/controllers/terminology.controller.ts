@@ -7,6 +7,7 @@ import { AppError, ValidationError } from '../utils/errors';
 import logger from '../utils/logger';
 import { tmxUploadMiddleware } from './translationMemory.controller'; // Reuse TM upload middleware for now?
 import multer from 'multer';
+import { validateId } from '../utils/errorHandler'; // Import validateId
 
 // Define multer config specifically for terminology CSV uploads
 const csvStorage = multer.memoryStorage();
@@ -38,13 +39,14 @@ class TerminologyController {
       const newTerminology = await terminologyService.createTerminology(userId, data);
       res.status(201).json({ success: true, data: newTerminology });
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      logger.error(`Error in TerminologyController.${methodName}:`, error);
       next(error);
     }
   }
 
   async getAll(req: AuthRequest, res: Response, next: NextFunction) {
     const methodName = 'getAll';
+    const { limit = 10, page = 1, sort = '-createdAt', ...filters } = req.query;
     try {
       const userId = req.user?.id; // Needed for permission filtering in service
       const filters: GetTerminologyFilter = {
@@ -56,10 +58,10 @@ class TerminologyController {
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       };
       logger.info(`Fetching terminologies for user ${userId} with filters:`, filters);
-      const result = await terminologyService.getTerminologies(filters);
-      res.status(200).json({ success: true, ...result });
+      const result = await terminologyService.getTerminologies({ ...filters, limit: Number(limit), page: Number(page) });
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      logger.error(`Error in TerminologyController.${methodName}:`, error);
       next(error);
     }
   }
@@ -107,7 +109,7 @@ class TerminologyController {
       const result = await terminologyService.deleteTerminology(terminologyId, userId);
       res.status(200).json({ success: result.success, message: 'Terminology deleted successfully' });
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName} for ID ${req.params.terminologyId}:`, error);
+      logger.error(`Error in TerminologyController.${methodName} for ID ${req.params.terminologyId}:`, error);
       next(error);
     }
   }
@@ -195,6 +197,46 @@ class TerminologyController {
     } catch (error) {
         logger.error(`Error in ${this.serviceName}.${methodName} for list ${req.params.terminologyId}:`, error);
         next(error);
+    }
+  }
+
+  // GET /terms/:terminologyId/terms
+  public getTermsByListId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { terminologyId } = req.params;
+    logger.info(`Entering TerminologyController.getTermsByListId for ID: ${terminologyId}`);
+    try {
+      validateId(terminologyId, 'Terminology List'); // Assuming validateId utility
+      // Assuming a service method exists to fetch terms by list ID
+      const terms = await terminologyService.getTermsByListId(terminologyId);
+      res.status(200).json({ success: true, data: { terms } }); // Assuming standard response format
+    } catch (error) {
+      logger.error(`Error in TerminologyController.getTermsByListId for ID ${terminologyId}:`, error);
+      next(error);
+    }
+  }
+
+  // Export terminology list
+  async exportById(req: AuthRequest, res: Response, next: NextFunction) {
+    const methodName = 'exportById';
+    try {
+      const userId = req.user?.id;
+      if (!userId) return next(new AppError('Authentication required', 401));
+      const terminologyId = req.params.terminologyId;
+      if (!terminologyId) return next(new AppError('Terminology ID is required', 400));
+
+      logger.info(`User ${userId} requesting export for terminology ${terminologyId}`);
+
+      // Assume service returns CSV content or throws error
+      const csvData = await terminologyService.exportTerminology(terminologyId, userId);
+
+      const filename = `terminology_export_${terminologyId}.csv`;
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.status(200).send(csvData);
+
+    } catch (error) {
+      logger.error(`Error in TerminologyController.${methodName} for ID ${req.params.terminologyId}:`, error);
+      next(error);
     }
   }
 }

@@ -1,4 +1,4 @@
-import { PromptTemplate, IPromptTemplate, PromptTaskType } from '../models/promptTemplate.model';
+import { PromptTemplate, IPromptTemplate, PromptTemplateType } from '../models/promptTemplate.model';
 import logger from './logger';
 import { Types } from 'mongoose';
 
@@ -14,15 +14,41 @@ interface PromptBuildContext {
 
 // Define the output structure
 export interface ProcessedPrompt {
-  systemInstruction: string;
-  userPrompt: string; // This is the final user prompt with input replaced
+  systemPrompt: string | null; // System prompt might not always be separate
+  userPrompt: string;
 }
 
+// Default prompts (keep as fallbacks if needed)
 const DEFAULT_TRANSLATION_SYSTEM_PROMPT = 'You are a professional translator.';
-const DEFAULT_TRANSLATION_USER_PROMPT = 'Translate the following text from {{sourceLanguage}} to {{targetLanguage}}. Domain: {{domain}}. Text: {{input}}';
+const DEFAULT_TRANSLATION_USER_PROMPT = 'Translate the following text from {SOURCE_LANGUAGE} to {TARGET_LANGUAGE}:\n\n{SOURCE_TEXT}';
 
-const DEFAULT_REVIEW_SYSTEM_PROMPT = 'You are an expert translation reviewer.';
-const DEFAULT_REVIEW_USER_PROMPT = 'Review the translation from {{sourceLanguage}} to {{targetLanguage}}. Original: {{input}}. Translation: {{translation}}. Domain: {{domain}}.';
+const DEFAULT_REVIEW_SYSTEM_PROMPT = 'You are a professional translation reviewer.';
+const DEFAULT_REVIEW_USER_PROMPT = `Review the following translation. Source ({SOURCE_LANGUAGE}): "{SOURCE_TEXT}". Translation ({TARGET_LANGUAGE}): "{TRANSLATED_TEXT}". Provide feedback on accuracy, fluency, style, and terminology.`;
+
+interface VariableMap {
+  [key: string]: string | number | undefined;
+}
+
+/**
+ * Fills placeholders in a prompt string with provided variable values.
+ * Placeholders are in the format {{variable_name}}.
+ */
+function fillPlaceholders(prompt: string, variables: VariableMap): string {
+  let processedPrompt = prompt;
+  for (const key in variables) {
+    // Ensure the value is a string for replacement
+    const value = variables[key] !== undefined ? String(variables[key]) : ''; 
+    // Use a global regex to replace all occurrences
+    const regex = new RegExp(`\\{\\{${key}\\}\}`, 'g'); 
+    processedPrompt = processedPrompt.replace(regex, value);
+  }
+  // Log warnings for any remaining unfilled placeholders (optional)
+  const remainingPlaceholders = processedPrompt.match(/\{\{[a-zA-Z0-9_]+\}\}/g);
+  if (remainingPlaceholders) {
+    logger.warn(`[fillPlaceholders] Unfilled placeholders remaining: ${remainingPlaceholders.join(', ')}`);
+  }
+  return processedPrompt;
+}
 
 class PromptProcessor {
 
@@ -58,14 +84,15 @@ class PromptProcessor {
     let template: IPromptTemplate | null = null;
     if (context.promptTemplateId) {
       template = await this.findTemplate(context.promptTemplateId);
-      if (!template || template.taskType !== PromptTaskType.TRANSLATION) {
+      if (!template || template.type !== PromptTemplateType.TRANSLATION) {
         logger.warn(`Translation template ${context.promptTemplateId} not found or wrong type. Using default.`);
         template = null; // Fallback to default if wrong type
       }
     }
 
-    const systemInstruction = template ? template.systemInstruction : DEFAULT_TRANSLATION_SYSTEM_PROMPT;
-    const userPromptTemplate = template ? template.userPrompt : DEFAULT_TRANSLATION_USER_PROMPT;
+    // If a system prompt is needed separately, it should be handled differently.
+    const systemInstruction = template ? '' : DEFAULT_TRANSLATION_SYSTEM_PROMPT;
+    const userPromptTemplate = template ? template.content : DEFAULT_TRANSLATION_USER_PROMPT;
 
     // Prepare context for placeholder replacement
     const fullContext = { 
@@ -80,7 +107,7 @@ class PromptProcessor {
     const finalSystemInstruction = this.replacePlaceholders(systemInstruction, fullContext);
 
     return {
-      systemInstruction: finalSystemInstruction,
+      systemPrompt: finalSystemInstruction,
       userPrompt: finalUserPrompt,
     };
   }
@@ -94,14 +121,15 @@ class PromptProcessor {
      let template: IPromptTemplate | null = null;
     if (context.promptTemplateId) {
       template = await this.findTemplate(context.promptTemplateId);
-      if (!template || template.taskType !== PromptTaskType.REVIEW) {
+      if (!template || template.type !== PromptTemplateType.REVIEW) {
         logger.warn(`Review template ${context.promptTemplateId} not found or wrong type. Using default.`);
         template = null; 
       }
     }
 
-    const systemInstruction = template ? template.systemInstruction : DEFAULT_REVIEW_SYSTEM_PROMPT;
-    const userPromptTemplate = template ? template.userPrompt : DEFAULT_REVIEW_USER_PROMPT;
+    // Remove direct access to systemInstruction, similar to the translation prompt.
+    const systemInstruction = template ? '' : DEFAULT_REVIEW_SYSTEM_PROMPT;
+    const userPromptTemplate = template ? template.content : DEFAULT_REVIEW_USER_PROMPT;
 
     const fullContext = { 
         ...context, 
@@ -114,7 +142,7 @@ class PromptProcessor {
     const finalSystemInstruction = this.replacePlaceholders(systemInstruction, fullContext);
 
     return {
-      systemInstruction: finalSystemInstruction,
+      systemPrompt: finalSystemInstruction,
       userPrompt: finalUserPrompt,
     };
   }
@@ -122,3 +150,70 @@ class PromptProcessor {
 
 // Export singleton instance
 export const promptProcessor = new PromptProcessor(); 
+
+/**
+ * Processes a translation prompt using an optional template.
+ */
+export function processTranslationPrompt(template: IPromptTemplate | null | undefined, variables: VariableMap): ProcessedPrompt {
+    // Use the corrected type check
+    if (!template || template.type !== PromptTemplateType.TRANSLATION) {
+        if (template) {
+             logger.warn(`[processTranslationPrompt] Provided template ID ${template._id} is not a TRANSLATION template. Using default.`);
+        } else {
+             logger.debug(`[processTranslationPrompt] No template provided. Using default.`);
+        }
+        // Fallback to default prompts if no valid template
+        // Assume default system prompt might not be needed if AI handles it
+        return {
+            systemPrompt: null, // Or DEFAULT_TRANSLATION_SYSTEM_PROMPT if needed
+            userPrompt: fillPlaceholders(DEFAULT_TRANSLATION_USER_PROMPT, variables)
+        };
+    }
+
+    // Use the template content
+    // We assume the content field contains the full prompt structure.
+    // The concept of a separate systemInstruction isn't directly mapped anymore.
+    const systemInstruction = null; // System instruction is part of content or handled by AI
+    const userPromptTemplate = template.content; // Use the main content field
+
+    logger.debug(`[processTranslationPrompt] Using template ID: ${template._id}`);
+    // Fill placeholders in the user prompt template from the template's content
+    const finalUserPrompt = fillPlaceholders(userPromptTemplate, variables);
+
+    return {
+        systemPrompt: systemInstruction, // Use the determined system instruction (null in this case)
+        userPrompt: finalUserPrompt
+    };
+}
+
+/**
+ * Processes a review prompt using an optional template.
+ */
+export function processReviewPrompt(template: IPromptTemplate | null | undefined, variables: VariableMap): ProcessedPrompt {
+     // Use the corrected type check
+    if (!template || template.type !== PromptTemplateType.REVIEW) {
+       if (template) {
+             logger.warn(`[processReviewPrompt] Provided template ID ${template._id} is not a REVIEW template. Using default.`);
+        } else {
+             logger.debug(`[processReviewPrompt] No template provided. Using default.`);
+        }
+         // Fallback to default prompts
+        return {
+            systemPrompt: null, // Or DEFAULT_REVIEW_SYSTEM_PROMPT
+            userPrompt: fillPlaceholders(DEFAULT_REVIEW_USER_PROMPT, variables)
+        };
+    }
+
+    // Use the template content
+    const systemInstruction = null; // System instruction is part of content or handled by AI
+    const userPromptTemplate = template.content; // Use the main content field
+
+    logger.debug(`[processReviewPrompt] Using template ID: ${template._id}`);
+     // Fill placeholders in the user prompt template from the template's content
+    const finalUserPrompt = fillPlaceholders(userPromptTemplate, variables);
+
+    return {
+        systemPrompt: systemInstruction, // Use the determined system instruction (null in this case)
+        userPrompt: finalUserPrompt
+    };
+} 

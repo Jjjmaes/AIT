@@ -1,10 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import { translationMemoryService, AddTMEntryDto } from '../services/translationMemory.service';
+import { translationMemoryService, AddTMEntryDto, CreateTMSetDto } from '../services/translationMemory.service';
 import logger from '../utils/logger';
 import { AppError, ValidationError } from '../utils/errors';
 import { authenticateJwt } from '../middleware/auth.middleware'; // Use correct export name
 import { body, validationResult } from 'express-validator'; // For input validation
 import multer from 'multer';
+import { TranslationMemoryService } from '../services/translationMemory.service';
+import { Container } from 'typedi';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { TranslationMemory } from '../models/translationMemory.model'; // Corrected model path
+import { TranslationMemorySet } from '../models/translationMemorySet.model'; // Corrected model path
+import { UnauthorizedError } from '../utils/errors';
 
 // Extend Express Request interface to include user property and file
 interface AuthenticatedRequest extends Request {
@@ -21,6 +27,8 @@ const upload = multer({
 
 
 export class TranslationMemoryController {
+  public translationMemoryService = Container.get(TranslationMemoryService);
+
   /**
    * @desc    Add a single Translation Memory entry
    * @route   POST /api/v1/tm
@@ -97,6 +105,86 @@ export class TranslationMemoryController {
       next(error);
     }
   }
+
+  /**
+   * @desc    Create a new Translation Memory Set
+   * @route   POST /api/v1/tm
+   * @access  Private
+   */
+  async createTMSet(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+        return next(new AppError('Authentication required to create TM set', 401));
+    }
+
+    const setData: CreateTMSetDto = {
+        name: req.body.name,
+        description: req.body.description,
+        sourceLanguage: req.body.sourceLanguage,
+        targetLanguage: req.body.targetLanguage,
+        domain: req.body.domain,
+        isPublic: req.body.isPublic,
+        // projectId: req.body.projectId // Add if needed
+    };
+
+    try {
+        const newTMSet = await translationMemoryService.createTMSet(userId, setData);
+        res.status(201).json({ success: true, data: newTMSet });
+        logger.info(`User ${userId} created TM Set ID ${newTMSet._id}`);
+    } catch (error) {
+        logger.error('Error creating TM set:', error);
+        next(error); // Pass to global error handler
+    }
+  }
+
+  public createTranslationMemorySet = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const methodName = 'createTranslationMemorySet';
+    try {
+      // Assert req.user exists because authenticateJwt middleware should ensure it
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required.');
+      }
+
+      // Validate input data
+      const tmSetData: CreateTMSetDto = req.body; // Use the correct DTO type
+      // We don't need to manually add createdBy here, service handles it
+      // tmSetData.createdBy = req.user.id;
+
+      logger.info(`[${methodName}] User ${req.user.id} attempting to create TM Set: ${tmSetData.name}`);
+      
+      // Correct argument order: userId first, then DTO data
+      const newTmSet = await this.translationMemoryService.createTMSet(req.user.id, tmSetData);
+      
+      logger.info(`[${methodName}] TM Set created successfully: ${newTmSet._id} by User ${req.user.id}`);
+      res.status(201).json({ data: newTmSet, message: 'Translation Memory Set created successfully' });
+    } catch (error) {
+      logger.error(`[${methodName}] Error creating Translation Memory Set:`, error);
+      next(error); // Pass error to the global error handler
+    }
+  };
+
+  public getAllTMSets = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const methodName = 'getAllTMSets';
+    try {
+      // Assert req.user exists because authenticateJwt middleware should ensure it
+      if (!req.user) {
+        throw new UnauthorizedError('Authentication required.');
+      }
+      logger.info(`[${methodName}] User ${req.user.id} requesting all TM Sets`); // Use req.user.id
+      const tmSets = await this.translationMemoryService.getAllTMSets(req.user.id); // Use req.user.id
+      logger.info(`[${methodName}] Found ${tmSets.length} TM Sets for User ${req.user.id}`);
+      res.status(200).json({ data: tmSets, message: 'Translation Memory Sets retrieved successfully' });
+    } catch (error) {
+      logger.error(`[${methodName}] Error fetching TM Sets:`, error);
+      next(error); // Pass error to the global error handler
+    }
+  };
 
   // TODO: Add methods for searching/querying TM, deleting entries etc. as needed
 }

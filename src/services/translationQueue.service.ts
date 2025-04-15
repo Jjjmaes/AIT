@@ -15,6 +15,7 @@ export interface TranslationJobData {
   fileId?: string; // Only for file type
   userId: string; // User who initiated the job
   requesterRoles: string[]; // Roles of the user who initiated
+  aiConfigId?: string; // Make AI Config ID optional for now
   options?: TranslationOptions; // Optional translation settings
 }
 
@@ -44,9 +45,7 @@ class TranslationQueueService {
       maxRetriesPerRequest: null // BullMQ specific option
     };
     
-    // Optionally, only connect if Redis is configured or needed
-    // For now, we comment out the connection and queue creation
-    /*
+    // Uncomment Redis connection and queue creation
     this.connection = new Redis(connectionOptions);
     this.connection.on('error', (err: Error) => logger.error('Redis Connection Error', err));
 
@@ -63,8 +62,9 @@ class TranslationQueueService {
         }
     });
     logger.info(`Translation queue service initialized. Connected to Redis: ${connectionOptions.host}:${connectionOptions.port}`);
-    */
-   logger.warn(`Translation queue service initialized WITHOUT Redis connection (temporary).`);
+    
+   // Remove temporary warning
+   // logger.warn(`Translation queue service initialized WITHOUT Redis connection (temporary).`);
   }
 
   private getJobId(type: 'file' | 'project', id: string): string {
@@ -75,17 +75,32 @@ class TranslationQueueService {
   async addFileTranslationJob(
     projectId: string,
     fileId: string,
-    options: TranslationOptions,
-    userId: string, // Pass userId
-    requesterRoles: string[] // Pass requesterRoles
+    aiConfigId: string, // Keep required here, controller must provide it
+    options: TranslationOptions, 
+    userId: string, 
+    requesterRoles: string[]
   ): Promise<string> {
     const methodName = 'addFileTranslationJob';
     const jobId = this.getJobId('file', fileId);
-    const jobData: TranslationJobData = { type: 'file', projectId, fileId, options, userId, requesterRoles };
+    // aiConfigId is now optional in the interface, but we provide it here
+    const jobData: TranslationJobData = { 
+        type: 'file', 
+        projectId, 
+        fileId, 
+        userId, 
+        requesterRoles, 
+        aiConfigId, 
+        options 
+    };
     try {
-      // Temporarily bypass adding to the queue
-      // await this.queue.add(jobId, jobData, { jobId });
-      logger.warn(`TEMPORARY: Skipped adding file translation job ${jobId} to queue.`);
+      // Add check for queue existence
+      if (!this.queue) {
+        throw new Error('Translation queue is not initialized.');
+      }
+      // Uncomment adding to the queue
+      await this.queue.add(jobId, jobData, { jobId });
+      // Remove temporary log
+      // logger.warn(`TEMPORARY: Skipped adding file translation job ${jobId} to queue.`);
       return jobId;
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -103,9 +118,14 @@ class TranslationQueueService {
      const jobId = this.getJobId('project', projectId);
      const jobData: TranslationJobData = { type: 'project', projectId, options, userId, requesterRoles };
      try {
-       // Temporarily bypass adding to the queue
-       // await this.queue.add(jobId, jobData, { jobId });
-       logger.warn(`TEMPORARY: Skipped adding project translation job ${jobId} to queue.`);
+       // Add check for queue existence
+       if (!this.queue) {
+         throw new Error('Translation queue is not initialized.');
+       }
+       // Uncomment adding to the queue
+       await this.queue.add(jobId, jobData, { jobId });
+       // Remove temporary log
+       // logger.warn(`TEMPORARY: Skipped adding project translation job ${jobId} to queue.`);
        return jobId;
      } catch (error) {
        logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -114,76 +134,79 @@ class TranslationQueueService {
   }
 
   async getJobStatus(jobId: string): Promise<JobStatus> {
-    // Temporarily return default status
-    logger.warn(`TEMPORARY: Returning dummy status for job ${jobId} as queue is disabled.`);
-    return { jobId, status: 'unknown', progress: 0, timestamp: Date.now() };
-    // const methodName = 'getJobStatus';
-    // try {
-    //   const job = await this.queue?.getJob(jobId);
-    //   if (!job) {
-    //     throw new NotFoundError(`任务 ${jobId} 未找到`);
-    //   }
+    // Uncomment actual job status logic
+    // logger.warn(`TEMPORARY: Returning dummy status for job ${jobId} as queue is disabled.`);
+    // return { jobId, status: 'unknown', progress: 0, timestamp: Date.now() };
+    const methodName = 'getJobStatus';
+    try {
+      if (!this.queue) throw new Error('Queue not initialized'); // Add check
+      const job = await this.queue.getJob(jobId);
+      if (!job) {
+        throw new NotFoundError(`任务 ${jobId} 未找到`);
+      }
 
-    //   const state = await job.getState();
-    //   const progress = job.progress;
+      const state = await job.getState();
+      const progress = job.progress;
       
-    //   return {
-    //     jobId: job.id || jobId,
-    //     status: state,
-    //     progress: progress,
-    //     failedReason: job.failedReason,
-    //     returnValue: job.returnvalue,
-    //     timestamp: job.timestamp,
-    //     processedOn: job.processedOn,
-    //     finishedOn: job.finishedOn
-    //   };
-    // } catch (error) {
-    //     if (!(error instanceof NotFoundError)) {
-    //         logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
-    //     }
-    //     throw handleServiceError(error, this.serviceName, methodName, '获取任务状态');
-    // }
+      return {
+        jobId: job.id || jobId,
+        status: state,
+        progress: progress,
+        failedReason: job.failedReason,
+        returnValue: job.returnvalue,
+        timestamp: job.timestamp,
+        processedOn: job.processedOn,
+        finishedOn: job.finishedOn
+      };
+    } catch (error) {
+        if (!(error instanceof NotFoundError)) {
+            logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
+        }
+        throw handleServiceError(error, this.serviceName, methodName, '获取任务状态');
+    }
   }
 
   async cancelJob(jobId: string): Promise<void> {
-     // Temporarily do nothing
-     logger.warn(`TEMPORARY: Skipped cancelling job ${jobId} as queue is disabled.`);
-     return;
-    // const methodName = 'cancelJob';
-    // try {
-    //   const job = await this.queue?.getJob(jobId);
-    //   if (!job) {
-    //      logger.warn(`Attempted to cancel non-existent job ${jobId}`);
-    //      return; // Or throw NotFoundError if preferred
-    //   }
+     // Uncomment actual cancel logic
+     // logger.warn(`TEMPORARY: Skipped cancelling job ${jobId} as queue is disabled.`);
+     // return;
+    const methodName = 'cancelJob';
+    try {
+      if (!this.queue) throw new Error('Queue not initialized'); // Add check
+      const job = await this.queue.getJob(jobId);
+      if (!job) {
+         logger.warn(`Attempted to cancel non-existent job ${jobId}`);
+         return; // Or throw NotFoundError if preferred
+      }
         
-    //   const state = await job.getState();
-    //   // Only allow cancelling active or waiting jobs
-    //   if (state === 'active' || state === 'waiting' || state === 'delayed') {
-    //       if (state === 'active') {
-    //           // Attempt to send interrupt signal? Depends on worker logic.
-    //           // For now, just remove.
-    //           logger.info(`Job ${jobId} is active, attempting removal.`);
-    //       }
-    //       // Remove the job from the queue
-    //       await job.remove();
-    //       logger.info(`Job ${jobId} removed from queue.`);
-    //   } else {
-    //       logger.warn(`Job ${jobId} cannot be cancelled in state: ${state}`);
-    //       // Optional: throw error if cancellation is expected to always succeed on valid ID
-    //   }
-    // } catch (error) {
-    //     logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
-    //     throw handleServiceError(error, this.serviceName, methodName, '取消任务');
-    // }
+      const state = await job.getState();
+      // Only allow cancelling active or waiting jobs
+      if (state === 'active' || state === 'waiting' || state === 'delayed') {
+          if (state === 'active') {
+              // Attempt to send interrupt signal? Depends on worker logic.
+              // For now, just remove.
+              logger.info(`Job ${jobId} is active, attempting removal.`);
+          }
+          // Remove the job from the queue
+          await job.remove();
+          logger.info(`Job ${jobId} removed from queue.`);
+      } else {
+          logger.warn(`Job ${jobId} cannot be cancelled in state: ${state}`);
+          // Optional: throw error if cancellation is expected to always succeed on valid ID
+      }
+    } catch (error) {
+        logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
+        throw handleServiceError(error, this.serviceName, methodName, '取消任务');
+    }
   }
 
   // Graceful shutdown
   async close(): Promise<void> {
-    // Temporarily do nothing
-    // await this.queue?.close();
-    // await this.connection?.quit();
-    logger.info('Translation queue service shutdown skipped (temporary).');
+    // Uncomment closing logic
+    await this.queue?.close();
+    await this.connection?.quit();
+    logger.info('Translation queue service connections closed.'); // Updated message
+    // logger.info('Translation queue service shutdown skipped (temporary).');
   }
 }
 

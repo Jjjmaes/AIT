@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { fileManagementService } from '../services/fileManagement.service';
-import { validateId } from '../utils/errorHandler';
+import { validateId, validateEntityExists } from '../utils/errorHandler';
 import { AppError, ValidationError, NotFoundError } from '../utils/errors';
 import logger from '../utils/logger';
 import { FileType } from '../models/file.model';
@@ -8,6 +8,7 @@ import { validateFileType } from '../utils/fileUtils'; // Assuming validateFileT
 import fs from 'fs/promises'; // Import fs for cleanup
 import { translationQueueService } from '../services/translationQueue.service'; // Import queue service
 import { projectService } from '../services/project.service'; // Import project service for validation
+import { aiConfigService } from '../services/aiConfig.service';
 
 // Assuming AuthRequest extends Request and includes user info
 // Define it here or import from auth middleware if defined there
@@ -24,7 +25,7 @@ interface AuthRequest extends Request {
 export class FileController {
   private serviceName = 'FileController'; // Add service name
 
-  async uploadFile(req: AuthRequest, res: Response, next: NextFunction) {
+  uploadFile = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const methodName = 'uploadFile';
     const { projectId } = req.params;
     const userId = req.user?.id;
@@ -55,7 +56,8 @@ export class FileController {
 
       // Prepare file info for the service
       const fileInfo = {
-        path: req.file.path,
+        path: req.file.path,       // Keep path for UploadedFileInfo type
+        filePath: req.file.path, // Use filePath for potential schema field
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
@@ -155,46 +157,62 @@ export class FileController {
   }
 
   // Placeholder for starting translation
-  async startTranslation(req: AuthRequest, res: Response, next: NextFunction) {
+  startTranslation = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const methodName = 'startTranslation';
     const { projectId, fileId } = req.params;
     const userId = req.user?.id;
-    const userRoles = req.user?.role ? [req.user.role] : []; // Extract roles
-    // Extract options from request body if needed, otherwise use default/empty
-    const options = req.body.options || {}; 
+    const userRoles = req.user?.role ? [req.user.role] : [];
+    const options = req.body.options || {}; // Get options from body
 
     try {
       validateId(projectId, '项目');
       validateId(fileId, '文件');
       if (!userId) return next(new AppError('认证失败', 401));
 
-      // 1. Validate user permission (Example using projectService)
-      // This ensures the user triggering the job has access to the project
-      await projectService.getProjectById(projectId, userId, userRoles);
-      // Optionally add specific validation for the file itself if needed
+      // 1. Validate user permission and get project details
+      const project = await projectService.getProjectById(projectId, userId, userRoles);
+      validateEntityExists(project, '项目');
 
-      logger.info(`User ${userId} (Roles: ${userRoles.join(',')}) queuing translation for file ${fileId} in project ${projectId}`);
+      // 2. Determine AI Configuration ID
+      let aiConfigId = project.translationAIConfigId?.toString(); // Get from project
 
-      // 2. Call QueueService to enqueue the job
-      // 3. Pass userId and userRoles to the job queue data
-      // Temporarily comment out adding job to queue
-      /*
-      const jobId = await translationQueueService.addFileTranslationJob(
-        projectId, 
-        fileId, 
-        options, 
-        userId, 
-        userRoles // Pass roles here
-      );
-      */
-      const fakeJobId = `temp-job-${fileId}-${Date.now()}`; // Generate fake ID for response
-      logger.warn(`TEMPORARY: Skipped adding translation job for file ${fileId} to queue.`);
+      if (!aiConfigId) {
+        // ---!!! HARDCODED FALLBACK (TEMPORARY) !!!---
+        // TODO: Replace this with proper error handling or default config lookup
+        // For now, assume a specific ID exists for testing. 
+        // You MUST create an AIProviderConfig with this ID in your DB.
+        const fallbackConfigId = 'HARDCODED_AI_CONFIG_ID_REPLACE_ME'; 
+        logger.warn(`${methodName}: Project ${projectId} has no AI config set. Using HARDCODED fallback ID: ${fallbackConfigId}`);
+        aiConfigId = fallbackConfigId;
+        // Optional: Validate fallback exists
+        // const fallbackConfig = await aiConfigService.getConfigById(aiConfigId);
+        // if (!fallbackConfig) {
+        //   throw new AppError(`Fallback AI config ID ${aiConfigId} not found`, 500);
+        // }
+      }
       
-      // Return job ID or success message
-      res.status(202).json({ 
-        success: true, 
-        message: 'Translation request received (queue disabled).',
-        jobId: fakeJobId // Return fake ID
+      // ---!!! Ensure aiConfigId is not undefined before proceeding !!!---
+      if (!aiConfigId) {
+         throw new AppError(`无法确定用于项目 ${projectId} 的 AI 配置`, 500);
+      }
+
+      logger.info(`User ${userId} queuing translation for file ${fileId} in project ${projectId} using AI Config ${aiConfigId}`);
+
+      // 3. Call QueueService to enqueue the job, passing the determined aiConfigId
+      const jobId = await translationQueueService.addFileTranslationJob(
+        projectId,
+        fileId,
+        aiConfigId, // Pass the determined ID
+        options,
+        userId,
+        userRoles
+      );
+
+      // 4. Return job ID or success message
+      res.status(202).json({
+        success: true,
+        message: '翻译请求已接收', // Updated message
+        jobId: jobId 
       });
 
     } catch (error) {

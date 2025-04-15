@@ -53,40 +53,14 @@ export function getFileTypeFromFilename(filename: string): FileType {
     throw new ValidationError('无法识别文件扩展名');
   }
 
-  switch (ext) {
-    case 'txt':
-      return FileType.TXT;
-    case 'docx':
-    case 'doc':
-      return FileType.DOCX;
-    case 'xlsx':
-    case 'xls':
-      return FileType.JSON;
-    case 'csv':
-      return FileType.JSON;
-    case 'json':
-      return FileType.JSON;
-    case 'xml':
-      return FileType.XLIFF;
-    case 'html':
-    case 'htm':
-      return FileType.TXT;
-    case 'md':
-      return FileType.MD;
-    case 'pdf':
-      return FileType.DOCX;
-    case 'po':
-    case 'pot':
-      return FileType.XLIFF;
-    case 'srt':
-    case 'vtt':
-      return FileType.TXT;
-    case 'resx':
-    case 'resw':
-      return FileType.XLIFF;
-    default:
-      throw new ValidationError(`不支持的文件类型: ${ext}`);
+  // Use the FILE_EXTENSION_MAP for lookup
+  const fileType = FILE_EXTENSION_MAP[ext];
+  if (!fileType) {
+    // Throw error if extension is not found in the map
+    throw new ValidationError(`不支持的文件扩展名: ${ext}`);
   }
+  
+  return fileType;
 }
 
 /**

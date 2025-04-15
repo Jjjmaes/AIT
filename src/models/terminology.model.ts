@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
+import mongoosePaginate from 'mongoose-paginate-v2'; // Import pagination plugin
 import { IUser } from './user.model';
 import { IProject } from './project.model';
 
@@ -131,6 +132,9 @@ TerminologySchema.path('languagePairs').validate(function(value) {
 TerminologySchema.index({ createdBy: 1, name: 1 });
 TerminologySchema.index({ project: 1 });
 TerminologySchema.index({ isPublic: 1 });
+
+// Apply the pagination plugin
+TerminologySchema.plugin(mongoosePaginate);
 
 // Export the Mongoose model
 export const Terminology = mongoose.model<ITerminology>('Terminology', TerminologySchema);

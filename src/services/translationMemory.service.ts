@@ -1,9 +1,22 @@
+import { Service } from 'typedi';
 import mongoose, { Types } from 'mongoose';
 import { TranslationMemory, ITranslationMemoryEntry } from '../models/translationMemory.model';
+import { TranslationMemorySet, ITranslationMemorySet } from '../models/translationMemorySet.model';
 import logger from '../utils/logger';
-import { handleServiceError } from '../utils/errorHandler';
+import { handleServiceError, validateId } from '../utils/errorHandler';
 import { ValidationError } from '../utils/errors';
 import { XMLParser } from 'fast-xml-parser'; // Import the parser
+
+// DTO for creating a new TM Set
+export interface CreateTMSetDto {
+  name: string;
+  description?: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  domain?: string;
+  isPublic?: boolean;
+  // projectId?: string; // Add later if needed
+}
 
 // DTO for adding a new TM entry
 export interface AddTMEntryDto {
@@ -30,6 +43,7 @@ export interface TMXImportResult {
   errors: string[];
 }
 
+@Service()
 export class TranslationMemoryService {
   private serviceName = 'TranslationMemoryService';
   private xmlParser: XMLParser;
@@ -50,6 +64,66 @@ export class TranslationMemoryService {
       }
     });
     logger.info(`[${this.serviceName}] Initialized XML Parser.`);
+  }
+
+  /**
+   * Creates a new Translation Memory Set (Collection).
+   */
+  async createTMSet(userId: string, data: CreateTMSetDto): Promise<ITranslationMemorySet> {
+    const methodName = 'createTMSet';
+    validateId(userId, '创建用户');
+    if (!data.name || !data.sourceLanguage || !data.targetLanguage) {
+      throw new ValidationError('Missing required fields (name, sourceLanguage, targetLanguage) for TM set.');
+    }
+
+    try {
+      const newTMSet = new TranslationMemorySet({
+        ...data,
+        createdBy: new Types.ObjectId(userId),
+        domain: data.domain || 'general',
+        isPublic: data.isPublic ?? false,
+        entryCount: 0, // Initialize count
+        // project: data.projectId ? new Types.ObjectId(data.projectId) : undefined,
+      });
+
+      await newTMSet.save();
+      logger.info(`[${this.serviceName}.${methodName}] TM Set '${newTMSet.name}' created by user ${userId}`);
+      return newTMSet;
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '创建翻译记忆库');
+    }
+  }
+
+  /**
+   * Retrieves all Translation Memory Sets, potentially filtering by user.
+   */
+  async getAllTMSets(userId?: string): Promise<ITranslationMemorySet[]> {
+    const methodName = 'getAllTMSets';
+    try {
+        // Basic query: find sets created by the user OR public sets
+        // Adjust logic based on requirements (e.g., admin sees all, etc.)
+        const query: mongoose.FilterQuery<ITranslationMemorySet> = {};
+        if (userId) {
+            query.$or = [
+                { createdBy: new Types.ObjectId(userId) },
+                { isPublic: true } 
+            ];
+        } else {
+            // If no user ID, perhaps only show public sets? Or throw error?
+            // For now, let's assume an unauthenticated user sees only public sets.
+            query.isPublic = true; 
+        }
+
+      logger.debug(`[${this.serviceName}.${methodName}] Fetching TM Sets with query: ${JSON.stringify(query)}`);
+      // Sort by creation date descending, add other sorting/pagination later if needed
+      const tmSets = await TranslationMemorySet.find(query).sort({ createdAt: -1 }).exec(); 
+      logger.info(`[${this.serviceName}.${methodName}] Found ${tmSets.length} TM Sets.`);
+      return tmSets;
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '获取翻译记忆库列表');
+    }
   }
 
   /**

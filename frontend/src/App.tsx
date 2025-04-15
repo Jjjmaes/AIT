@@ -37,8 +37,10 @@ import TerminologyPage from './pages/TerminologyPage';
 // Translation Memory Pages
 import TranslationMemoryPage from './pages/TranslationMemoryPage';
 
-// Import the new AI Configs page
-import AIConfigsPage from './pages/admin/AIConfigsPage';
+// AI Configuration Pages
+import AIConfigListPage from './pages/AIConfigListPage';
+import AIConfigCreatePage from './pages/AIConfigCreatePage';
+import AIConfigEditPage from './pages/AIConfigEditPage';
 
 // Notification Pages
 import NotificationsPage from './pages/NotificationsPage';
@@ -98,7 +100,9 @@ function App() {
                 <Route path="/prompts/:promptId/edit" element={<AdminRoute><EditPromptTemplatePage /></AdminRoute>} />
 
                 {/* AI Configs - Admin Only */}
-                <Route path="/ai-configs" element={<AdminRoute><AIConfigsPage /></AdminRoute>} />
+                <Route path="/ai-configs" element={<AdminRoute><AIConfigListPage /></AdminRoute>} />
+                <Route path="/ai-configs/create" element={<AdminRoute><AIConfigCreatePage /></AdminRoute>} />
+                <Route path="/ai-configs/:configId/edit" element={<AdminRoute><AIConfigEditPage /></AdminRoute>} />
 
                 {/* Terminology */}
                 <Route path="/terminology" element={<TerminologyPage />} />

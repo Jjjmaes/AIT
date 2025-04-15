@@ -4,7 +4,7 @@ import { ReviewAdapter, ReviewOptions, AIReviewResponse } from './translation/ai
 import logger from '../utils/logger';
 import { ReviewScoreType, IssueType } from '../models/segment.model';
 import { promptTemplateService, PromptTemplateService } from './promptTemplate.service';
-import { PromptTaskType, IPromptTemplate } from '../models/promptTemplate.model';
+import { PromptTemplateType, IPromptTemplate } from '../models/promptTemplate.model';
 import { terminologyService, TerminologyService } from './terminology.service';
 import { ITermEntry } from '../models/terminology.model';
 import { projectService, ProjectService } from './project.service';
@@ -129,14 +129,14 @@ export class AIReviewService {
       if (!effectivePrompt && options.promptTemplateId) {
         logger.debug(`[${methodName}] Attempting to fetch prompt template ID: ${options.promptTemplateId}`);
         try {
-          const template: IPromptTemplate | null = await this.promptTemplateService.getTemplateById(
+          const template: IPromptTemplate | null = await this.promptTemplateService.getPromptTemplateById(
             options.promptTemplateId
           );
 
-          if (template && template.taskType === PromptTaskType.REVIEW) {
+          if (template && template.type === PromptTemplateType.REVIEW) {
             logger.info(`[${methodName}] Using prompt template ID: ${options.promptTemplateId}`);
             // Start with the base user prompt from the template
-            let promptText = template.userPrompt
+            let promptText = template.content
               .replace('{SOURCE_LANGUAGE}', options.sourceLanguage)
               .replace('{TARGET_LANGUAGE}', options.targetLanguage)
               .replace('{ORIGINAL_CONTENT}', original)
@@ -200,16 +200,16 @@ export class AIReviewService {
         projectId: options.projectId // Pass projectId if needed by adapter
       };
 
-      // 执行审校并返回结果
-      logger.info(`[${methodName}] Starting AI review using ${provider} model ${model}`);
-      const result = await reviewAdapter.reviewText(reviewOptions);
-      logger.info(`[${methodName}] AI review completed successfully`);
-
-      return result;
+      // --- Execute review and return --- 
+      logger.debug(`[${methodName}] Executing adapter review.`);
+      const reviewResult = await reviewAdapter.reviewText(reviewOptions); 
+      logger.debug(`[${methodName}] Review process completed successfully.`);
+      return reviewResult;
 
     } catch (error: any) {
-      logger.error(`[${methodName}] AI review failed`, { error });
-      throw new Error(`AI审校失败: ${error.message}`);
+      logger.error(`[${methodName}] Error during review process:`, error);
+      // Rethrow or handle error appropriately
+      throw error; // Rethrowing for now
     }
   }
 

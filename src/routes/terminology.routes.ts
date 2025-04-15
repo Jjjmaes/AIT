@@ -28,6 +28,12 @@ router.route('/:terminologyId')
    )
   .delete(terminologyController.delete); // DELETE /api/terms/:terminologyId
 
+// GET /api/terms/:terminologyId/terms - Get all terms within a specific list
+router.get('/:terminologyId/terms', terminologyController.getTermsByListId);
+
+// Export route
+router.get('/:terminologyId/export', terminologyController.exportById);
+
 // --- Routes for Terms within a List --
 
 // Add/Update a specific term (using PUT or POST)

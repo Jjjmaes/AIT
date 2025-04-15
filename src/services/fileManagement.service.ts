@@ -61,11 +61,11 @@ class FileManagementService {
                 originalName: fileInfo.originalName,
                 fileSize: fileInfo.size,
                 mimeType: fileInfo.mimeType,
-                type: fileInfo.fileType,
+                fileType: fileInfo.fileType,
                 status: FileStatus.PENDING,
                 uploadedBy: new mongoose.Types.ObjectId(userId),
                 storageUrl: storagePath, // Relative path for now, could be full URL later
-                path: storagePath, // Use the normalized storage path
+                filePath: storagePath,
                 metadata: {
                     sourceLanguage: sourceLang,
                     targetLanguage: targetLang
@@ -83,8 +83,8 @@ class FileManagementService {
             await fileRecord.save();
 
             // 4. Call FileProcessorFactory to extract segments
-            // Note: processFile expects the final stored path, not the temporary upload path
-            const processingResult = await FileProcessorFactory.processFile(fileRecord.path, fileRecord.type);
+            // Pass the correct fields: filePath and fileType
+            const processingResult = await FileProcessorFactory.processFile(fileRecord.filePath, fileRecord.fileType);
 
             // 5. Update File record with metadata and segment count
             fileRecord.segmentCount = processingResult.segmentCount;

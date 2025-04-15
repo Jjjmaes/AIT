@@ -44,6 +44,32 @@ class UserController {
     }
   }
 
+  /**
+   * Get statistics for the currently logged-in user
+   */
+  async getUserStats(req: AuthRequest, res: Response, next: NextFunction) {
+    const methodName = 'getUserStats';
+    try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('未授权的访问，无法获取用户ID');
+      }
+      const userId = req.user.id;
+      logger.info(`Request received to get stats for user: ${userId}`);
+
+      // Call the service layer to get the actual stats
+      const stats = await userService.getUserStats(userId);
+
+      res.status(200).json({
+        success: true,
+        data: stats // Assuming stats is the object expected by frontend
+      });
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      next(error); // Pass error to global error handler
+    }
+  }
+
   // Add other user controller methods here if needed
 
 }

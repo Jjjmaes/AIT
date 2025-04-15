@@ -13,13 +13,22 @@ import notificationRoutes from './routes/notification.routes';
 import promptTemplateRoutes from './routes/promptTemplate.routes';
 import terminologyRoutes from './routes/terminology.routes';
 import translationMemoryRoutes from './routes/translationMemory.routes';
+import aiConfigRoutes from './routes/aiConfig.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 // 创建Express应用
 const app = express();
 
 // 中间件
-app.use(cors());
+// Configure CORS to allow requests from the frontend development server
+const corsOptions = {
+  origin: 'http://localhost:5174', // Your frontend origin
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, // Allow cookies if needed
+  optionsSuccessStatus: 204 // Some legacy browsers choke on 204
+};
+app.use(cors(corsOptions));
+
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
@@ -30,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/ai-configs', aiConfigRoutes);
 app.use('/api/review', reviewRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/prompts', promptTemplateRoutes);

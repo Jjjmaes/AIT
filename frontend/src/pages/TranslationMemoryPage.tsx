@@ -32,9 +32,9 @@ const TranslationMemoryPage: React.FC = () => {
     setLoading(true);
     try {
       // Replace with actual API call
-      const response = await api.get('/translation-memories');
+      const response = await api.get('/v1/tm');
       if (response.data?.success || response.status === 200) {
-        setMemories(response.data.memories || response.data || []);
+        setMemories(response.data?.data?.memories || response.data?.data || []);
       } else {
         throw new Error(response.data?.message || 'Failed to fetch translation memories');
       }
@@ -65,7 +65,7 @@ const TranslationMemoryPage: React.FC = () => {
     try {
       if (modalMode === 'create') {
         // Replace with actual API call
-        const response = await api.post('/translation-memories', values);
+        const response = await api.post('/v1/tm', values);
         if (response.data?.success || response.status === 201) {
           message.success('翻译记忆库创建成功');
         } else {
@@ -73,7 +73,7 @@ const TranslationMemoryPage: React.FC = () => {
         }
       } else if (modalMode === 'edit' && currentMemory) {
         // Replace with actual API call
-        const response = await api.put(`/translation-memories/${currentMemory.id}`, values);
+        const response = await api.put(`/v1/tm/${currentMemory.id}`, values);
         if (response.data?.success || response.status === 200) {
           message.success('翻译记忆库更新成功');
         } else {
@@ -91,7 +91,7 @@ const TranslationMemoryPage: React.FC = () => {
   const handleDelete = async (id: string) => {
     try {
       // Replace with actual API call
-      const response = await api.delete(`/translation-memories/${id}`);
+      const response = await api.delete(`/v1/tm/${id}`);
       if (response.data?.success || response.status === 200) {
         message.success('翻译记忆库删除成功');
         fetchMemories();
@@ -106,7 +106,7 @@ const TranslationMemoryPage: React.FC = () => {
 
   const uploadProps: UploadProps = {
     name: 'file',
-    action: `${api.defaults.baseURL}/translation-memories/import`,
+    action: `${api.defaults.baseURL}/v1/tm/import`,
     headers: {
       authorization: `Bearer ${localStorage.getItem('token')}`,
     },
@@ -163,7 +163,7 @@ const TranslationMemoryPage: React.FC = () => {
           <Tooltip title="导出">
             <Button 
               icon={<DownloadOutlined />} 
-              onClick={() => window.location.href = `${api.defaults.baseURL}/translation-memories/${record.id}/export`} 
+              onClick={() => window.location.href = `${api.defaults.baseURL}/v1/tm/${record.id}/export`}
             />
           </Tooltip>
           <Tooltip title="删除">

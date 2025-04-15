@@ -32,20 +32,9 @@ export const errorHandler = (
   if (err instanceof ValidationError) {
     statusCode = 400;
     status = 'fail';
-    message = '请求参数验证失败';
-    // Log the properties of the caught ValidationError
-    logger.warn('Handling ValidationError instance:', { 
-      name: err.name,
-      message: err.message, // This is what we are trying to parse
-      stack: err.stack?.split('\n').slice(0, 5).join('\n') // Log first few lines of stack
-    });
-    try {
-        details = JSON.parse(err.message);
-        logger.info('Parsed Zod error details:', details);
-    } catch (parseError: any) {
-        logger.error('Failed to parse Zod error details from message:', { parseErrorMessage: parseError.message });
-        details = err.message; // Fallback to the raw message
-    }
+    message = err.message;
+    details = undefined;
+    logger.warn(`Handling ValidationError: ${message}`);
   }
   // Handle other AppError subtypes (like UnauthorizedError, NotFoundError)
   else if (err instanceof AppError) {
