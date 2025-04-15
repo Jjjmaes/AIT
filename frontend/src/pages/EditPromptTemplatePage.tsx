@@ -25,8 +25,8 @@ const EditPromptTemplatePage: React.FC = () => {
     setError(null);
     try {
       const response = await api.get(`/prompts/${promptId}`);
-      if ((response.data?.success || response.status === 200) && response.data) {
-        setTemplate(response.data.template || response.data as PromptTemplate);
+      if ((response.data?.success || response.status === 200) && response.data?.data?.template) {
+        setTemplate(response.data.data.template as PromptTemplate);
       } else {
         throw new Error(response.data?.message || '无法加载模板数据');
       }

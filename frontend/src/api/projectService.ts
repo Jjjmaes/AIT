@@ -1,4 +1,4 @@
-import apiClient from './client';
+import api from './api';
 import { AxiosRequestConfig } from 'axios';
 
 // Interface for a single prompt template
@@ -54,23 +54,40 @@ export interface GetProjectsParams {
 
 // Function to fetch projects with optional params and Axios config
 export const getProjects = async (params?: GetProjectsParams, config?: AxiosRequestConfig): Promise<PaginatedProjectsResponse> => {
-  const responseData = await apiClient.get<PaginatedProjectsResponse>('/api/projects', { params, ...config }); // Pass params and config
-  // Use double cast due to interceptor
-  return responseData as unknown as PaginatedProjectsResponse;
+  // api.get returns the full AxiosResponse<PaginatedProjectsResponse>
+  const responseData = await api.get<PaginatedProjectsResponse>('/projects', { params, ...config }); 
+  // Return the data part of the response, which matches the PaginatedProjectsResponse type
+  return responseData.data; 
 };
 
 // Type for the response when fetching a single project
 export interface ProjectDetailResponse {
   success: boolean;
-  data?: Project; // Project data if successful
+  data?: { project: Project }; // Project data is nested inside data
   message?: string; // Error message if not successful
 }
 
-// Apply the same fix here
-export const getProjectById = async (projectId: string): Promise<ProjectDetailResponse> => {
-  const responseData = await apiClient.get<ProjectDetailResponse>(`/api/projects/${projectId}`);
-  // Use a double cast for consistency
-  return responseData as unknown as ProjectDetailResponse;
+// Modify getProjectById to accept config
+export const getProjectById = async (projectId: string, config?: AxiosRequestConfig): Promise<ProjectDetailResponse> => {
+  // Pass the config (which might contain the signal) to api.get
+  const response = await api.get<ProjectDetailResponse>(`/projects/${projectId}`, config);
+  // Assuming the backend wraps successful response in `data` 
+  // but might return the error structure directly. Need to be flexible.
+  // Check if response.data seems like the expected structure
+  if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+      return response.data; // Return the nested structure if present
+  }
+  // Fallback or handle cases where backend might return structure differently
+  // This part might need adjustment based on actual backend error/success formats
+  console.warn('[getProjectById] Unexpected response structure:', response);
+  // Attempt a defensive cast or return a default error structure
+  // The previous double cast was hiding potential issues
+  // Let's try returning a standard error format if unsure
+  return {
+      success: false,
+      message: `Unexpected response structure for project ${projectId}`,
+      // data: undefined // Ensure data is undefined on error
+  };
 };
 
 // --- Project Creation ---
@@ -106,10 +123,10 @@ export interface CreateProjectResponse {
 
 // Function to create a new project
 export const createProject = async (payload: CreateProjectPayload): Promise<CreateProjectResponse> => {
-  // POST request to the projects endpoint
-  const responseData = await apiClient.post<CreateProjectResponse>('/api/projects', payload);
-  // Use double cast because TS infers AxiosResponse, but interceptor returns the data part
-  return responseData as unknown as CreateProjectResponse;
+  // api.post returns the full AxiosResponse
+  const response = await api.post<CreateProjectResponse>('/projects', payload); 
+  // Return the .data property which contains the actual backend response
+  return response.data;
 };
 
 // --- Project Update ---
@@ -144,7 +161,7 @@ export interface UpdateProjectResponse {
 export const updateProject = async (projectId: string, payload: UpdateProjectPayload): Promise<UpdateProjectResponse> => {
   // PATCH or PUT request to the specific project endpoint
   // Using PATCH as typically not all fields are sent
-  const responseData = await apiClient.patch<UpdateProjectResponse>(`/api/projects/${projectId}`, payload);
+  const responseData = await api.patch<UpdateProjectResponse>(`/projects/${projectId}`, payload); // Use api
   // Use double cast
   return responseData as unknown as UpdateProjectResponse;
 };
@@ -162,7 +179,7 @@ export interface DeleteProjectResponse {
 // Function to delete a project
 export const deleteProject = async (projectId: string): Promise<DeleteProjectResponse> => {
   // DELETE request to the specific project endpoint
-  const responseData = await apiClient.delete<DeleteProjectResponse>(`/api/projects/${projectId}`);
+  const responseData = await api.delete<DeleteProjectResponse>(`/projects/${projectId}`); // Use api
   // Use double cast
   return responseData as unknown as DeleteProjectResponse;
 };

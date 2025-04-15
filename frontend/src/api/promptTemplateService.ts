@@ -1,4 +1,4 @@
-import apiClient from './client';
+import api from './api';
 
 // Interface for a single prompt template (match backend model)
 // Adjust fields based on src/models/promptTemplate.model.ts
@@ -28,9 +28,9 @@ export interface PromptTemplatesResponse {
 
 // Function to fetch prompt templates
 export const getPromptTemplates = async (/* params?: GetPromptTemplatesParams */): Promise<PromptTemplatesResponse> => {
-  const responseData = await apiClient.get<PromptTemplatesResponse>('/api/prompts' /*, { params }*/);
-  // Use double cast due to interceptor
-  return responseData as unknown as PromptTemplatesResponse;
+  const response = await api.get<PromptTemplatesResponse>('/prompts' /*, { params }*/);
+  // Return response.data as 'api' interceptor returns full response
+  return response.data;
 };
 
 // TODO: Add functions for getById, create, update, delete if needed later 

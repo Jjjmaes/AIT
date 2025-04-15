@@ -29,8 +29,15 @@ export const useNotifications = () => {
     
     try {
       const response = await api.get('/notifications');
-      setNotifications(response.data.notifications);
-      setUnreadCount(response.data.notifications.filter((n: Notification) => !n.isRead).length);
+      if (response.data && response.data.data && response.data.data.notifications) {
+        setNotifications(response.data.data.notifications);
+        setUnreadCount(response.data.data.notifications.filter((n: Notification) => !n.isRead).length);
+      } else {
+        console.error('Unexpected response structure for notifications:', response.data);
+        setNotifications([]);
+        setUnreadCount(0);
+        setError('获取通知数据格式错误');
+      }
     } catch (err) {
       console.error('获取通知失败:', err);
       setError('获取通知失败');

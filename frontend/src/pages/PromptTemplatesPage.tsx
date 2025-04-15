@@ -5,11 +5,10 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, QuestionCircl
 import api from '../api/api'; // Assuming API calls are handled here or via a service
 
 const { Title } = Typography;
-const { confirm } = Modal;
 
 // Define type for Prompt Template (adjust based on actual API response)
 interface PromptTemplate {
-  id: string;
+  _id: string; // Use MongoDB default _id
   name: string;
   description: string;
   type: 'translation' | 'review';
@@ -26,6 +25,7 @@ const PromptTemplatesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [modal, contextHolder] = Modal.useModal();
 
   // Fetch templates using useCallback
   const fetchTemplates = useCallback(async () => {
@@ -33,13 +33,21 @@ const PromptTemplatesPage: React.FC = () => {
     setError(null); // Clear previous errors
     try {
       const response = await api.get('/prompts');
-      // Improved API response handling
-      if (response.status === 200 && response.data) {
-        // Assuming API returns { success: boolean, templates: PromptTemplate[] } or just PromptTemplate[]
-        setTemplates(response.data.templates || (Array.isArray(response.data) ? response.data : [])); 
+      // Correctly handle the nested data structure: { success: true, data: { templates: [...] } }
+      let fetchedTemplates: PromptTemplate[] = [];
+      if (response.status === 200 && response.data?.data?.templates && Array.isArray(response.data.data.templates)) {
+        fetchedTemplates = response.data.data.templates;
+      } else if (response.status === 200 && response.data?.success && !response.data?.data?.templates) {
+        // Handle success case but no templates found
+        fetchedTemplates = [];
       } else {
         throw new Error(response.data?.message || 'Failed to fetch prompt templates');
       }
+
+      // Ensure every item has a unique id for the Table rowKey
+      const validTemplates = fetchedTemplates.filter(t => t && t._id);
+      const uniqueTemplates = Array.from(new Map(validTemplates.map(t => [t._id, t])).values());
+      setTemplates(uniqueTemplates);
     } catch (err: any) {
       console.error('Error fetching prompt templates:', err);
       setError(err.message || '加载提示词模板列表失败');
@@ -54,18 +62,20 @@ const PromptTemplatesPage: React.FC = () => {
   }, [fetchTemplates]); // fetchTemplates is now stable
 
   // Delete handler
-  const handleDelete = (id: string) => {
-    confirm({
+  const handleDelete = (_id: string) => {
+    console.log(`[handleDelete] function called with _id: ${_id}`);
+
+    // Use the modal instance from the hook
+    modal.confirm({
       title: '确认删除?',
       icon: <QuestionCircleOutlined style={{ color: 'red' }} />,
       content: '删除此提示词模板后将无法恢复，确认删除吗？',
       okText: '确认删除',
-      okType: 'danger',
       cancelText: '取消',
+      okType: 'danger',
       onOk: async () => {
         try {
-          // Replace with actual API call
-          const response = await api.delete(`/prompts/${id}`);
+          const response = await api.delete(`/prompts/${_id}`);
           if (response.data?.success || response.status === 200) {
             message.success('模板删除成功');
             fetchTemplates(); // Refresh list
@@ -85,7 +95,7 @@ const PromptTemplatesPage: React.FC = () => {
     message.loading({ content: '正在复制模板...', key: 'duplicate' });
     try {
         // Create payload for new template based on the old one
-        const { id, createdAt, ...duplicateData } = template;
+        const { _id, createdAt, ...duplicateData } = template;
         const newName = `${template.name} (复制)`;
         const payload = { ...duplicateData, name: newName };
 
@@ -108,7 +118,7 @@ const PromptTemplatesPage: React.FC = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: PromptTemplate) => <Link to={`/prompts/${record.id}/edit`}>{text}</Link>,
+      render: (text: string, record: PromptTemplate) => <Link to={`/prompts/${record._id}/edit`}>{text}</Link>,
     },
     {
       title: '类型',
@@ -153,13 +163,13 @@ const PromptTemplatesPage: React.FC = () => {
       render: (_: any, record: PromptTemplate) => (
         <Space size="middle">
           <Tooltip title="编辑">
-            <Button icon={<EditOutlined />} onClick={() => navigate(`/prompts/${record.id}/edit`)} />
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/prompts/${record._id}/edit`)} />
           </Tooltip>
           <Tooltip title="复制">
             <Button icon={<CopyOutlined />} onClick={() => handleDuplicate(record)} />
           </Tooltip>
           <Tooltip title="删除">
-            <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
+            <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record._id)} />
           </Tooltip>
         </Space>
       ),
@@ -168,6 +178,8 @@ const PromptTemplatesPage: React.FC = () => {
 
   return (
     <div>
+      {/* Render the context holder for the modal hook */}
+      {contextHolder}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <Title level={2}>提示词模板管理</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/prompts/create')}>
@@ -179,7 +191,7 @@ const PromptTemplatesPage: React.FC = () => {
         columns={columns} 
         dataSource={templates} 
         loading={loading} 
-        rowKey="id" 
+        rowKey="_id"
       />
     </div>
   );

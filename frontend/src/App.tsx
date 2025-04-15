@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntApp } from 'antd';
 import zhCN from 'antd/lib/locale/zh_CN';
 
 // Layout
@@ -37,6 +37,9 @@ import TerminologyPage from './pages/TerminologyPage';
 // Translation Memory Pages
 import TranslationMemoryPage from './pages/TranslationMemoryPage';
 
+// Import the new AI Configs page
+import AIConfigsPage from './pages/admin/AIConfigsPage';
+
 // Notification Pages
 import NotificationsPage from './pages/NotificationsPage';
 
@@ -65,49 +68,54 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN}>
-        <AuthProvider>
-          <Routes>
-            {/* Auth Routes */}
-            <Route element={<AuthLayout />}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-            </Route>
+        <AntApp>
+          <AuthProvider>
+            <Routes>
+              {/* Auth Routes */}
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+              </Route>
 
-            {/* Protected Routes */}
-            <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
-              {/* Dashboard */}
-              <Route path="/dashboard" element={<DashboardPage />} />
+              {/* Protected Routes */}
+              <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+                {/* Dashboard */}
+                <Route path="/dashboard" element={<DashboardPage />} />
 
-              {/* Projects */}
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/create" element={<AdminRoute><CreateProjectPage /></AdminRoute>} />
-              <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-              <Route path="/projects/:projectId/edit" element={<AdminRoute><EditProjectPage /></AdminRoute>} />
-              <Route path="/projects/:projectId/files" element={<ProjectFilesPage />} />
+                {/* Projects */}
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/projects/create" element={<AdminRoute><CreateProjectPage /></AdminRoute>} />
+                <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+                <Route path="/projects/:projectId/edit" element={<AdminRoute><EditProjectPage /></AdminRoute>} />
+                <Route path="/projects/:projectId/files" element={<ProjectFilesPage />} />
 
-              {/* Review */}
-              <Route path="/files/:fileId/review" element={<FileReviewPage />} />
+                {/* Review */}
+                <Route path="/files/:fileId/review" element={<FileReviewPage />} />
 
-              {/* Prompts - Admin Only */}
-              <Route path="/prompts" element={<AdminRoute><PromptTemplatesPage /></AdminRoute>} />
-              <Route path="/prompts/create" element={<AdminRoute><CreatePromptTemplatePage /></AdminRoute>} />
-              <Route path="/prompts/:promptId/edit" element={<AdminRoute><EditPromptTemplatePage /></AdminRoute>} />
+                {/* Prompts - Admin Only */}
+                <Route path="/prompts" element={<AdminRoute><PromptTemplatesPage /></AdminRoute>} />
+                <Route path="/prompts/create" element={<AdminRoute><CreatePromptTemplatePage /></AdminRoute>} />
+                <Route path="/prompts/:promptId/edit" element={<AdminRoute><EditPromptTemplatePage /></AdminRoute>} />
 
-              {/* Terminology */}
-              <Route path="/terminology" element={<TerminologyPage />} />
+                {/* AI Configs - Admin Only */}
+                <Route path="/ai-configs" element={<AdminRoute><AIConfigsPage /></AdminRoute>} />
 
-              {/* Translation Memory */}
-              <Route path="/translation-memory" element={<TranslationMemoryPage />} />
+                {/* Terminology */}
+                <Route path="/terminology" element={<TerminologyPage />} />
 
-              {/* Notifications */}
-              <Route path="/notifications" element={<NotificationsPage />} />
-            </Route>
+                {/* Translation Memory */}
+                <Route path="/translation-memory" element={<TranslationMemoryPage />} />
 
-            {/* Redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </AuthProvider>
+                {/* Notifications */}
+                <Route path="/notifications" element={<NotificationsPage />} />
+              </Route>
+
+              {/* Redirect */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AuthProvider>
+        </AntApp>
       </ConfigProvider>
     </QueryClientProvider>
   );

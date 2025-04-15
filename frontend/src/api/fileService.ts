@@ -1,4 +1,4 @@
-import apiClient from './client';
+import api from './api';
 
 // Define and export Issue type
 export interface Issue {
@@ -22,7 +22,7 @@ export enum SegmentStatus {
 // Adjust based on the actual data returned by the backend
 export interface ProjectFile {
   _id: string;
-  filename: string;
+  fileName: string;
   originalFilename?: string; // Added optional original filename
   projectId?: string; // Added optional projectId if available at file level
   sourceLanguage: string; // Changed from originalLanguage
@@ -56,8 +56,9 @@ export interface FileUploadResponse {
 
 // Function to fetch files for a specific project
 export const getFilesByProjectId = async (projectId: string): Promise<FilesListResponse> => {
-  // Assuming the API endpoint is /api/projects/:projectId/files
-  const response = await apiClient.get<FilesListResponse>(`/api/projects/${projectId}/files`);
+  // Assuming the API endpoint is /projects/:projectId/files (adjust if needed)
+  const response = await api.get<FilesListResponse>(`/projects/${projectId}/files`);
+  // Return response.data
   return response.data;
 };
 
@@ -74,9 +75,9 @@ export const uploadFile = async (
   formData.append('sourceLanguage', sourceLanguage);
   formData.append('targetLanguage', targetLanguage);
 
-  // Assuming the API endpoint is POST /api/projects/:projectId/files
-  const response = await apiClient.post<FileUploadResponse>(
-    `/api/projects/${projectId}/files`,
+  // Assuming the API endpoint is POST /projects/:projectId/files
+  const response = await api.post<FileUploadResponse>(
+    `/projects/${projectId}/files`,
     formData,
     {
       headers: {
@@ -84,6 +85,7 @@ export const uploadFile = async (
       },
     }
   );
+  // Return response.data
   return response.data;
 };
 
@@ -98,11 +100,12 @@ export interface StartTranslationResponse {
 }
 
 // Function to trigger the translation process for a file
-export const startFileTranslation = async (fileId: string): Promise<StartTranslationResponse> => {
-  // POST request to the specific file's translate endpoint
-  const responseData = await apiClient.post<StartTranslationResponse>(`/api/files/${fileId}/translate`);
-  // Use double cast
-  return responseData as unknown as StartTranslationResponse;
+// Update function signature to accept projectId
+export const startFileTranslation = async (projectId: string, fileId: string): Promise<StartTranslationResponse> => {
+  // POST request to the specific file's translate endpoint, including projectId
+  const response = await api.post<StartTranslationResponse>(`/projects/${projectId}/files/${fileId}/translate`);
+  // Return response.data
+  return response.data;
 };
 
 // --- File Details & Segments ---
@@ -156,8 +159,9 @@ export interface UpdateSegmentResponse {
 
 // Function to fetch detailed information for a single file
 export const getFileDetails = async (fileId: string): Promise<FileDetailResponse> => {
-  const responseData = await apiClient.get<FileDetailResponse>(`/api/files/${fileId}`);
-  return responseData as unknown as FileDetailResponse;
+  const response = await api.get<FileDetailResponse>(`/files/${fileId}`);
+  // Return response.data
+  return response.data;
 };
 
 // Function to fetch segments for a file with optional pagination/filtering
@@ -165,8 +169,9 @@ export const getFileSegments = async (
   fileId: string, 
   params?: { page?: number; limit?: number; status?: string }
 ): Promise<GetSegmentsResponse> => {
-  const responseData = await apiClient.get<GetSegmentsResponse>(`/api/files/${fileId}/segments`, { params });
-  return responseData as unknown as GetSegmentsResponse;
+  const response = await api.get<GetSegmentsResponse>(`/files/${fileId}/segments`, { params });
+  // Return response.data
+  return response.data;
 };
 
 // Function to update a specific segment
@@ -174,9 +179,10 @@ export const updateSegment = async (
   segmentId: string, 
   payload: UpdateSegmentPayload
 ): Promise<UpdateSegmentResponse> => {
-  // Assuming PATCH /api/segments/:segmentId endpoint
-  const responseData = await apiClient.patch<UpdateSegmentResponse>(`/api/segments/${segmentId}`, payload);
-  return responseData as unknown as UpdateSegmentResponse;
+  // Assuming PATCH /segments/:segmentId endpoint
+  const response = await api.patch<UpdateSegmentResponse>(`/segments/${segmentId}`, payload);
+  // Return response.data
+  return response.data;
 };
 
 // TODO: Add functions for getFileDetails, deleteFile etc. as needed 

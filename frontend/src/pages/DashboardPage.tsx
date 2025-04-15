@@ -105,12 +105,12 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div>
-      <Title level={2}>仪表盘</Title>
+    <div className="dashboard-container">
+      <Title level={2} style={{ marginBottom: 24 }}>仪表盘</Title>
       
-      <Row gutter={[16, 16]}>
+      <Row gutter={[24, 24]}>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card hoverable style={{ height: '100%' }}>
             <Skeleton loading={loading} active paragraph={{ rows: 1 }}>
               <Statistic
                 title="我的项目"
@@ -121,7 +121,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card hoverable style={{ height: '100%' }}>
             <Skeleton loading={loading} active paragraph={{ rows: 1 }}>
               <Statistic
                 title="待审校"
@@ -133,7 +133,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card hoverable style={{ height: '100%' }}>
             <Skeleton loading={loading} active paragraph={{ rows: 1 }}>
               <Statistic
                 title="已完成文件"
@@ -144,7 +144,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card>
+          <Card hoverable style={{ height: '100%' }}>
             <Skeleton loading={loading} active paragraph={{ rows: 1 }}>
               <Statistic
                 title="总体进度"
@@ -158,7 +158,7 @@ const DashboardPage = () => {
         </Col>
       </Row>
 
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <Title level={4}>近期项目</Title>
           <Button type="primary" onClick={() => navigate('/projects')}>查看全部</Button>
@@ -170,9 +170,26 @@ const DashboardPage = () => {
             dataSource={recentProjects}
             rowKey="id"
             pagination={false}
+            style={{ overflowX: 'auto' }}
+            scroll={{ x: 'max-content' }}
           />
         </Skeleton>
       </div>
+
+      <style>{`
+        .dashboard-container .ant-card {
+          transition: all 0.3s;
+        }
+        .dashboard-container .ant-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        @media screen and (max-width: 768px) {
+          .dashboard-container .ant-card {
+            margin-bottom: 16px;
+          }
+        }
+      `}</style>
     </div>
   );
 };

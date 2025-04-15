@@ -1,4 +1,4 @@
-import apiClient from './client';
+import api from './api';
 
 // Basic User interface (adjust based on actual user data)
 export interface User {
@@ -20,9 +20,8 @@ export interface GetUsersResponse {
 
 // Function to fetch users, potentially filtering by role
 export const getUsers = async (params?: { role?: string }): Promise<GetUsersResponse> => {
-  const responseData = await apiClient.get<GetUsersResponse>('/api/users', { params });
-  // Use double cast because TS infers AxiosResponse, but interceptor returns the data part
-  return responseData as unknown as GetUsersResponse;
+  const response = await api.get<GetUsersResponse>('/users', { params });
+  return response.data;
 };
 
 // Specific function to get reviewers

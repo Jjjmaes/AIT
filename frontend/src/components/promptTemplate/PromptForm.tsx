@@ -34,10 +34,7 @@ export interface PromptTemplate {
   content: string;
   outputFormat: string;
   variables: string[];
-  modelId: string;
-  sourceLang?: string;
-  targetLang?: string;
-  domain?: string;
+  modelIdentifier: string;
   isActive: boolean;
 }
 
@@ -62,15 +59,29 @@ const PromptForm: React.FC<PromptTemplateFormProps> = ({
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await api.get('/ai-models');
-        setModels(response.data.models);
-      } catch (error) {
+        const response = await api.get('/ai-configs/ai-models');
+        // Correct access path: response.data contains { success: true, data: { models: [...] } }
+        const modelsData = response?.data?.data?.models;
+        if (modelsData && Array.isArray(modelsData)) {
+          setModels(modelsData);
+        } else {
+          console.error('API response for AI models is missing or not an array:', response?.data);
+          message.error('获取AI模型数据格式不正确');
+          setModels([]); // Set to empty array to prevent render error
+        }
+      } catch (error) { // Catch network errors or non-2xx status codes
         console.error('获取AI模型失败', error);
         message.error('获取AI模型列表失败');
+        setModels([]); // Also set to empty array on error
       }
     };
 
     fetchModels();
+
+    // Cleanup function (optional but good practice)
+    return () => {
+      // Cancel any pending requests if needed
+    };
   }, []);
 
   // 当编辑时，设置初始值
@@ -200,7 +211,7 @@ const PromptForm: React.FC<PromptTemplateFormProps> = ({
             </Form.Item>
 
             <Form.Item
-              name="modelId"
+              name="modelIdentifier"
               label="AI模型"
               rules={[{ required: true, message: '请选择AI模型' }]}
               style={{ width: 200 }}
@@ -223,58 +234,6 @@ const PromptForm: React.FC<PromptTemplateFormProps> = ({
                 checkedChildren="已启用" 
                 unCheckedChildren="已禁用" 
               />
-            </Form.Item>
-          </Space>
-
-          <Space>
-            <Form.Item
-              name="sourceLang"
-              label="源语言"
-              style={{ width: 200 }}
-            >
-              <Select placeholder="选择源语言">
-                <Option value="english">英语</Option>
-                <Option value="chinese">中文</Option>
-                <Option value="japanese">日语</Option>
-                <Option value="korean">韩语</Option>
-                <Option value="french">法语</Option>
-                <Option value="german">德语</Option>
-                <Option value="spanish">西班牙语</Option>
-                <Option value="russian">俄语</Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              name="targetLang"
-              label="目标语言"
-              style={{ width: 200 }}
-            >
-              <Select placeholder="选择目标语言">
-                <Option value="english">英语</Option>
-                <Option value="chinese">中文</Option>
-                <Option value="japanese">日语</Option>
-                <Option value="korean">韩语</Option>
-                <Option value="french">法语</Option>
-                <Option value="german">德语</Option>
-                <Option value="spanish">西班牙语</Option>
-                <Option value="russian">俄语</Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              name="domain"
-              label="领域"
-              style={{ width: 200 }}
-            >
-              <Select placeholder="选择领域">
-                <Option value="general">通用</Option>
-                <Option value="technical">技术</Option>
-                <Option value="legal">法律</Option>
-                <Option value="medical">医学</Option>
-                <Option value="finance">金融</Option>
-                <Option value="marketing">营销</Option>
-                <Option value="academic">学术</Option>
-              </Select>
             </Form.Item>
           </Space>
         </Space>

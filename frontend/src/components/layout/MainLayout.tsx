@@ -13,6 +13,7 @@ import {
   MenuUnfoldOutlined,
   LogoutOutlined,
   SettingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -46,6 +47,13 @@ const MainLayout = () => {
       icon: <FormOutlined />,
       label: '提示词管理',
       onClick: () => navigate('/prompts'),
+      disabled: !isAdmin,
+    },
+    {
+      key: 'ai-configs',
+      icon: <RobotOutlined />,
+      label: 'AI引擎配置',
+      onClick: () => navigate('/ai-configs'),
       disabled: !isAdmin,
     },
     {
@@ -151,10 +159,12 @@ const MainLayout = () => {
           padding: 24, 
           background: token.colorBgContainer, 
           borderRadius: token.borderRadius,
-          overflow: 'auto',
+          overflow: 'initial',
           minHeight: 280,
         }}>
-          <Outlet />
+          <div style={{ padding: '8px', overflow: 'auto' }}>
+            <Outlet />
+          </div>
         </Content>
       </Layout>
     </Layout>

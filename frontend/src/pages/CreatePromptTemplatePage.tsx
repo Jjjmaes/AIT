@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Typography, Breadcrumb, message } from 'antd';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import PromptForm from '../components/promptTemplate/PromptForm';
 import api from '../api/api'; // Assuming API calls are handled here or via a service
 
 const { Title } = Typography;
 
 const CreatePromptTemplatePage: React.FC = () => {
-  const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
   // Function to handle form submission (create logic)
@@ -20,7 +19,8 @@ const CreatePromptTemplatePage: React.FC = () => {
       // Check for success, including common success statuses like 201
       if ((response.data?.success || response.status === 201) && response.data) {
         message.success({ content: '模板创建成功!', key: 'createPrompt' });
-        navigate('/prompts'); // Navigate to list page on success
+        // Force a full page reload to ensure the list page fetches fresh data
+        window.location.href = '/prompts';
       } else {
         // Handle API error messages if needed
         const errorMsg = response.data?.message || '创建模板失败';

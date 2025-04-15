@@ -248,46 +248,47 @@ const FileReviewPage = () => {
   }
 
   if (error && !fileDetails) { // Show full page error if details failed to load
-     return <Alert message="加载错误" description={error} type="error" showIcon />;
+    return <Alert message="Error Loading Data" description={error} type="error" showIcon closable />;
   }
 
-  if (!fileDetails) { // Should not happen if loading/error handled, but as a fallback
-    return <Alert message="错误" description="无法加载文件详情。" type="error" showIcon />;
+  if (!fileDetails) {
+    return <Empty description="未找到文件详情" />;
   }
+
+  // Calculate completion stats
+  const completedCount = fileDetails.completedSegments ?? 0;
+  const totalCount = fileDetails.totalSegments ?? 1; // Avoid division by zero
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   // Main Layout Render
   return (
-    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-      {/* Header */}
-      <Layout.Header style={{
-        background: '#fff', padding: '0 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10
+    <Layout style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
+      <Layout.Header style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        backgroundColor: 'white', 
+        padding: '0 24px', 
+        borderBottom: '1px solid #f0f0f0' 
       }}>
-        <Space>
-          <Button
-            icon={<ArrowLeftOutlined />}
+        <Space align="center">
+          <Button 
+            icon={<ArrowLeftOutlined />} 
             onClick={() => navigate(`/projects/${projectId}/files`)} // Use projectId from params
           >
             返回文件列表
           </Button>
-          <Title level={4} style={{ margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }} title={fileDetails.filename}>
-            {fileDetails.filename}
+          <FileTextOutlined style={{ fontSize: '20px', marginLeft: '16px' }} />
+          {/* Use fileName from fileDetails */}
+          <Title level={4} style={{ marginBottom: 0, marginLeft: '8px' }}>
+            审校: {fileDetails.fileName}
           </Title>
         </Space>
         <Space>
-          <Progress
-            type="circle"
-            percent={Math.round(fileDetails.progress || 0)}
-            width={40}
-            format={percent => `${percent}%`}
-          />
-          <Button
-            type="primary"
-            onClick={() => setDrawerVisible(true)}
-            icon={<InfoCircleOutlined />}
-          >
-            文件信息
+          <Button onClick={() => setDrawerVisible(true)} icon={<InfoCircleOutlined />}>
+            项目信息
           </Button>
+          {/* Add other header actions if needed */}
         </Space>
       </Layout.Header>
 
@@ -405,7 +406,7 @@ const FileReviewPage = () => {
       >
         {fileDetails && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            <Statistic title="文件名称" value={fileDetails.filename} />
+            <Statistic title="文件名称" value={fileDetails.fileName} />
             <Statistic title="原始名称" value={fileDetails.originalFilename ?? '-'} />
             <Statistic title="语言对" value={`${fileDetails.sourceLanguage} → ${fileDetails.targetLanguage}`} />
             <Statistic title="文件状态" value={fileDetails.status || '-'} />
@@ -416,7 +417,7 @@ const FileReviewPage = () => {
                   <List.Item>总段落数 <Text strong style={{float: 'right'}}>{fileDetails.totalSegments ?? 0}</Text></List.Item>
                   <List.Item>已完成 <Text strong style={{float: 'right', color: '#52c41a'}}>{fileDetails.completedSegments ?? 0}</Text></List.Item>
                   <List.Item>待审校 <Text strong style={{float: 'right', color: '#faad14'}}>{fileDetails.pendingSegments ?? 0}</Text></List.Item>
-                  <List.Item>整体进度 <Progress percent={Math.round(fileDetails.progress || 0)} size="small" /></List.Item>
+                  <List.Item>整体进度 <Progress percent={progressPercent} size="small" /></List.Item>
                 </List>
               </Panel>
             </Collapse>
