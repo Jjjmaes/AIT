@@ -22,7 +22,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import SegmentReview from '../components/review/SegmentReview';
-import api from '../api/api';
+import { axiosInstance as api } from '../api/base';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

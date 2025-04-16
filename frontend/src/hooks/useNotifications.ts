@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/api';
+import { axiosInstance as api } from '../api/base';
 
 interface Notification {
   id: string;

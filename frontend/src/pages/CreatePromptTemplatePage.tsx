@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Typography, Breadcrumb, message } from 'antd';
 import { Link } from 'react-router-dom';
 import PromptForm from '../components/promptTemplate/PromptForm';
-import api from '../api/api'; // Assuming API calls are handled here or via a service
+import { axiosInstance as api } from '../api/base';
 
 const { Title } = Typography;
 

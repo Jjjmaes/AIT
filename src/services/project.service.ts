@@ -91,6 +91,7 @@ export interface ProjectService {
     limit?: number;
   }): Promise<{ segments: ISegment[], total: number, page: number, limit: number }>;
   updateFileProgress(fileId: string, userId: string): Promise<void>;
+  getRecentProjects(userId: string, limit?: number): Promise<IProject[]>;
 }
 
 // Add a simple word count utility function (or import if exists)
@@ -781,6 +782,30 @@ export class ProjectService implements ProjectService {
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName} for project ${projectId}:`, error);
       throw handleServiceError(error, this.serviceName, methodName, '项目状态');
+    }
+  }
+
+  /**
+   * 获取用户的近期项目
+   */
+  async getRecentProjects(userId: string, limit: number = 5): Promise<IProject[]> {
+    const methodName = 'getRecentProjects';
+    validateId(userId, '用户');
+    try {
+      const projects = await Project.find({
+        $or: [
+          { manager: new Types.ObjectId(userId) },
+          { reviewers: new Types.ObjectId(userId) }
+        ]
+      })
+      .sort({ updatedAt: -1 }) // Sort by most recently updated
+      .limit(limit)
+      .populate('manager', 'username email')
+      .exec();
+      return projects;
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName} for user ${userId}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '获取近期项目');
     }
   }
 }

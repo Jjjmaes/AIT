@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import logger from './utils/logger'; // Ensure logger is imported
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import projectRoutes from './routes/project.routes';
@@ -18,6 +19,15 @@ import { errorHandler } from './middleware/error.middleware';
 
 // 创建Express应用
 const app = express();
+
+// --- Add Entry Logging Middleware ---
+app.use((req, res, next) => {
+  logger.info(`[ENTRY] Received request: ${req.method} ${req.originalUrl}`);
+  // Optionally log headers if needed for deep debugging:
+  // logger.debug(`[ENTRY] Headers: ${JSON.stringify(req.headers)}`);
+  next();
+});
+// --- End Entry Logging ---
 
 // 中间件
 // Configure CORS to allow requests from the frontend development server

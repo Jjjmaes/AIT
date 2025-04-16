@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getFilesByProjectId, uploadFile, ProjectFile, startFileTranslation } from '../api/fileService';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { getFilesByProjectId, uploadFile, ProjectFile } from '../api/fileService';
 import { getProjectById } from '../api/projectService'; // Import project service
 import { LANGUAGES, LanguageOption } from '../constants/projectConstants'; // Import LANGUAGES
 
@@ -12,6 +12,7 @@ interface LocalLanguagePair {
 
 const ProjectFilesPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [projectLanguages, setProjectLanguages] = useState<LocalLanguagePair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,8 +21,6 @@ const ProjectFilesPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
-  const [translatingFileId, setTranslatingFileId] = useState<string | null>(null); // State for tracking translation
-  const [translateError, setTranslateError] = useState<string | null>(null); // State for translation error
   // Default source/target based on project languages after fetch
   const [sourceLanguage, setSourceLanguage] = useState<string>('');
   const [targetLanguage, setTargetLanguage] = useState<string>('');
@@ -176,36 +175,9 @@ const ProjectFilesPage: React.FC = () => {
     }
   };
 
-  // Handler for clicking the Translate button
-  const handleTranslateClick = async (fileId: string) => {
-    // Ensure projectId is available before proceeding
-    if (!projectId) {
-      setTranslateError('项目ID缺失，无法开始翻译。');
-      return;
-    }
-    
-    setTranslatingFileId(fileId); // Indicate which file is being processed
-    setTranslateError(null); // Clear previous errors
-    try {
-      // Pass projectId to the service function
-      const response = await startFileTranslation(projectId, fileId);
-      if (response.success) {
-        console.log(`Translation started for file ${fileId}`);
-        // Option 1: Optimistic update (faster UI, less accurate)
-        // setFiles(prevFiles => 
-        //   prevFiles.map(f => f._id === fileId ? { ...f, status: 'TRANSLATING' } : f)
-        // );
-        // Option 2: Re-fetch data (slower UI, more accurate)
-        fetchData(); 
-      } else {
-        setTranslateError(response.message || `Failed to start translation for file ${fileId}.`);
-      }
-    } catch (err: any) {
-      console.error('Start translation error:', err);
-      setTranslateError(err.response?.data?.message || err.message || `An error occurred starting translation for file ${fileId}.`);
-    } finally {
-      setTranslatingFileId(null); // Clear processing state
-    }
+  // 添加导航到翻译中心的函数
+  const navigateToTranslationCenter = () => {
+    navigate(`/projects/${projectId}/translate`);
   };
 
   return (
@@ -476,18 +448,6 @@ const ProjectFilesPage: React.FC = () => {
               <p style={{ margin: 0 }}>{uploadSuccess}</p>
             </div>
           )}
-          
-          {translateError && (
-            <div style={{ 
-              padding: '0.75rem',
-              backgroundColor: '#ffebee',
-              color: '#c62828',
-              borderRadius: '4px',
-              marginTop: '1rem'
-            }}>
-              <p style={{ margin: 0 }}>{translateError}</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -590,20 +550,19 @@ const ProjectFilesPage: React.FC = () => {
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {file.status !== 'PROCESSING' && (
+                        {file.status === 'pending' && (
                           <button 
-                            onClick={() => handleTranslateClick(file._id)}
-                            disabled={translatingFileId === file._id}
+                            onClick={navigateToTranslationCenter}
                             style={{
                               padding: '0.5rem 0.75rem',
-                              backgroundColor: translatingFileId === file._id ? '#e0e0e0' : '#e3f2fd',
-                              color: translatingFileId === file._id ? '#9e9e9e' : '#1976d2',
-                              border: translatingFileId === file._id ? '1px solid #e0e0e0' : '1px solid #bbdefb',
+                              backgroundColor: '#e3f2fd',
+                              color: '#1976d2',
+                              border: '1px solid #bbdefb',
                               borderRadius: '4px',
-                              cursor: translatingFileId === file._id ? 'not-allowed' : 'pointer'
+                              cursor: 'pointer'
                             }}
                           >
-                            {translatingFileId === file._id ? '处理中...' : '翻译'}
+                            前往翻译中心
                           </button>
                         )}
                         

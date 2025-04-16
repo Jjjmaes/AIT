@@ -14,6 +14,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   RobotOutlined,
+  TranslationOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -41,6 +42,12 @@ const MainLayout = () => {
       icon: <ProjectOutlined />,
       label: '项目管理',
       onClick: () => navigate('/projects'),
+    },
+    {
+      key: 'translate',
+      icon: <TranslationOutlined />,
+      label: '翻译中心',
+      onClick: () => navigate('/translate'),
     },
     {
       key: 'prompts',

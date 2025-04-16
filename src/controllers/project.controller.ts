@@ -77,10 +77,12 @@ export default class ProjectController {
    * 获取项目列表
    */
   async getProjects(req: AuthRequest, res: Response, next: NextFunction) {
+    logger.info(`[ProjectController.getProjects] Entered function for user ID (from auth): ${req.user?.id}`);
     try {
       const userId = req.user?.id;
       if (!userId) {
-        throw new UnauthorizedError('未授权的访问');
+        logger.warn('[ProjectController.getProjects] Reached controller but req.user.id is missing!');
+        throw new UnauthorizedError('未授权的访问 - 内部错误');
       }
 
       const { status, priority, search, page, limit } = req.query;
@@ -93,11 +95,19 @@ export default class ProjectController {
         limit: limit ? parseInt(limit as string) : undefined
       });
       
+      logger.info(`[ProjectController.getProjects] Service returned result for user ${userId}:`, result);
+      if (result && result.projects) {
+        logger.info(`[ProjectController.getProjects] Found ${result.projects.length} projects.`);
+      } else {
+        logger.warn('[ProjectController.getProjects] Service result is missing projects array or is invalid.');
+      }
+      
       res.status(200).json({
         success: true,
         data: result
       });
     } catch (error) {
+      logger.error(`[ProjectController.getProjects] Error caught:`, error);
       next(error);
     }
   }
@@ -293,8 +303,8 @@ export default class ProjectController {
         data: { files }
       });
     } catch (error) {
-      // Log the error before passing to next (use variables from outer scope)
-      logger.error(`[Controller/${methodName}] FAILED - ProjectId: ${projectId}, UserId: ${userIdForLog}. Error:`, error);
+      // Log the error without referencing userId (which is out of scope)
+      logger.error(`[ProjectController.getProjects] Error caught:`, error);
       next(error);
     }
   }
@@ -424,6 +434,32 @@ export default class ProjectController {
         message: 'Project stats endpoint not implemented yet.'
       });
     } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 获取近期项目
+   */
+  async getRecentProjects(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new UnauthorizedError('未授权的访问');
+      }
+      
+      // Optional limit from query, default to 5
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 5;
+
+      const projects = await projectService.getRecentProjects(userId, limit);
+      
+      res.status(200).json({
+        success: true,
+        // Match the structure DashboardPage expects
+        data: { projects } 
+      });
+    } catch (error) {
+      logger.error(`[ProjectController.getRecentProjects] Error caught:`, error);
       next(error);
     }
   }

@@ -1,4 +1,4 @@
-import api from './api';
+import { axiosInstance as api } from './base';
 
 // Basic User interface (adjust based on actual user data)
 export interface User {
@@ -20,7 +20,7 @@ export interface GetUsersResponse {
 
 // Function to fetch users, potentially filtering by role
 export const getUsers = async (params?: { role?: string }): Promise<GetUsersResponse> => {
-  const response = await api.get<GetUsersResponse>('/users', { params });
+  const response = await api.get<GetUsersResponse>('/api/users', { params });
   return response.data;
 };
 

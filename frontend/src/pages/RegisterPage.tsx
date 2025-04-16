@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Alert, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/api'; // Assuming API client
+import { axiosInstance as api } from '../api/base';
 
 const { Title } = Typography;
 

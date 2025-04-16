@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Table, Button, Input, Space, Form, Modal, Select, message, Tooltip, Upload, Popconfirm } from 'antd';
 import { PlusOutlined, UploadOutlined, DeleteOutlined, SearchOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import api from '../api/api';
+import { axiosInstance as api } from '../api/base';
 
 const { Title } = Typography;
 const { Option } = Select;

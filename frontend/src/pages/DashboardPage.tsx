@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Row, Col, Card, Statistic, Table, Button, Typography, Skeleton, Tag } from 'antd';
-import { ProjectOutlined, FileTextOutlined, CheckCircleOutlined, ClockCircleOutlined, RightOutlined } from '@ant-design/icons';
+import { ProjectOutlined, FileTextOutlined, ClockCircleOutlined, RightOutlined, TranslationOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/api';
+import { axiosInstance as api } from '../api/base';
 import { useAuth } from '../context/AuthContext';
 
 const { Title } = Typography;
@@ -33,12 +33,19 @@ const DashboardPage = () => {
     const fetchDashboardData = async () => {
       try {
         const [statsResponse, projectsResponse] = await Promise.all([
-          api.get('/users/stats'),
-          api.get('/projects/recent')
+          api.get('/api/users/stats'),
+          api.get('/api/projects/recent')
         ]);
         
         setStats(statsResponse.data);
-        setRecentProjects(projectsResponse.data.projects);
+        
+        if (projectsResponse.data && projectsResponse.data.success && projectsResponse.data.data) {
+            setRecentProjects(projectsResponse.data.data.projects);
+        } else {
+            console.error('Unexpected structure for /api/projects/recent:', projectsResponse.data);
+            setRecentProjects([]);
+        }
+
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -144,15 +151,15 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
-          <Card hoverable style={{ height: '100%' }}>
+          <Card 
+            hoverable 
+            style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }} 
+            onClick={() => navigate('/projects')}
+          >
             <Skeleton loading={loading} active paragraph={{ rows: 1 }}>
-              <Statistic
-                title="总体进度"
-                value={stats.overallProgress}
-                suffix="%"
-                prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: stats.overallProgress > 75 ? '#52c41a' : undefined }}
-              />
+              <TranslationOutlined style={{ fontSize: '24px', marginBottom: '8px' }} />
+              <Typography.Text strong>开始翻译</Typography.Text>
+              <Typography.Text type="secondary" style={{ display: 'block', fontSize: '12px' }}>选择项目并启动</Typography.Text>
             </Skeleton>
           </Card>
         </Col>

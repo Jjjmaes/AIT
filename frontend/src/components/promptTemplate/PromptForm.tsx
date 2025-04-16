@@ -13,7 +13,7 @@ import {
   message,
 } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import api from '../../api/api';
+import { axiosInstance as api } from '../../api/base';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;

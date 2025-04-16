@@ -1,4 +1,4 @@
-import api from './api'; // Assuming 'api' is your configured Axios instance
+import { axiosInstance as api } from './base'; // Import and alias the correct instance
 
 // Interface for AI Config data received from backend (excluding sensitive info like full API key)
 export interface AIConfig {
@@ -71,7 +71,7 @@ export interface DeleteAIConfigResponse {
  * Fetches all AI configurations (for admin).
  */
 export const getAllAIConfigs = async (): Promise<GetAllAIConfigsResponse> => {
-    const response = await api.get<GetAllAIConfigsResponse>('/ai-configs');
+    const response = await api.get<GetAllAIConfigsResponse>('/api/ai-configs');
     return response.data;
 };
 
@@ -80,7 +80,7 @@ export const getAllAIConfigs = async (): Promise<GetAllAIConfigsResponse> => {
  * Includes the API key, handle carefully in the UI.
  */
 export const getAIConfigById = async (configId: string): Promise<GetAIConfigByIdResponse> => {
-    const response = await api.get<GetAIConfigByIdResponse>(`/ai-configs/${configId}`);
+    const response = await api.get<GetAIConfigByIdResponse>(`/api/ai-configs/${configId}`);
     return response.data;
 };
 
@@ -88,7 +88,7 @@ export const getAIConfigById = async (configId: string): Promise<GetAIConfigById
  * Creates a new AI configuration (for admin).
  */
 export const createAIConfig = async (payload: AIConfigPayload): Promise<CreateAIConfigResponse> => {
-    const response = await api.post<CreateAIConfigResponse>('/ai-configs', payload);
+    const response = await api.post<CreateAIConfigResponse>('/api/ai-configs', payload);
     return response.data;
 };
 
@@ -96,7 +96,7 @@ export const createAIConfig = async (payload: AIConfigPayload): Promise<CreateAI
  * Updates an existing AI configuration (for admin).
  */
 export const updateAIConfig = async (configId: string, payload: Partial<AIConfigPayload>): Promise<UpdateAIConfigResponse> => {
-    const response = await api.put<UpdateAIConfigResponse>(`/ai-configs/${configId}`, payload);
+    const response = await api.put<UpdateAIConfigResponse>(`/api/ai-configs/${configId}`, payload);
     return response.data;
 };
 
@@ -104,6 +104,6 @@ export const updateAIConfig = async (configId: string, payload: Partial<AIConfig
  * Deletes an AI configuration (for admin).
  */
 export const deleteAIConfig = async (configId: string): Promise<DeleteAIConfigResponse> => {
-    const response = await api.delete<DeleteAIConfigResponse>(`/ai-configs/${configId}`);
+    const response = await api.delete<DeleteAIConfigResponse>(`/api/ai-configs/${configId}`);
     return response.data;
 }; 

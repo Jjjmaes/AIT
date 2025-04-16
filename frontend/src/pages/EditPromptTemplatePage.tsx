@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Typography, Breadcrumb, Spin, Alert, message } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import PromptForm, { PromptTemplate } from '../components/promptTemplate/PromptForm';
-import api from '../api/api'; // Assuming API calls are handled here or via a service
+import { axiosInstance as api } from '../api/base';
 
 const { Title } = Typography;
 

@@ -1,4 +1,4 @@
-import apiClient from './client';
+import { axiosInstance as apiClient } from './base';
 
 // TODO: Define types for login credentials and API response
 interface LoginCredentials {

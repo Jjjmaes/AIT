@@ -2,11 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Typography, Button, Table, Tag, Space, Modal, message, Tooltip, Alert } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import api from '../api/api'; // Assuming API calls are handled here or via a service
+// Remove the direct api import if no longer needed for other calls in this component
+// import { axiosInstance as api } from '../api/base'; 
+// Restore api import as it's needed by other functions
+import { axiosInstance as api } from '../api/base'; 
+// Import the service function AND the type
+import { getPromptTemplates, PromptTemplatesResponse, PromptTemplate } from '../api/promptTemplateService';
 
 const { Title } = Typography;
 
 // Define type for Prompt Template (adjust based on actual API response)
+// REMOVE local interface definition, use imported one
+/*
 interface PromptTemplate {
   _id: string; // Use MongoDB default _id
   name: string;
@@ -19,9 +26,10 @@ interface PromptTemplate {
   isActive: boolean;
   createdAt: string;
 }
+*/
 
 const PromptTemplatesPage: React.FC = () => {
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]); // Now uses imported PromptTemplate type
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -32,16 +40,20 @@ const PromptTemplatesPage: React.FC = () => {
     setLoading(true);
     setError(null); // Clear previous errors
     try {
-      const response = await api.get('/prompts');
-      // Correctly handle the nested data structure: { success: true, data: { templates: [...] } }
+      // const response = await api.get('/prompts'); // Old incorrect call
+      const response: PromptTemplatesResponse = await getPromptTemplates(); // Use the service function
+      
+      // Correctly handle the nested data structure returned by the service
       let fetchedTemplates: PromptTemplate[] = [];
-      if (response.status === 200 && response.data?.data?.templates && Array.isArray(response.data.data.templates)) {
-        fetchedTemplates = response.data.data.templates;
-      } else if (response.status === 200 && response.data?.success && !response.data?.data?.templates) {
+      // The service function already returns the expected structure
+      if (response.success && response.data?.templates && Array.isArray(response.data.templates)) {
+        fetchedTemplates = response.data.templates;
+      } else if (response.success && !response.data?.templates) {
         // Handle success case but no templates found
         fetchedTemplates = [];
       } else {
-        throw new Error(response.data?.message || 'Failed to fetch prompt templates');
+        // Use message from the service response if available
+        throw new Error(response.message || 'Failed to fetch prompt templates');
       }
 
       // Ensure every item has a unique id for the Table rowKey

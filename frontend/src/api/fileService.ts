@@ -1,4 +1,4 @@
-import api from './api';
+import { axiosInstance as api } from './base';
 
 // Define and export Issue type
 export interface Issue {
@@ -57,7 +57,7 @@ export interface FileUploadResponse {
 // Function to fetch files for a specific project
 export const getFilesByProjectId = async (projectId: string): Promise<FilesListResponse> => {
   // Assuming the API endpoint is /projects/:projectId/files (adjust if needed)
-  const response = await api.get<FilesListResponse>(`/projects/${projectId}/files`);
+  const response = await api.get<FilesListResponse>(`/api/projects/${projectId}/files`);
   // Return response.data
   return response.data;
 };
@@ -77,7 +77,7 @@ export const uploadFile = async (
 
   // Assuming the API endpoint is POST /projects/:projectId/files
   const response = await api.post<FileUploadResponse>(
-    `/projects/${projectId}/files`,
+    `/api/projects/${projectId}/files`,
     formData,
     {
       headers: {
@@ -103,7 +103,7 @@ export interface StartTranslationResponse {
 // Update function signature to accept projectId
 export const startFileTranslation = async (projectId: string, fileId: string): Promise<StartTranslationResponse> => {
   // POST request to the specific file's translate endpoint, including projectId
-  const response = await api.post<StartTranslationResponse>(`/projects/${projectId}/files/${fileId}/translate`);
+  const response = await api.post<StartTranslationResponse>(`/api/projects/${projectId}/files/${fileId}/translate`);
   // Return response.data
   return response.data;
 };
@@ -159,7 +159,7 @@ export interface UpdateSegmentResponse {
 
 // Function to fetch detailed information for a single file
 export const getFileDetails = async (fileId: string): Promise<FileDetailResponse> => {
-  const response = await api.get<FileDetailResponse>(`/files/${fileId}`);
+  const response = await api.get<FileDetailResponse>(`/api/files/${fileId}`);
   // Return response.data
   return response.data;
 };
@@ -169,7 +169,7 @@ export const getFileSegments = async (
   fileId: string, 
   params?: { page?: number; limit?: number; status?: string }
 ): Promise<GetSegmentsResponse> => {
-  const response = await api.get<GetSegmentsResponse>(`/files/${fileId}/segments`, { params });
+  const response = await api.get<GetSegmentsResponse>(`/api/files/${fileId}/segments`, { params });
   // Return response.data
   return response.data;
 };
@@ -180,7 +180,7 @@ export const updateSegment = async (
   payload: UpdateSegmentPayload
 ): Promise<UpdateSegmentResponse> => {
   // Assuming PATCH /segments/:segmentId endpoint
-  const response = await api.patch<UpdateSegmentResponse>(`/segments/${segmentId}`, payload);
+  const response = await api.patch<UpdateSegmentResponse>(`/api/segments/${segmentId}`, payload);
   // Return response.data
   return response.data;
 };

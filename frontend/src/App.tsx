@@ -23,7 +23,9 @@ import EditProjectPage from './pages/EditProjectPage';
 // File Pages
 import ProjectFilesPage from './pages/ProjectFilesPage';
 
-// Review Pages
+// Translation & Review Pages
+import TranslationCenterPage from './pages/TranslationCenterPage';
+import ReviewWorkspacePage from './pages/ReviewWorkspacePage';
 import FileReviewPage from './pages/FileReviewPage';
 
 // Prompt Template Pages
@@ -91,8 +93,13 @@ function App() {
                 <Route path="/projects/:projectId/edit" element={<AdminRoute><EditProjectPage /></AdminRoute>} />
                 <Route path="/projects/:projectId/files" element={<ProjectFilesPage />} />
 
+                {/* Translation */}
+                <Route path="/translate" element={<TranslationCenterPage />} />
+                <Route path="/projects/:projectId/translate" element={<TranslationCenterPage />} />
+
                 {/* Review */}
                 <Route path="/files/:fileId/review" element={<FileReviewPage />} />
+                <Route path="/review-workspace/:fileId" element={<ReviewWorkspacePage />} />
 
                 {/* Prompts - Admin Only */}
                 <Route path="/prompts" element={<AdminRoute><PromptTemplatesPage /></AdminRoute>} />
