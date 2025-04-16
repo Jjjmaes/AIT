@@ -48,14 +48,14 @@ const EditProjectPage: React.FC = () => {
         // Process project data
         if (projectResponse.success && projectResponse.data?.project) {
           const project = projectResponse.data.project;
-          setName(project.name);
-          setDescription(project.description || '');
+          setName(project.name ?? '');
+          setDescription(project.description ?? '');
           setLanguagePairs(project.languagePairs?.length ? project.languagePairs : [{ source: '', target: '' }]);
           // Format date for input type='date' (YYYY-MM-DD)
           setDeadline(project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '');
           setPriority(project.priority ?? '');
-          setDomain(project.domain || '');
-          setIndustry(project.industry || '');
+          setDomain(project.domain ?? '');
+          setIndustry(project.industry ?? '');
           // Set initial selected templates safely accessing _id
           setSelectedTransPrompt(project.defaultTranslationPromptTemplate?._id || '');
           setSelectedRevPrompt(project.defaultReviewPromptTemplate?._id || '');
@@ -68,8 +68,8 @@ const EditProjectPage: React.FC = () => {
         // Process templates data
         if (templatesResponse.success && templatesResponse.data?.templates) {
             const allTemplates = templatesResponse.data.templates;
-            setTranslationTemplates(allTemplates.filter(t => t.taskType === 'translation'));
-            setReviewTemplates(allTemplates.filter(t => t.taskType === 'review'));
+            setTranslationTemplates(allTemplates.filter(t => t.type === 'translation'));
+            setReviewTemplates(allTemplates.filter(t => t.type === 'review'));
         } else {
             console.error('Failed to fetch prompt templates:', templatesResponse.message);
             setError(prev => prev ? `${prev}; 无法加载提示词模板` : '无法加载提示词模板'); // Append or set error
@@ -252,7 +252,7 @@ const EditProjectPage: React.FC = () => {
               <input
                 type="text"
                 id="projectName"
-                value={name}
+                value={name ?? ''}
                 onChange={(e) => setName(e.target.value)}
                 required
                 disabled={isUpdating}
@@ -278,7 +278,7 @@ const EditProjectPage: React.FC = () => {
               </label>
               <textarea
                 id="projectDescription"
-                value={description}
+                value={description ?? ''}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isUpdating}
                 rows={3}
@@ -454,7 +454,7 @@ const EditProjectPage: React.FC = () => {
                 <input
                   type="date"
                   id="projectDeadline"
-                  value={deadline}
+                  value={deadline ?? ''}
                   onChange={(e) => setDeadline(e.target.value)}
                   disabled={isUpdating}
                   style={{ 

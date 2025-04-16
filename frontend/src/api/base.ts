@@ -1,8 +1,11 @@
 import axios from 'axios';
 
-// Create axios instance with default config
+// Determine the base URL from environment or default
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+// Set baseURL to just the raw backend origin, without /api
 export const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  baseURL: rawBaseUrl,
   timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',

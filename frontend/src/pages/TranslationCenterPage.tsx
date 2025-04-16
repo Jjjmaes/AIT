@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Typography, Card, Steps, Button, Alert, Divider, message, Tooltip, Spin, Table, 
+import {
+  Typography, Card, Steps, Button, Alert, Divider, message, Tooltip, Spin, Table,
   Tag, Space, Row, Col, Badge, Input, Radio, Statistic
 } from 'antd';
-import { 
-  CloudOutlined, TranslationOutlined, InfoCircleOutlined, ArrowRightOutlined, 
+import {
+  CloudOutlined, TranslationOutlined, InfoCircleOutlined, ArrowRightOutlined,
   LoadingOutlined, CheckCircleOutlined, ClockCircleOutlined, FileOutlined,
   SyncOutlined, WarningOutlined, SearchOutlined
 } from '@ant-design/icons';
@@ -13,9 +13,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from "../context/AuthContext";
 
 import { getProjectById, getProjects, Project } from '../api/projectService';
-import { getFilesByProjectId, ProjectFile, startFileTranslation } from '../api/fileService';
+import { getFilesByProjectId, startFileTranslation, FileType } from '../api/fileService';
+// Assuming PromptTemplate interface includes a 'type' field ('translation' | 'review')
 import { getPromptTemplates, PromptTemplate } from '../api/promptTemplateService';
 import { getAllAIConfigs, AIConfig } from '../api/aiConfigService';
+import { getTerminologyBases, TerminologyBase } from '../api/terminologyService';
+import { getTranslationMemories, TranslationMemory } from '../api/translationMemoryService';
 
 import FileList from '../components/translation/FileList';
 import TranslationSettings from '../components/translation/TranslationSettings';
@@ -24,12 +27,14 @@ import TranslationProgress from '../components/translation/TranslationProgress';
 const { Title, Paragraph, Text } = Typography;
 const { Step } = Steps;
 
+// REMOVED local TypedPromptTemplate interface definition
+
 const TranslationCenterPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  
+
   // State for project list (used when no projectId)
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState<boolean>(false);
@@ -44,7 +49,10 @@ const TranslationCenterPage: React.FC = () => {
     promptTemplateId: '',
     aiModelId: '',
     useTerminology: false,
+    terminologyBaseId: null as string | null,
     useTranslationMemory: false,
+    translationMemoryId: null as string | null,
+    reviewPromptTemplateId: null as string | null, // Ensure it allows null
   });
 
   // Statistics for dashboard cards
@@ -65,14 +73,14 @@ const TranslationCenterPage: React.FC = () => {
           // Call getProjects without signal
           const responseData = await getProjects({ limit: 100 });
 
-          // --- Log the received data directly --- 
-          console.log('[TranslationCenter] Received responseData:', responseData);
+          // --- Log the received data directly ---
+          // console.log('[TranslationCenter] Received responseData:', responseData);
           // --- End Logging ---
 
           // Correctly check the nested data structure
-          if (responseData && responseData.data && Array.isArray(responseData.data.projects)) { 
+          if (responseData && responseData.data && Array.isArray(responseData.data.projects)) {
             setProjects(responseData.data.projects);
-            
+
             // Update statistics
             setStatistics({
               totalProjects: responseData.data.projects.length,
@@ -119,32 +127,48 @@ const TranslationCenterPage: React.FC = () => {
     queryKey: ['projectFiles', projectId],
     queryFn: () => getFilesByProjectId(projectId as string),
     enabled: !!projectId,
-    select: (res): ProjectFile[] => {
-        console.log('[Select Function - Files] Received data:', res);
-        if (res?.success && Array.isArray(res.data)) {
-            console.log('[Select Function - Files] Structure res.data matched.');
-            return res.data;
+    select: (res: FileType[]): FileType[] => { // Expect res to be FileType[]
+        // console.log('[Select Function - Files] Received data:', res);
+        // Directly return the array if it is one, otherwise return empty
+        if (Array.isArray(res)) {
+            return res;
         } else {
-            console.error('[Select Function - Files] Unexpected data structure for project files:', res);
+            // This case might happen if queryFn returns something unexpected
+            // or if there was an upstream transformation issue.
+            console.error('[Select Function - Files] Expected an array but received:', res);
             return [];
         }
     },
   });
   const files = filesResponse;
 
-  // Fetch prompt templates (enabled only if projectId is present)
-  const { data: promptTemplatesResponse, isLoading: promptsLoading } = useQuery({
-    queryKey: ['promptTemplates', 'translation', projectId],
-    queryFn: () => getPromptTemplates(),
+  // Define expected response type from getPromptTemplates
+  // Matching the structure suggested by previous linter errors
+  interface ActualPromptTemplatesResponse {
+    success: boolean;
+    data?: { templates: PromptTemplate[] }; // data might contain a nested templates array
+    message?: string;
+  }
+
+  // Fetch ALL Prompt Templates (assuming no API filter)
+  const { data: allPromptTemplatesResponse, isLoading: promptsLoading } = useQuery<ActualPromptTemplatesResponse, Error, PromptTemplate[]>({ // Fetch raw response, select PromptTemplate[]
+    queryKey: ['promptTemplates', projectId], // Simplified key based on project
+    queryFn: () => getPromptTemplates(), // Call API function WITHOUT arguments
     enabled: !!projectId,
-    select: (res): PromptTemplate[] => {
-      if (res?.success && Array.isArray(res.data)) {
-        return res.data;
-      }
-      return [];
+    select: (res) => { // select receives the ActualPromptTemplatesResponse
+        // Access the nested templates array based on error details
+        return (res?.success && Array.isArray(res.data?.templates)) ? res.data.templates : [];
     }
   });
-  const promptTemplates = promptTemplatesResponse;
+  const allPromptTemplates = allPromptTemplatesResponse || [];
+
+  // Filter templates client-side (assuming templates have a 'type' property)
+  // TODO: Ensure PromptTemplate interface (in promptTemplateService.ts) has a 'type' field ('translation' | 'review')
+  const translationPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type === 'translation');
+  const reviewPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type === 'review');
+  // Add isLoading state for review prompts based on the single query
+  const reviewPromptsLoading = promptsLoading; // Use the same loading state
+
 
   // Fetch AI models/configs (enabled only if projectId is present)
   const { data: aiConfigsResponse, isLoading: aiConfigsLoading } = useQuery({
@@ -160,55 +184,102 @@ const TranslationCenterPage: React.FC = () => {
   });
   const aiConfigs = aiConfigsResponse;
 
+  // Fetch Terminology Bases (enabled only if projectId is present)
+  const { data: terminologyBasesResponse, isLoading: tbLoading } = useQuery<TerminologyBase[]>({
+    queryKey: ['terminologyBases', projectId],
+    queryFn: () => getTerminologyBases({ projectId: projectId as string }),
+    enabled: !!projectId,
+  });
+  const terminologyBases = terminologyBasesResponse || [];
+
+  // Fetch Translation Memories (enabled only if projectId is present)
+  const { data: translationMemoriesResponse, isLoading: tmLoading } = useQuery<TranslationMemory[]>({
+    queryKey: ['translationMemories', projectId],
+    queryFn: () => getTranslationMemories({ projectId: projectId as string }),
+    enabled: !!projectId,
+  });
+  const translationMemories = translationMemoriesResponse || [];
+
   // Handler to start the translation process
   const handleStartTranslation = async () => {
     if (!projectId || selectedFileIds.length === 0) {
       message.error('项目ID无效或未选择文件');
       return;
     }
-    if (!translationSettings.aiModelId || !translationSettings.promptTemplateId) {
-      message.warning('请选择AI引擎和提示词模板');
-      return;
+    // Add validation checks here based on handleNext logic
+    let isValid = true;
+    if (!translationSettings.aiModelId) {
+        message.warning('请选择AI引擎'); isValid = false;
     }
+    if (!translationSettings.promptTemplateId) {
+        message.warning('请选择翻译提示词模板'); isValid = false;
+    }
+    if (!translationSettings.reviewPromptTemplateId) { // Add validation for review template
+        message.warning('请选择审校提示词模板'); isValid = false;
+    }
+    if (translationSettings.useTerminology && !translationSettings.terminologyBaseId) {
+        message.warning('请选择要使用的术语库'); isValid = false;
+    }
+    if (translationSettings.useTranslationMemory && !translationSettings.translationMemoryId) {
+        message.warning('请选择要使用的翻译记忆库'); isValid = false;
+    }
+    if (!isValid) return; // Stop if validation fails
 
     console.log('启动翻译，文件:', selectedFileIds, '设置:', translationSettings);
     message.loading({ content: '正在为所选文件启动翻译...', key: 'startTranslation' });
 
-    const translationPromises = selectedFileIds.map(fileId =>
-      startFileTranslation(projectId, fileId /* Add settings if API supports */)
-        // We might need to adapt startFileTranslation or have another endpoint
-        // that accepts settings like prompt/model ID. For now, calling as is.
-        // TODO: Pass translationSettings (promptTemplateId, aiModelId, useTB, useTM)
-        //       to the backend when starting translation, if the API supports it.
-        //       The current startFileTranslation likely doesn't accept these.
-    );
+    // Get selected file details for better error messages
+    const selectedFiles = files?.filter(f => selectedFileIds.includes(f._id)) || [];
 
-    const results = await Promise.allSettled(translationPromises);
+    // --- TODO: Adapt backend API call ---
+    // The backend endpoint needs to accept the translationSettings object
+    // We are calling the existing startFileTranslation which likely doesn't accept settings yet
+    // REMOVED unused startRequestPayload variable
 
-    let successCount = 0;
-    let failureCount = 0;
-    results.forEach((result, index) => {
-      const fileId = selectedFileIds[index];
-      if (result.status === 'fulfilled' && result.value.success) {
-        console.log(`文件 ${fileId} 翻译启动成功`);
-        successCount++;
-      } else {
-        console.error(`文件 ${fileId} 翻译启动失败:`, result.status === 'rejected' ? result.reason : result.value?.message);
-        failureCount++;
-      }
-    });
+    try {
+        const promises = selectedFileIds.map(fileId =>
+             // FIX: Call startFileTranslation with only 2 arguments
+             startFileTranslation(projectId, fileId)
+        );
+        const results = await Promise.allSettled(promises);
 
-    if (successCount > 0) {
-      message.success({ content: `${successCount}个文件的翻译已成功启动`, key: 'startTranslation', duration: 2 });
-      // Invalidate queries to refetch file list and show updated status
-      queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
-      // Optionally move to the progress step, though progress is now per-file
-      setCurrentStep(prev => Math.min(prev + 1, 2)); // Move to next step or stay at max
-    } else {
-      message.error({ content: '所有选定文件的翻译启动失败', key: 'startTranslation', duration: 2 });
-    }
-    if (failureCount > 0 && successCount > 0) {
-       message.warning(`${failureCount}个文件的翻译启动失败`, 3);
+        let successCount = 0;
+        let failureCount = 0;
+        results.forEach((result, index) => {
+            const fileId = selectedFileIds[index];
+            if (result.status === 'fulfilled' && result.value.success) {
+                console.log(`文件 ${fileId} 翻译启动成功`);
+                successCount++;
+            } else {
+                // Check if error is available and has a message
+                const errorMsg = result.status === 'rejected'
+                  ? (result.reason instanceof Error ? result.reason.message : String(result.reason))
+                  : (result.value?.message || '未知错误');
+                console.error(`文件 ${fileId} 翻译启动失败:`, errorMsg);
+                message.error(`文件 ${selectedFiles.find(f=>f._id === fileId)?.fileName || fileId} 翻译启动失败: ${errorMsg}`, 5); // Show specific error
+                failureCount++;
+            }
+        });
+
+        if (successCount > 0 && failureCount === 0) {
+            message.success({ content: `所有 ${successCount} 个文件的翻译已成功启动`, key: 'startTranslation', duration: 3 });
+            queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
+            setCurrentStep(prev => Math.min(prev + 1, 2)); // Move to progress
+        } else if (successCount > 0 && failureCount > 0) {
+            message.warning({ content: `${successCount}个文件启动成功, ${failureCount}个失败`, key: 'startTranslation', duration: 5 });
+            queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
+            setCurrentStep(prev => Math.min(prev + 1, 2)); // Still move to progress? Or stay?
+        } else { // Only failures
+             message.error({ content: '所有选定文件的翻译启动失败', key: 'startTranslation', duration: 3 });
+        }
+
+    } catch (error) { // Catch errors outside Promise.allSettled (e.g., network issues before loop)
+        console.error('Error starting translation job(s): ', error);
+        // FIX: Add type check before accessing error.message
+        const errorMsg = error instanceof Error ? error.message : '未知错误';
+        message.error({ content: `启动翻译时发生错误: ${errorMsg}`, key: 'startTranslation', duration: 3 });
+    } finally {
+        // message.destroy('startTranslation'); // Implicitly destroyed by success/error/warning
     }
 
   };
@@ -218,22 +289,42 @@ const TranslationCenterPage: React.FC = () => {
     setSelectedFileIds(fileIds);
   };
 
-  // Handle settings change
-  const handleSettingsChange = (settings: any) => {
-    setTranslationSettings(settings);
+  // Update handleSettingsChange to properly type settings
+  const handleSettingsChange = (newSettings: typeof translationSettings) => {
+    setTranslationSettings(prev => ({ ...prev, ...newSettings }));
   };
 
-  // Handle navigation for Steps UI
   const handleNext = () => {
     if (currentStep === 0 && selectedFileIds.length === 0) {
       message.warning('请选择至少一个文件继续');
       return;
     }
+    // Validation for Step 1 (Settings)
     if (currentStep === 1) {
-      if (!translationSettings.aiModelId || !translationSettings.promptTemplateId) {
-        message.warning('请选择AI模型和提示模板');
-        return;
+      let isValid = true;
+      if (!translationSettings.aiModelId) {
+        message.warning('请选择AI引擎');
+        isValid = false;
       }
+      if (!translationSettings.promptTemplateId) {
+        message.warning('请选择翻译提示词模板');
+        isValid = false;
+      }
+      // Only require review template if review step exists or is part of process
+      // Assuming it's required for now based on previous context
+      if (!translationSettings.reviewPromptTemplateId) {
+        message.warning('请选择审校提示词模板');
+        isValid = false;
+      }
+      if (translationSettings.useTerminology && !translationSettings.terminologyBaseId) {
+        message.warning('请选择要使用的术语库');
+        isValid = false;
+      }
+      if (translationSettings.useTranslationMemory && !translationSettings.translationMemoryId) {
+        message.warning('请选择要使用的翻译记忆库');
+        isValid = false;
+      }
+      if (!isValid) return; // Stop if validation fails
     }
     setCurrentStep(prev => prev + 1);
   };
@@ -253,12 +344,12 @@ const TranslationCenterPage: React.FC = () => {
 
   // Filter projects based on search and active filter
   const filteredProjects = projects.filter(project => {
-    const matchesSearch = !searchText || 
+    const matchesSearch = !searchText ||
       project.name?.toLowerCase().includes(searchText.toLowerCase()) ||
       project.description?.toLowerCase().includes(searchText.toLowerCase());
-    
+
     const matchesFilter = !activeFilter || project.status === activeFilter;
-    
+
     return matchesSearch && matchesFilter;
   });
 
@@ -277,10 +368,10 @@ const TranslationCenterPage: React.FC = () => {
     if (projectsError) {
       return (
         <div className="error-container" style={{ padding: '2rem' }}>
-          <Alert 
-            type="error" 
-            message="加载项目列表失败" 
-            description={projectsError || '请刷新页面重试'} 
+          <Alert
+            type="error"
+            message="加载项目列表失败"
+            description={projectsError || '请刷新页面重试'}
             showIcon
           />
         </div>
@@ -296,12 +387,12 @@ const TranslationCenterPage: React.FC = () => {
         </Tag>
       );
     };
-    
+
     // Project table columns
     const projectColumns = [
-      { 
-        title: '项目名称', 
-        dataIndex: 'name', 
+      {
+        title: '项目名称',
+        dataIndex: 'name',
         key: 'name',
         render: (text: string, record: Project) => (
           <Space direction="vertical" size={0}>
@@ -310,14 +401,14 @@ const TranslationCenterPage: React.FC = () => {
           </Space>
         )
       },
-      { 
-        title: '语言', 
+      {
+        title: '语言',
         key: 'languages',
         render: (_: any, record: Project) => (
           <Space>
             <Tag color="blue">
-              {record.languagePairs && record.languagePairs.length > 0 
-                ? record.languagePairs[0].source 
+              {record.languagePairs && record.languagePairs.length > 0
+                ? record.languagePairs[0].source
                 : 'N/A'}
             </Tag>
             <ArrowRightOutlined style={{ color: '#8c8c8c' }} />
@@ -327,9 +418,9 @@ const TranslationCenterPage: React.FC = () => {
           </Space>
         )
       },
-      { 
-        title: '优先级', 
-        dataIndex: 'priority', 
+      {
+        title: '优先级',
+        dataIndex: 'priority',
         key: 'priority',
         render: (priority: string) => {
           const colorMap: Record<string, string> = {
@@ -340,16 +431,16 @@ const TranslationCenterPage: React.FC = () => {
           return <Tag color={colorMap[priority] || 'default'}>{priority}</Tag>;
         }
       },
-      { 
-        title: '状态', 
-        dataIndex: 'status', 
+      {
+        title: '状态',
+        dataIndex: 'status',
         key: 'status',
         render: renderStatusTag
       },
-      { 
-        title: '创建时间', 
-        dataIndex: 'createdAt', 
-        key: 'createdAt', 
+      {
+        title: '创建时间',
+        dataIndex: 'createdAt',
+        key: 'createdAt',
         render: (date: string) => (
           <Tooltip title={new Date(date).toLocaleString()}>
             {new Date(date).toLocaleDateString()}
@@ -360,8 +451,8 @@ const TranslationCenterPage: React.FC = () => {
         title: '操作',
         key: 'action',
         render: (_: any, record: Project) => (
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             icon={<ArrowRightOutlined />}
             onClick={() => navigate(`/projects/${record._id}/translate`)}
           >
@@ -384,9 +475,9 @@ const TranslationCenterPage: React.FC = () => {
                   </Paragraph>
                 </Col>
                 <Col xs={24} md={8} style={{ textAlign: 'center' }}>
-                  <img 
-                    src="/logo.png" 
-                    alt="Translation Platform Logo" 
+                  <img
+                    src="/logo.png"
+                    alt="Translation Platform Logo"
                     style={{ maxWidth: '100%', maxHeight: '80px', opacity: 0.8 }}
                   />
                 </Col>
@@ -398,29 +489,29 @@ const TranslationCenterPage: React.FC = () => {
         <Row gutter={[16, 16]} style={{ marginTop: '16px' }}>
           <Col xs={24} md={8}>
             <Card hoverable>
-              <Statistic 
-                title="总项目数" 
-                value={statistics.totalProjects} 
-                prefix={<FileOutlined />} 
+              <Statistic
+                title="总项目数"
+                value={statistics.totalProjects}
+                prefix={<FileOutlined />}
               />
             </Card>
           </Col>
           <Col xs={24} md={8}>
             <Card hoverable>
-              <Statistic 
-                title="活跃翻译" 
-                value={statistics.activeTranslations} 
-                prefix={<SyncOutlined spin={statistics.activeTranslations > 0} />} 
+              <Statistic
+                title="活跃翻译"
+                value={statistics.activeTranslations}
+                prefix={<SyncOutlined spin={statistics.activeTranslations > 0} />}
                 valueStyle={{ color: statistics.activeTranslations > 0 ? '#1890ff' : 'inherit' }}
               />
             </Card>
           </Col>
           <Col xs={24} md={8}>
             <Card hoverable>
-              <Statistic 
-                title="今日完成" 
-                value={statistics.completedToday} 
-                prefix={<CheckCircleOutlined />} 
+              <Statistic
+                title="今日完成"
+                value={statistics.completedToday}
+                prefix={<CheckCircleOutlined />}
                 valueStyle={{ color: statistics.completedToday > 0 ? '#52c41a' : 'inherit' }}
               />
             </Card>
@@ -429,19 +520,19 @@ const TranslationCenterPage: React.FC = () => {
 
         <Card style={{ marginTop: '16px' }}>
           <Title level={3}>项目列表</Title>
-          
+
           <Row gutter={16} style={{ marginBottom: '16px' }}>
             <Col span={12}>
-              <Input 
-                placeholder="搜索项目..." 
+              <Input
+                placeholder="搜索项目..."
                 allowClear
                 prefix={<SearchOutlined />}
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </Col>
             <Col span={12}>
-              <Radio.Group 
-                value={activeFilter} 
+              <Radio.Group
+                value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
                 buttonStyle="solid"
               >
@@ -452,11 +543,11 @@ const TranslationCenterPage: React.FC = () => {
               </Radio.Group>
             </Col>
           </Row>
-          
-          <Table 
-            columns={projectColumns} 
+
+          <Table
+            columns={projectColumns}
             dataSource={filteredProjects}
-            rowKey="_id" 
+            rowKey="_id"
             pagination={{ pageSize: 10 }}
             rowClassName={(record) => record.status === 'active' ? 'active-row' : ''}
             loading={projectsLoading}
@@ -469,8 +560,8 @@ const TranslationCenterPage: React.FC = () => {
 
   // Case 2: projectId exists - Show Translation Steps UI
 
-  // Loading state for specific project data
-  const isProjectDataLoading = projectLoading || filesLoading || promptsLoading || aiConfigsLoading;
+  // Loading state for specific project data (includes new queries)
+  const isProjectDataLoading = projectLoading || filesLoading || promptsLoading || reviewPromptsLoading || aiConfigsLoading || tbLoading || tmLoading;
 
   if (isProjectDataLoading) {
     return (
@@ -484,14 +575,14 @@ const TranslationCenterPage: React.FC = () => {
   }
 
   // Error state for specific project data
-  const projectDataError = projectError || filesFetchError;
+  const projectDataError = projectError || filesFetchError; // TODO: Add errors from other queries?
   if (projectDataError) {
-    const errorMsg = (projectDataError as Error)?.message || "获取项目数据失败";
+    const errorMsg = (projectDataError instanceof Error) ? projectDataError.message : "获取项目数据失败"; // Added type check
     return (
       <div className="error-container" style={{ padding: '2rem' }}>
-        <Alert 
-          type="error" 
-          message="加载项目数据失败" 
+        <Alert
+          type="error"
+          message="加载项目数据失败"
           description={errorMsg}
           showIcon
           action={
@@ -508,10 +599,10 @@ const TranslationCenterPage: React.FC = () => {
   if (!project) {
     return (
       <div className="not-found-container" style={{ padding: '2rem' }}>
-        <Alert 
-          type="warning" 
-          message="未找到项目" 
-          description="无法加载翻译中心，请确保项目ID有效。" 
+        <Alert
+          type="warning"
+          message="未找到项目"
+          description="无法加载翻译中心，请确保项目ID有效。"
           showIcon
           action={
             <Button type="primary" onClick={() => navigate('/translate')}>
@@ -529,9 +620,9 @@ const TranslationCenterPage: React.FC = () => {
       title: '选择文件',
       icon: <CloudOutlined />,
       content: (
-        <FileList 
-          files={files || []} 
-          onSelectFiles={handleFileSelect} 
+        <FileList
+          files={files || []}
+          onSelectFiles={handleFileSelect}
           selectedFileIds={selectedFileIds}
         />
       ),
@@ -540,11 +631,14 @@ const TranslationCenterPage: React.FC = () => {
       title: '翻译设置',
       icon: <TranslationOutlined />,
       content: (
-        <TranslationSettings 
-          project={project} 
-          promptTemplates={promptTemplates || []} 
+        <TranslationSettings
+          project={project}
+          promptTemplates={translationPromptTemplates} // Pass filtered translation templates
+          reviewPromptTemplates={reviewPromptTemplates} // Pass filtered review templates
           aiConfigs={aiConfigs || []}
-          settings={translationSettings}
+          terminologyBases={terminologyBases}
+          translationMemories={translationMemories}
+          settings={translationSettings} // Pass the state object
           onSettingsChange={handleSettingsChange}
         />
       ),
@@ -555,8 +649,8 @@ const TranslationCenterPage: React.FC = () => {
       content: (
         <TranslationProgress
           // Pass placeholder props to satisfy types - needs refactoring
-          jobId={null} 
-          status={null} 
+          jobId={null}
+          status={null}
           isLoading={false}
           onViewReview={() => {console.warn('onViewReview not implemented for per-file progress yet')}}
         />
@@ -573,7 +667,7 @@ const TranslationCenterPage: React.FC = () => {
               <Badge status="processing" />
               <Title level={2} style={{ margin: 0 }}>AI翻译中心</Title>
             </Space>
-            
+
             <Row align="middle">
               <Col flex="auto">
                 <Paragraph style={{ margin: 0 }}>
@@ -590,8 +684,8 @@ const TranslationCenterPage: React.FC = () => {
                 </Paragraph>
               </Col>
               <Col>
-                <Button 
-                  type="link" 
+                <Button
+                  type="link"
                   onClick={() => navigate(`/projects/${projectId}`)}
                   icon={<ArrowRightOutlined />}
                 >
@@ -600,12 +694,12 @@ const TranslationCenterPage: React.FC = () => {
               </Col>
             </Row>
           </Col>
-          
+
           <Col span={24}>
-            <Card 
-              className="steps-card" 
-              bordered={false} 
-              bodyStyle={{ 
+            <Card
+              className="steps-card"
+              bordered={false}
+              bodyStyle={{
                 padding: '24px',
                 background: '#f5f5f5',
                 borderRadius: '8px'
@@ -618,13 +712,13 @@ const TranslationCenterPage: React.FC = () => {
               </Steps>
             </Card>
           </Col>
-          
+
           <Col span={24}>
             <div className="steps-content" style={{ padding: '16px', minHeight: '300px' }}>
               {currentStep === 1 && (
                 <Alert
                   message="必要配置提示"
-                  description="请确保完成以下三项关键配置：1. 选择合适的提示词模板；2. 选择AI引擎；3. 启用术语库（如有需要）。只有完成这些配置才能提交有效的翻译任务。"
+                  description="请确保完成以下关键配置：1. 翻译提示词；2. 审校提示词；3. AI引擎；4. 如需使用，启用并选择术语库和翻译记忆库。只有完成这些配置才能提交有效的翻译任务。"
                   type="warning"
                   showIcon
                   style={{ marginBottom: '16px' }}
@@ -633,32 +727,39 @@ const TranslationCenterPage: React.FC = () => {
               {steps[currentStep].content}
             </div>
           </Col>
-          
+
           <Col span={24}>
             <Divider style={{ margin: '16px 0' }} />
-            
+
             <div className="steps-action" style={{ display: 'flex', justifyContent: 'flex-end' }}>
               {currentStep > 0 && currentStep < 2 && (
                 <Button onClick={handlePrev} style={{ marginRight: 8 }}>
                   上一步
                 </Button>
               )}
-              
+
               {currentStep === 0 && (
-                <Button 
-                  type="primary" 
-                  onClick={handleNext} 
+                <Button
+                  type="primary"
+                  onClick={handleNext}
                   disabled={selectedFileIds.length === 0}
                 >
                   下一步
                 </Button>
               )}
-              
+
               {currentStep === 1 && (
-                <Button 
-                  type="primary" 
+                <Button
+                  type="primary"
                   onClick={handleStartTranslation}
-                  disabled={!translationSettings.aiModelId || !translationSettings.promptTemplateId}
+                  // Disable button based on validation logic used in handleNext/handleStartTranslation
+                  disabled={
+                    !translationSettings.aiModelId ||
+                    !translationSettings.promptTemplateId ||
+                    !translationSettings.reviewPromptTemplateId ||
+                    (translationSettings.useTerminology && !translationSettings.terminologyBaseId) ||
+                    (translationSettings.useTranslationMemory && !translationSettings.translationMemoryId)
+                  }
                 >
                   启动翻译
                 </Button>
@@ -671,4 +772,4 @@ const TranslationCenterPage: React.FC = () => {
   );
 };
 
-export default TranslationCenterPage; 
+export default TranslationCenterPage;

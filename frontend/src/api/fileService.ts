@@ -1,4 +1,4 @@
-import { axiosInstance as api } from './base';
+import { axiosInstance } from './base';
 
 // Define and export Issue type
 export interface Issue {
@@ -50,139 +50,188 @@ export interface FilesListResponse {
 // Type for the API response when uploading a file
 export interface FileUploadResponse {
   success: boolean;
-  data?: ProjectFile; // The newly created file record if successful
-  message?: string;    // Error message if not successful
+  data: FileType;
+  message?: string;
 }
 
-// Function to fetch files for a specific project
-export const getFilesByProjectId = async (projectId: string): Promise<FilesListResponse> => {
-  // Assuming the API endpoint is /projects/:projectId/files (adjust if needed)
-  const response = await api.get<FilesListResponse>(`/api/projects/${projectId}/files`);
-  // Return response.data
-  return response.data;
+export interface StartTranslationResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface FileDetailResponse {
+  success: boolean;
+  file: FileType;
+  message?: string;
+}
+
+export interface Segment {
+  id: string;
+  fileId: string;
+  index: number;
+  source: string;
+  target: string;
+  status: 'pending' | 'translated' | 'reviewed';
+}
+
+export interface GetSegmentsResponse {
+  success: boolean;
+  segments: Segment[];
+  total: number;
+  message?: string;
+}
+
+export interface UpdateSegmentPayload {
+  target: string;
+  status?: 'pending' | 'translated' | 'reviewed';
+}
+
+export interface UpdateSegmentResponse {
+  success: boolean;
+  segment: Segment;
+  message?: string;
+}
+
+// Update FileType to match backend IFile model
+export interface FileType {
+  _id: string; 
+  fileName: string; 
+  originalName?: string; 
+  fileSize: number; 
+  mimeType: string;
+  // Re-checked src/models/file.model.ts FileStatus enum again
+  status: 'pending' | 'processing' | 'extracted' | 'translating' | 'translated' | 'reviewing' | 'review_completed' | 'completed' | 'error'; 
+  createdAt: string; 
+  projectId?: string;
+}
+
+// 添加缺失的类型定义
+export interface GetFilesResponse {
+  success: boolean;
+  files: FileType[];
+  message?: string;
+}
+
+export interface DeleteFileResponse {
+  success: boolean;
+  message?: string;
+}
+
+/**
+ * Get all files
+ */
+export const getAllFiles = async (): Promise<FileType[]> => {
+  const response = await axiosInstance.get<GetFilesResponse>('/api/files');
+  return response.data.files;
 };
 
-// Function to upload a file to a specific project
-export const uploadFile = async (
-  projectId: string, 
-  file: File, 
-  sourceLanguage: string, 
-  targetLanguage: string
-): Promise<FileUploadResponse> => {
-  const formData = new FormData();
-  formData.append('file', file); // Key 'file' must match backend expectation
-  // Append languages to the FormData
-  formData.append('sourceLanguage', sourceLanguage);
-  formData.append('targetLanguage', targetLanguage);
+/**
+ * Get files by project ID
+ */
+export const getFilesByProjectId = async (projectId: string): Promise<FileType[]> => {
+  try {
+    // Backend seems to return { success: boolean, data: FileType[] }
+    // Adjust the expected response type if needed, or use 'any' and check dynamically
+    const response = await axiosInstance.get<{ success: boolean; data?: FileType[]; message?: string }>(`/api/projects/${projectId}/files`);
+    
+    // Check if the request was successful and the data array exists
+    if (response?.data?.success && Array.isArray(response.data.data)) {
+      return response.data.data; // Return the nested data array
+    } else {
+      // Log unexpected structure or unsuccessful response
+      console.warn(`Request for files of project ${projectId} was not successful or data format is incorrect:`, response?.data);
+      return []; 
+    }
+  } catch (error) {
+    // Log the error and return empty array
+    console.error(`Error fetching files for project ${projectId}:`, error);
+    return []; 
+  }
+};
 
-  // Assuming the API endpoint is POST /projects/:projectId/files
-  const response = await api.post<FileUploadResponse>(
-    `/api/projects/${projectId}/files`,
-    formData,
-    {
+/**
+ * Upload a file
+ */
+export const uploadFile = async (file: File, projectId?: string): Promise<FileType> => {
+  const uploadUrl = projectId ? `/api/projects/${projectId}/files` : '/api/files/upload';
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  console.log(`[fileService] Uploading '${file.name}' to ${uploadUrl}`);
+  
+  try {
+    const response = await axiosInstance.post<FileUploadResponse>(uploadUrl, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+    });
+    
+    // --- DEBUG LOGGING --- 
+    console.log('[fileService] Raw Axios response:', response);
+    console.log('[fileService] response.data:', response.data);
+    console.log('[fileService] response.data.data (expected FileType):', response.data.data);
+    // --- END DEBUG LOGGING --- 
+    
+    // Check if the expected nested data exists before returning
+    if (response?.data?.data) {
+      return response.data.data; 
+    } else {
+      // Throw an error if the structure is not as expected
+      console.error('[fileService] Error: response.data.data is missing or undefined.', response.data);
+      throw new Error('Upload response format error: missing nested data.');
     }
-  );
-  // Return response.data
-  return response.data;
+  } catch (error) {
+    console.error(`[fileService] Error during uploadFile for '${file.name}':`, error);
+    // Re-throw the error to be caught by the calling component
+    throw error;
+  }
 };
 
-// --- Start File Translation ---
+/**
+ * Delete a file
+ */
+export const deleteFile = async (fileId: string): Promise<boolean> => {
+  const response = await axiosInstance.delete<DeleteFileResponse>(`/api/files/${fileId}`);
+  return response.data.success;
+};
 
-// Define the type for the response when starting translation
-export interface StartTranslationResponse {
-  success: boolean;
-  message?: string;
-  // Optional: Add any data returned by the backend, e.g., the updated file status
-  data?: { status?: string }; 
-}
-
-// Function to trigger the translation process for a file
-// Update function signature to accept projectId
+/**
+ * Start translation process for a file
+ */
 export const startFileTranslation = async (projectId: string, fileId: string): Promise<StartTranslationResponse> => {
-  // POST request to the specific file's translate endpoint, including projectId
-  const response = await api.post<StartTranslationResponse>(`/api/projects/${projectId}/files/${fileId}/translate`);
-  // Return response.data
+  const response = await axiosInstance.post<StartTranslationResponse>(`/api/projects/${projectId}/files/${fileId}/translate`);
   return response.data;
 };
 
-// --- File Details & Segments ---
-
-// Interface for a single translation segment
-export interface Segment {
-  _id: string;
-  fileId: string;
-  segmentIndex: number;
-  sourceText: string;
-  mtText?: string;
-  aiReviewedText?: string;
-  humanReviewedText?: string;
-  status: SegmentStatus; // Use the SegmentStatus enum
-  issues?: Issue[]; // Use the defined Issue type
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Response type for fetching single file details (could reuse ProjectFile or be more specific)
-export interface FileDetailResponse {
-  success: boolean;
-  data?: ProjectFile; // Assuming it returns the same structure as the list
-  message?: string;
-}
-
-// Response type for fetching segments for a file
-export interface GetSegmentsResponse {
-  success: boolean;
-  data?: {
-    segments: Segment[];
-    total: number;
-    page: number;
-    limit: number;
-  };
-  message?: string;
-}
-
-// Payload for updating a segment (e.g., confirming or editing)
-export interface UpdateSegmentPayload {
-  humanReviewedText: string;
-  status: SegmentStatus; // Use the SegmentStatus enum
-}
-
-// Response type for updating a segment
-export interface UpdateSegmentResponse {
-  success: boolean;
-  data?: Segment; // Return the updated segment
-  message?: string;
-}
-
-// Function to fetch detailed information for a single file
-export const getFileDetails = async (fileId: string): Promise<FileDetailResponse> => {
-  const response = await api.get<FileDetailResponse>(`/api/files/${fileId}`);
-  // Return response.data
-  return response.data;
+/**
+ * Get file details
+ */
+export const getFileDetails = async (fileId: string): Promise<FileType> => {
+  const response = await axiosInstance.get<FileDetailResponse>(`/api/files/${fileId}`);
+  return response.data.file;
 };
 
-// Function to fetch segments for a file with optional pagination/filtering
+/**
+ * Get segments for a file
+ */
 export const getFileSegments = async (
-  fileId: string, 
+  fileId: string,
   params?: { page?: number; limit?: number; status?: string }
 ): Promise<GetSegmentsResponse> => {
-  const response = await api.get<GetSegmentsResponse>(`/api/files/${fileId}/segments`, { params });
-  // Return response.data
+  const response = await axiosInstance.get<GetSegmentsResponse>(`/api/files/${fileId}/segments`, { params });
   return response.data;
 };
 
-// Function to update a specific segment
+/**
+ * Update a segment
+ */
 export const updateSegment = async (
-  segmentId: string, 
+  segmentId: string,
   payload: UpdateSegmentPayload
-): Promise<UpdateSegmentResponse> => {
-  // Assuming PATCH /segments/:segmentId endpoint
-  const response = await api.patch<UpdateSegmentResponse>(`/api/segments/${segmentId}`, payload);
-  // Return response.data
-  return response.data;
+): Promise<Segment> => {
+  const response = await axiosInstance.patch<UpdateSegmentResponse>(`/api/segments/${segmentId}`, payload);
+  return response.data.segment;
 };
 
 // TODO: Add functions for getFileDetails, deleteFile etc. as needed 

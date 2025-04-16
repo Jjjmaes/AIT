@@ -159,9 +159,12 @@ export class XliffProcessor implements IFileProcessor {
            };
       }
 
-      const transUnitsXml = select(isMemoQ ? '//m:trans-unit' : '//xliff:file/xliff:body/xliff:trans-unit', doc);
+      // Always select trans-unit using the standard XLIFF namespace
+      const transUnitXPath = '//xliff:file/xliff:body/xliff:trans-unit';
+      const transUnitsXml = select(transUnitXPath, doc);
+
       if (!Array.isArray(transUnitsXml) || transUnitsXml.length === 0) {
-        logger.warn(`No trans-unit elements found or xpath returned empty array in ${filePath}`, transUnitsXml);
+        logger.warn(`No trans-unit elements found using XPath '${transUnitXPath}' in ${filePath}`, transUnitsXml);
         return { segments: [], metadata: fileMetadata, segmentCount: 0 };
       }
 
@@ -172,8 +175,10 @@ export class XliffProcessor implements IFileProcessor {
           const element = unitNode as Element;
 
           const id = element.getAttribute('id') ?? '';
-          const sourceNode = select(isMemoQ ? 'm:source' : 'xliff:source', element, true);
-          const targetNode = select(isMemoQ ? 'm:target' : 'xliff:target', element, true);
+          // Select source/target still potentially conditional on isMemoQ *if* MemoQ sometimes uses m:source/m:target
+          // (Let's assume for now it uses standard source/target like trans-unit)
+          const sourceNode = select('xliff:source', element, true); 
+          const targetNode = select('xliff:target', element, true);
           const sourceText = this.getJoinedText(sourceNode);
           const targetText = this.getJoinedText(targetNode);
           
@@ -182,12 +187,13 @@ export class XliffProcessor implements IFileProcessor {
               continue;
           }
 
+          // Get state attribute - THIS remains conditional
           let segmentState = null;
           if (isMemoQ) {
-              segmentState = element.getAttribute('m:state');
+              segmentState = element.getAttribute('m:state'); // Still look for MemoQ state
           } else {
               segmentState = (targetNode && typeof targetNode === 'object' && !Array.isArray(targetNode) && targetNode.nodeType === 1) 
-                ? (targetNode as Element).getAttribute('state') 
+                ? (targetNode as Element).getAttribute('state') // Standard state on target
                 : null;
           }
           const status = this.mapXliffStateToStatus(segmentState, !!targetText);

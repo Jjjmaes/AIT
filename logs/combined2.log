@@ -1,0 +1,249 @@
+{"level":"info","message":"[ENTRY] Received request: GET /api/ai-configs","timestamp":"2025-04-16T12:59:14.231Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:14.232Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:14.234Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:14.237Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:14.239Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:14.243Z"}
+{"level":"info","message":"Entering AIConfigController.getAllConfigs","timestamp":"2025-04-16T12:59:14.244Z"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:14.253Z"}
+{"level":"info","message":"Entering AIConfigController.getAllConfigs","timestamp":"2025-04-16T12:59:14.254Z"}
+{"level":"info","message":"AIConfigService.getAllConfigs: Retrieved 1 total AI configs","timestamp":"2025-04-16T12:59:14.258Z"}
+{"level":"info","message":"AIConfigService.getAllConfigs: Retrieved 1 total AI configs","timestamp":"2025-04-16T12:59:14.263Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:15.008Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:15.009Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:15.010Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:15.011Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:15.013Z","username":"admin"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:15.017Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:15.019Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:15.019Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:15.020Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:15.024Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:15.032Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:15.034Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:15.035Z"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:15.042Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:15.044Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:15.044Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:15.058Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:15.064Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /prompts/67fcfb8802aa2a1f99f37d25","timestamp":"2025-04-16T12:59:17.679Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /prompts/67fcfb8802aa2a1f99f37d25","timestamp":"2025-04-16T12:59:17.680Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /prompts/67fcfb8802aa2a1f99f37d25","timestamp":"2025-04-16T12:59:17.681Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /prompts/67fcfb8802aa2a1f99f37d25","timestamp":"2025-04-16T12:59:17.684Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/prompts","timestamp":"2025-04-16T12:59:19.784Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/prompts","timestamp":"2025-04-16T12:59:19.785Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:19.787Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:19.788Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:19.788Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:19.788Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:19.790Z","username":"admin"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:19.792Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:19.793Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:19.793Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:19.793Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:19.796Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:19.800Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:19.800Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:19.801Z"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:19.806Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:19.809Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:19.809Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:19.817Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:19.822Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /prompts/67fe34abde39936502045d6c","timestamp":"2025-04-16T12:59:20.725Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /prompts/67fe34abde39936502045d6c","timestamp":"2025-04-16T12:59:20.726Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /prompts/67fe34abde39936502045d6c","timestamp":"2025-04-16T12:59:20.729Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /prompts/67fe34abde39936502045d6c","timestamp":"2025-04-16T12:59:20.731Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/projects?limit=100","timestamp":"2025-04-16T12:59:22.010Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/projects?limit=100","timestamp":"2025-04-16T12:59:22.012Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/projects?limit=100","timestamp":"2025-04-16T12:59:22.014Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:22.016Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:22.017Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:22.018Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:22.022Z","username":"admin"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/projects?limit=100","timestamp":"2025-04-16T12:59:22.025Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:22.026Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:22.027Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:22.027Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:22.031Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:22.036Z"}
+{"level":"info","message":"[ProjectController.getProjects] Entered function for user ID (from auth): 67fcb942de30090a16d422b0","timestamp":"2025-04-16T12:59:22.037Z"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:22.039Z"}
+{"level":"info","message":"[ProjectController.getProjects] Entered function for user ID (from auth): 67fcb942de30090a16d422b0","timestamp":"2025-04-16T12:59:22.039Z"}
+{"level":"info","message":"[ProjectController.getProjects] Service returned result for user 67fcb942de30090a16d422b0:","pagination":{"limit":100,"page":1,"total":14,"totalPages":1},"projects":[{"__v":0,"_id":"67ff99f4faf101ce1590b9bb","createdAt":"2025-04-16T11:52:20.438Z","deadline":"2025-04-17T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"啪啪啪","domain":"Legal","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"啪啪啪","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-16T11:52:20.438Z"},{"__v":0,"_id":"67fe03eacb309c902c850eb8","createdAt":"2025-04-15T06:59:54.293Z","deadline":"2025-04-19T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"大苏打","domain":"Regulatory","files":[],"industry":"Insurance","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test2","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:59:54.293Z"},{"__v":0,"_id":"67fe0005cb309c902c850db4","createdAt":"2025-04-15T06:43:17.704Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"专利翻译","domain":"Regulatory","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:43:17.704Z"},{"__v":0,"_id":"67fdff98cb309c902c850dab","createdAt":"2025-04-15T06:41:28.139Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"专利翻译","domain":"Regulatory","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:41:28.139Z"},{"__v":0,"_id":"67fdcfab3034155a167dee53","createdAt":"2025-04-15T03:16:59.289Z","deadline":"2025-04-25T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Finance","files":[],"languagePairs":[{"source":"es-ES","target":"ja"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"时代的","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-15T03:16:59.289Z"},{"__v":0,"_id":"67fdcb1a3b5c61926af422a3","createdAt":"2025-04-15T02:57:30.435Z","deadline":"2025-04-20T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Legal","files":[],"languagePairs":[{"source":"es-ES","target":"en-GB"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"对的","owner":"67fcb942de30090a16d422b0","reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T02:57:30.435Z"},{"__v":0,"_id":"67fdc7595cd4632c3a64e06c","createdAt":"2025-04-15T02:41:29.100Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Technical","files":[],"industry":"Banking & Financial Services","languagePairs":[{"source":"en-US","target":"es-ES"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"是","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T02:41:29.100Z"},{"__v":0,"_id":"67fdc5535cd4632c3a64e019","createdAt":"2025-04-15T02:32:51.795Z","deadline":"2025-04-27T00:00:00.000Z","files":[],"languagePairs":[{"source":"zh-CN","target":"zh-TW"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"设施","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-15T02:32:51.795Z"},{"__v":0,"_id":"67fcfe157c51da91b704e51e","createdAt":"2025-04-14T12:22:45.978Z","deadline":"2025-04-04T00:00:00.000Z","domain":"Education","files":[],"languagePairs":[{"source":"it","target":"ar"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-14T12:22:45.978Z"},{"__v":0,"_id":"67fcfc2102aa2a1f99f37d37","createdAt":"2025-04-14T12:14:25.708Z","deadline":"2025-04-12T00:00:00.000Z","domain":"Finance","files":[],"industry":"Construction & Civil Engineering","languagePairs":[{"source":"de","target":"it"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"003","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-14T12:14:25.708Z"},{"__v":0,"_id":"67fcecf20e1b74f905d75904","createdAt":"2025-04-14T11:09:38.351Z","deadline":"2025-04-24T00:00:00.000Z","description":"111","domain":"Medical","files":[],"industry":"Insurance","languagePairs":[{"source":"de","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"111","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:09:38.351Z"},{"__v":0,"_id":"67fcec3e0e1b74f905d758bd","createdAt":"2025-04-14T11:06:38.798Z","deadline":"2025-04-19T00:00:00.000Z","description":"是","domain":"Finance","files":[],"industry":"Legal Services","languagePairs":[{"source":"en-GB","target":"zh-TW"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:06:38.798Z"},{"__v":0,"_id":"67fcebfb0e1b74f905d758ac","createdAt":"2025-04-14T11:05:31.666Z","deadline":"2025-04-18T00:00:00.000Z","domain":"Finance","files":[],"industry":"Banking & Financial Services","languagePairs":[{"source":"zh-TW","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:05:31.666Z"},{"__v":0,"_id":"67fce378e8e77e8888f5a6d8","createdAt":"2025-04-14T10:29:12.586Z","deadline":"2025-04-22T00:00:00.000Z","description":"设施","domain":"Gaming","files":[],"industry":"Software Development","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-14T10:29:12.586Z"}],"timestamp":"2025-04-16T12:59:22.067Z"}
+{"level":"info","message":"[ProjectController.getProjects] Found 14 projects.","timestamp":"2025-04-16T12:59:22.073Z"}
+{"level":"info","message":"[ProjectController.getProjects] Service returned result for user 67fcb942de30090a16d422b0:","pagination":{"limit":100,"page":1,"total":14,"totalPages":1},"projects":[{"__v":0,"_id":"67ff99f4faf101ce1590b9bb","createdAt":"2025-04-16T11:52:20.438Z","deadline":"2025-04-17T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"啪啪啪","domain":"Legal","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"啪啪啪","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-16T11:52:20.438Z"},{"__v":0,"_id":"67fe03eacb309c902c850eb8","createdAt":"2025-04-15T06:59:54.293Z","deadline":"2025-04-19T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"大苏打","domain":"Regulatory","files":[],"industry":"Insurance","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test2","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:59:54.293Z"},{"__v":0,"_id":"67fe0005cb309c902c850db4","createdAt":"2025-04-15T06:43:17.704Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"专利翻译","domain":"Regulatory","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:43:17.704Z"},{"__v":0,"_id":"67fdff98cb309c902c850dab","createdAt":"2025-04-15T06:41:28.139Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","description":"专利翻译","domain":"Regulatory","files":[],"industry":"Legal Services","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T06:41:28.139Z"},{"__v":0,"_id":"67fdcfab3034155a167dee53","createdAt":"2025-04-15T03:16:59.289Z","deadline":"2025-04-25T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Finance","files":[],"languagePairs":[{"source":"es-ES","target":"ja"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"时代的","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-15T03:16:59.289Z"},{"__v":0,"_id":"67fdcb1a3b5c61926af422a3","createdAt":"2025-04-15T02:57:30.435Z","deadline":"2025-04-20T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Legal","files":[],"languagePairs":[{"source":"es-ES","target":"en-GB"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"对的","owner":"67fcb942de30090a16d422b0","reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T02:57:30.435Z"},{"__v":0,"_id":"67fdc7595cd4632c3a64e06c","createdAt":"2025-04-15T02:41:29.100Z","deadline":"2025-04-18T00:00:00.000Z","defaultReviewPromptTemplate":"67fcfba302aa2a1f99f37d28","defaultTranslationPromptTemplate":"67fcfb8802aa2a1f99f37d25","domain":"Technical","files":[],"industry":"Banking & Financial Services","languagePairs":[{"source":"en-US","target":"es-ES"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"是","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcf9457524ff39c374aab7"],"status":"active","updatedAt":"2025-04-15T02:41:29.100Z"},{"__v":0,"_id":"67fdc5535cd4632c3a64e019","createdAt":"2025-04-15T02:32:51.795Z","deadline":"2025-04-27T00:00:00.000Z","files":[],"languagePairs":[{"source":"zh-CN","target":"zh-TW"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"设施","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-15T02:32:51.795Z"},{"__v":0,"_id":"67fcfe157c51da91b704e51e","createdAt":"2025-04-14T12:22:45.978Z","deadline":"2025-04-04T00:00:00.000Z","domain":"Education","files":[],"languagePairs":[{"source":"it","target":"ar"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-14T12:22:45.978Z"},{"__v":0,"_id":"67fcfc2102aa2a1f99f37d37","createdAt":"2025-04-14T12:14:25.708Z","deadline":"2025-04-12T00:00:00.000Z","domain":"Finance","files":[],"industry":"Construction & Civil Engineering","languagePairs":[{"source":"de","target":"it"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"003","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":["67fcfa077524ff39c374aabc"],"status":"active","updatedAt":"2025-04-14T12:14:25.708Z"},{"__v":0,"_id":"67fcecf20e1b74f905d75904","createdAt":"2025-04-14T11:09:38.351Z","deadline":"2025-04-24T00:00:00.000Z","description":"111","domain":"Medical","files":[],"industry":"Insurance","languagePairs":[{"source":"de","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"111","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:09:38.351Z"},{"__v":0,"_id":"67fcec3e0e1b74f905d758bd","createdAt":"2025-04-14T11:06:38.798Z","deadline":"2025-04-19T00:00:00.000Z","description":"是","domain":"Finance","files":[],"industry":"Legal Services","languagePairs":[{"source":"en-GB","target":"zh-TW"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:06:38.798Z"},{"__v":0,"_id":"67fcebfb0e1b74f905d758ac","createdAt":"2025-04-14T11:05:31.666Z","deadline":"2025-04-18T00:00:00.000Z","domain":"Finance","files":[],"industry":"Banking & Financial Services","languagePairs":[{"source":"zh-TW","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"test","owner":"67fcb942de30090a16d422b0","priority":2,"reviewers":[],"status":"active","updatedAt":"2025-04-14T11:05:31.666Z"},{"__v":0,"_id":"67fce378e8e77e8888f5a6d8","createdAt":"2025-04-14T10:29:12.586Z","deadline":"2025-04-22T00:00:00.000Z","description":"设施","domain":"Gaming","files":[],"industry":"Software Development","languagePairs":[{"source":"zh-CN","target":"en-US"}],"manager":{"_id":"67fcb942de30090a16d422b0","email":"admin@example.com","username":"admin"},"members":[],"name":"所所说","owner":"67fcb942de30090a16d422b0","priority":3,"reviewers":[],"status":"active","updatedAt":"2025-04-14T10:29:12.586Z"}],"timestamp":"2025-04-16T12:59:22.089Z"}
+{"level":"info","message":"[ProjectController.getProjects] Found 14 projects.","timestamp":"2025-04-16T12:59:22.093Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:22.546Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:22.547Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:22.548Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:22.548Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:22.549Z","username":"admin"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/prompts","timestamp":"2025-04-16T12:59:22.552Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T12:59:22.553Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T12:59:22.554Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T12:59:22.554Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T12:59:22.557Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:22.560Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:22.560Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:22.560Z"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T12:59:22.563Z"}
+{"level":"info","message":"Entering PromptTemplateController.getAllTemplates","timestamp":"2025-04-16T12:59:22.566Z"}
+{"level":"debug","message":"PromptTemplateService.getAllPromptTemplates called","timestamp":"2025-04-16T12:59:22.566Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:22.576Z"}
+{"level":"info","message":"Found 3 prompt templates.","timestamp":"2025-04-16T12:59:22.583Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:00:11.429Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:00:11.433Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:00:11.434Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:00:11.434Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:00:11.435Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:00:11.436Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:00:11.440Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:01:11.445Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:01:11.450Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:01:11.451Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:01:11.452Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:01:11.452Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:01:11.454Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:01:11.459Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:02:11.447Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:02:11.452Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:02:11.454Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:02:11.454Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:02:11.454Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:02:11.457Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:02:11.460Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:03:11.446Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:03:11.450Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:03:11.451Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:03:11.451Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:03:11.452Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:03:11.454Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:03:11.456Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:04:11.452Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:04:11.456Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:04:11.457Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:04:11.457Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:04:11.458Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:04:11.460Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:04:11.466Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:05:11.469Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:05:11.473Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:05:11.474Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:05:11.474Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:05:11.475Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:05:11.477Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:05:11.482Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:06:11.476Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:06:11.481Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:06:11.482Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:06:11.483Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:06:11.483Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:06:11.485Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:06:11.489Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:07:11.479Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:07:11.482Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:07:11.484Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:07:11.486Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:07:11.487Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:07:11.489Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:07:11.494Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:08:11.488Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:08:11.493Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:08:11.494Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:08:11.495Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:08:11.496Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:08:11.499Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:08:11.503Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:09:11.504Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:09:11.508Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:09:11.510Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:09:11.510Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:09:11.511Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:09:11.513Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:09:11.518Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:10:11.514Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:10:11.519Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:10:11.520Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:10:11.520Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:10:11.521Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:10:11.525Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:10:11.528Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:11:11.524Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:11:11.527Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:11:11.528Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:11:11.529Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:11:11.530Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:11:11.532Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:11:11.535Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:12:11.528Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:12:11.531Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:12:11.532Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:12:11.533Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:12:11.534Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:12:11.536Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:12:11.540Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:13:11.535Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:13:11.538Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:13:11.539Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:13:11.540Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:13:11.540Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:13:11.542Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:13:11.546Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:14:11.542Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:14:11.545Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:14:11.546Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:14:11.547Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:14:11.547Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:14:11.549Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:14:11.552Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:15:11.551Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:15:11.555Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:15:11.556Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:15:11.557Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:15:11.558Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:15:11.560Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:15:11.563Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:16:11.559Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:16:11.563Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:16:11.564Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:16:11.564Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:16:11.565Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:16:11.567Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:16:11.572Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:17:11.574Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:17:11.577Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:17:11.578Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:17:11.579Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:17:11.579Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:17:11.582Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:17:11.588Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:18:11.587Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:18:11.590Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:18:11.592Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:18:11.592Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:18:11.593Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:18:11.596Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:18:11.600Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:19:11.600Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:19:11.605Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:19:11.606Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:19:11.607Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:19:11.607Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:19:11.609Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:19:11.612Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:20:11.604Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:20:11.608Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:20:11.609Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:20:11.609Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:20:11.610Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:20:11.612Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:20:11.615Z"}
+{"level":"info","message":"[ENTRY] Received request: OPTIONS /api/notifications","timestamp":"2025-04-16T13:21:11.613Z"}
+{"level":"info","message":"[ENTRY] Received request: GET /api/notifications","timestamp":"2025-04-16T13:21:11.617Z"}
+{"level":"debug","message":"Attempting JWT authentication...","timestamp":"2025-04-16T13:21:11.618Z"}
+{"level":"debug","message":"Authorization Header:","timestamp":"2025-04-16T13:21:11.619Z"}
+{"level":"debug","message":"Extracted Token:","timestamp":"2025-04-16T13:21:11.620Z"}
+{"email":"admin@example.com","exp":1744893572,"iat":1744807172,"id":"67fcb942de30090a16d422b0","level":"debug","message":"JWT Payload verified (new structure):","role":"admin","timestamp":"2025-04-16T13:21:11.622Z","username":"admin"}
+{"level":"info","message":"Authenticated user: admin (ID: 67fcb942de30090a16d422b0, Role: admin)","timestamp":"2025-04-16T13:21:11.626Z"}

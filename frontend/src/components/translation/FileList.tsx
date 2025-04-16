@@ -1,30 +1,37 @@
 import React from 'react';
 import { Table, Tag, Typography, Button, Empty } from 'antd';
-import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, SyncOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { FileType } from '../../api/fileService';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
+
+dayjs.locale('zh-cn');
 
 const { Title, Text } = Typography;
 
 interface FileListProps {
-  files: any[]; // Replace with proper type when available
+  files: FileType[];
   selectedFileIds: string[];
   onSelectFiles: (fileIds: string[]) => void;
 }
 
 const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFiles }) => {
-  const columns: ColumnsType<any> = [
+  const columns: ColumnsType<FileType> = [
     {
       title: '文件名',
-      dataIndex: 'originalName',
-      key: 'originalName',
+      dataIndex: 'fileName',
+      key: 'fileName',
       render: (text, record) => (
         <div>
           <Text strong>{text}</Text>
-          <div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {record.sourceLanguage} → {record.targetLanguage}
-            </Text>
-          </div>
+          {record.originalName && record.originalName !== text && (
+            <div>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                (原名: {record.originalName})
+              </Text>
+            </div>
+          )}
         </div>
       ),
     },
@@ -33,54 +40,54 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFil
       dataIndex: 'fileSize',
       key: 'fileSize',
       width: 100,
-      render: (size) => `${(size / 1024).toFixed(2)} KB`,
+      render: (size) => size != null ? `${(size / 1024).toFixed(2)} KB` : '-',
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      render: (status) => {
+      render: (status: FileType['status']) => {
         let color = 'default';
         let icon = null;
         let text = '未知';
 
         switch (status) {
-          case 'UPLOADED':
-            color = 'default';
+          case 'pending':
+            color = 'cyan';
             icon = <ClockCircleOutlined />;
-            text = '已上传';
+            text = '准备就绪';
             break;
-          case 'PROCESSING':
+          case 'processing':
+          case 'extracted':
+          case 'translating':
+          case 'reviewing':
             color = 'processing';
             icon = <SyncOutlined spin />;
-            text = '处理中';
+            text = status === 'processing' ? '处理中' : 
+                   status === 'extracted' ? '提取完成' :
+                   status === 'translating' ? '翻译中' : 
+                   status === 'reviewing' ? '审校中' : 
+                   '进行中';
             break;
-          case 'PROCESSED':
-            color = 'success';
-            icon = <CheckCircleOutlined />;
-            text = '已处理';
-            break;
-          case 'TRANSLATING':
-            color = 'processing';
-            icon = <SyncOutlined spin />;
-            text = '翻译中';
-            break;
-          case 'TRANSLATED':
+          case 'translated':
+          case 'review_completed':
             color = 'warning';
             icon = <CheckCircleOutlined />;
-            text = '已翻译';
+            text = '待确认/完成';
             break;
-          case 'REVIEWED':
+          case 'completed':
             color = 'success';
             icon = <CheckCircleOutlined />;
-            text = '已审校';
+            text = '已完成';
             break;
-          case 'ERROR':
+          case 'error':
             color = 'error';
+            icon = <WarningOutlined />;
             text = '错误';
             break;
           default:
+            console.warn(`[FileList] Encountered unexpected file status: ${status}`);
             break;
         }
 
@@ -92,14 +99,15 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFil
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
-      render: (date) => new Date(date).toLocaleString('zh-CN'),
+      render: (date) => {
+        const parsedDate = dayjs(date);
+        return parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD HH:mm:ss') : '-';
+      },
     },
   ];
 
-  // --- Add Logging Here ---
+  // --- Add More Logging ---
   console.log('[FileList] Received files prop:', files);
-  console.log('[FileList] Type of files prop:', typeof files);
-  console.log('[FileList] Is files an Array?:', Array.isArray(files));
   // --- End Logging ---
 
   // --- Defensively ensure we have an array --- 
@@ -107,11 +115,19 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFil
   console.log('[FileList] filesArray value before filter:', filesArray);
   // --- End Defensive Check ---
 
-  // Filter files that are eligible for translation 
-  // Use the guaranteed array variable
+  // Log actual statuses received
+  filesArray.forEach(file => {
+    console.log(`[FileList] File ${file.fileName} status: '${file.status}'`);
+  });
+
+  // Filter files that are eligible for translation
   const eligibleFiles = filesArray.filter(
-    (file) => file && (file.status === 'PROCESSED' || file.status === 'UPLOADED') // Added check for file existence
+    (file) => file && (
+      file.status === 'pending'
+    )
   );
+
+  console.log('[FileList] Eligible files after filter:', eligibleFiles);
 
   // If no eligible files, show message
   if (eligibleFiles.length === 0) {
@@ -120,9 +136,9 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFil
         <Empty 
           description={
             <span>
-              没有可翻译的文件。请确保先上传并处理文件，然后再开始翻译。
+              没有状态为"准备就绪"的文件可供翻译。请确保文件已成功上传和处理。
             </span>
-          } 
+          }
         />
         <div style={{ marginTop: 20 }}>
           <Button type="primary" onClick={() => window.history.back()}>
@@ -138,20 +154,24 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFileIds, onSelectFil
     onChange: (selectedRowKeys: React.Key[]) => {
       onSelectFiles(selectedRowKeys as string[]);
     },
+    getCheckboxProps: (record: FileType) => ({
+      disabled: record.status !== 'pending',
+      name: record.fileName,
+    }),
   };
 
   return (
     <div className="file-list-container">
       <Title level={4}>选择要翻译的文件</Title>
       <Text type="secondary" style={{ marginBottom: '16px', display: 'block' }}>
-        选择下列已处理的文件进行翻译。您可以选择多个文件同时翻译。
+        选择下列状态为"准备就绪"的文件进行翻译。您可以选择多个文件同时翻译。
       </Text>
       
       <Table 
         rowSelection={rowSelection}
         columns={columns} 
         dataSource={eligibleFiles}
-        rowKey="id"
+        rowKey="_id"
         pagination={false}
         bordered
       />

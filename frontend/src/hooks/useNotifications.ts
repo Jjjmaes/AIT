@@ -28,7 +28,7 @@ export const useNotifications = () => {
     setError(null);
     
     try {
-      const response = await api.get('/notifications');
+      const response = await api.get('/api/notifications');
       if (response.data && response.data.data && response.data.data.notifications) {
         setNotifications(response.data.data.notifications);
         setUnreadCount(response.data.data.notifications.filter((n: Notification) => !n.isRead).length);
@@ -40,7 +40,7 @@ export const useNotifications = () => {
       }
     } catch (err) {
       console.error('获取通知失败:', err);
-      setError('获取通知失败');
+      setError((err as any)?.message || '获取通知失败');
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      await api.put(`/notifications/${notificationId}/read`);
+      await api.put(`/api/notifications/${notificationId}/read`);
       
       // 更新本地状态
       setNotifications(prev => 
@@ -74,7 +74,7 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      await api.put('/notifications/read-all');
+      await api.put('/api/notifications/read-all');
       
       // 更新本地状态
       setNotifications(prev => 
@@ -93,7 +93,7 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      await api.delete(`/notifications/${notificationId}`);
+      await api.delete(`/api/notifications/${notificationId}`);
       
       // 更新本地状态
       setNotifications(prev => 

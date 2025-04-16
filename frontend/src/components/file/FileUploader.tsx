@@ -21,7 +21,8 @@ import {
   FileUnknownOutlined
 } from '@ant-design/icons';
 import type { UploadFile, UploadProps, UploadChangeParam } from 'antd/es/upload/interface';
-import api from '../../api/api';
+import type { AxiosProgressEvent } from 'axios';
+import apiClient from '../../api/client';
 import { formatFileSize } from '../../utils/formatUtils';
 
 const { Dragger } = Upload;
@@ -60,7 +61,8 @@ const getFileIcon = (fileName: string) => {
 
 // 默认支持的文件格式
 const DEFAULT_SUPPORTED_FORMATS = [
-  '.doc', '.docx', '.pdf', '.txt', '.xml', '.json', '.md', '.csv', '.xls', '.xlsx'
+  '.doc', '.docx', '.pdf', '.txt', '.xml', '.json', '.md', '.csv', '.xls', '.xlsx',
+  '.mqxliff'
 ];
 
 const FileUploader: React.FC<FileUploaderProps> = ({
@@ -106,17 +108,17 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     
     try {
       // 创建上传请求
-      const response = await api.post(
+      const response = await apiClient.post(
         `/projects/${projectId}/files/upload`,
         formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          onUploadProgress: (progressEvent) => {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / (progressEvent.total || 1)
-            );
+          onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+            const percent = progressEvent.total
+              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              : 0;
             onProgress({ percent });
           },
         }
