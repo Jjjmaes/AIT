@@ -201,7 +201,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
             // Log the specific error for this segment
             logger.error(`[Worker Job ${job.id}] Error processing segment ${segmentId}: ${error.message}`, { error }); // Log the full error object
             erroredSegments++;
-            errors.push(`Segment ${segmentId}: ${error.message}`);
+            // Ensure a string is always pushed, even if error.message is undefined
+            errors.push(`Segment ${segmentId}: ${String(error?.message ?? 'Unknown segment error')}`);
             // Segment status should be updated within translateSegment's catch block
             updatedSegment = null; // Ensure segment is null on error
         }
@@ -246,7 +247,11 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
       // Throw an error to mark the job as failed, providing details
       const failureMsg = `${erroredSegments} segment(s) failed to translate. Errors: ${errors.join('; ')}`;
       logger.error(`[Worker Job ${job.id}] Failing job due to segment errors: ${failureMsg}`);
-      throw new Error(failureMsg);
+      // --- TEMPORARY DIAGNOSTIC --- 
+      // Throw a simple hardcoded error instead of the complex message
+      throw new Error('HARDCODED_JOB_FAILURE_DUE_TO_SEGMENT_ERRORS');
+      // --- END TEMPORARY DIAGNOSTIC ---
+      // throw new Error(failureMsg); // Original line commented out
     }
 
     logger.info(`[Worker Job ${job.id}] COMPLETED Successfully.`);

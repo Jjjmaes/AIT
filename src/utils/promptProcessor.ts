@@ -20,12 +20,12 @@ export interface ProcessedPrompt {
   userPrompt: string;
 }
 
-// Default prompts (keep as fallbacks if needed)
+// Default prompts using {{variable}} format
 const DEFAULT_TRANSLATION_SYSTEM_PROMPT = 'You are a professional translator.';
-const DEFAULT_TRANSLATION_USER_PROMPT = 'Translate the following text from {SOURCE_LANGUAGE} to {TARGET_LANGUAGE}:\n\n{SOURCE_TEXT}';
+const DEFAULT_TRANSLATION_USER_PROMPT = 'Translate the following text from {{sourceLang}} to {{targetLang}}:\n\n{{sourceText}}';
 
 const DEFAULT_REVIEW_SYSTEM_PROMPT = 'You are a professional translation reviewer.';
-const DEFAULT_REVIEW_USER_PROMPT = `Review the following translation. Source ({SOURCE_LANGUAGE}): "{SOURCE_TEXT}". Translation ({TARGET_LANGUAGE}): "{TRANSLATED_TEXT}". Provide feedback on accuracy, fluency, style, and terminology.`;
+const DEFAULT_REVIEW_USER_PROMPT = `Review the following translation. Source ({{sourceLang}}): "{{sourceText}}". Translation ({{targetLang}}): "{{translatedText}}". Provide feedback on accuracy, fluency, style, and terminology.`;
 
 interface VariableMap {
   [key: string]: string | number | undefined;
@@ -35,16 +35,20 @@ interface VariableMap {
  * Fills placeholders in a prompt string with provided variable values.
  * Placeholders are in the format {{variable_name}}.
  */
-function fillPlaceholders(prompt: string, variables: VariableMap): string {
+function fillPlaceholders(prompt: string | null | undefined, variables: VariableMap): string {
+  // Gracefully handle null or undefined prompt input
+  if (prompt === null || prompt === undefined) {
+    logger.warn('[fillPlaceholders] Received null or undefined prompt input. Returning empty string.');
+    return ''; 
+  }
+
   let processedPrompt = prompt;
   for (const key in variables) {
-    // Ensure the value is a string for replacement
     const value = variables[key] !== undefined ? String(variables[key]) : ''; 
-    // Use a global regex to replace all occurrences
-    const regex = new RegExp(`\\{\\{${key}\\}\}`, 'g'); 
+    const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`\{\{${escapedKey}\}\}`, 'g'); 
     processedPrompt = processedPrompt.replace(regex, value);
   }
-  // Log warnings for any remaining unfilled placeholders (optional)
   const remainingPlaceholders = processedPrompt.match(/\{\{[a-zA-Z0-9_]+\}\}/g);
   if (remainingPlaceholders) {
     logger.warn(`[fillPlaceholders] Unfilled placeholders remaining: ${remainingPlaceholders.join(', ')}`);
@@ -99,28 +103,29 @@ class PromptProcessor {
       }
     }
 
-    // Determine the templates to use
-    const userPromptTemplate = template ? template.content : DEFAULT_TRANSLATION_USER_PROMPT;
-    const systemInstructionTemplate = template ? null : DEFAULT_TRANSLATION_SYSTEM_PROMPT; 
+    // Check if template and template.content are valid before using
+    const userPromptTemplate = (template && template.content) ? template.content : DEFAULT_TRANSLATION_USER_PROMPT;
+    const systemInstructionTemplate = (template && template.content) ? null : DEFAULT_TRANSLATION_SYSTEM_PROMPT; 
     
-    logger.debug(`[PromptProcessor.buildTranslationPrompt] Using systemInstruction template (length ${systemInstructionTemplate?.length ?? 'undefined'}): ${systemInstructionTemplate?.substring(0,100)}...`);
-    logger.debug(`[PromptProcessor.buildTranslationPrompt] Using userPromptTemplate template (length ${userPromptTemplate?.length ?? 'undefined'}): ${userPromptTemplate?.substring(0,100)}...`);
+    if (template && !template.content) {
+        logger.warn(`[PromptProcessor.buildTranslationPrompt] Template ${template._id} found, but its content is missing. Falling back to default prompts.`);
+    }
+    
+    logger.debug(`[PromptProcessor.buildTranslationPrompt] Using systemInstruction template ...`); // Simplified log
+    logger.debug(`[PromptProcessor.buildTranslationPrompt] Using userPromptTemplate template ...`); // Simplified log
 
-    // Prepare variables for placeholder replacement, excluding complex types
-    // Destructure context first to easily omit fields
+    // Prepare variables map (variables)
     const { promptTemplateId, terms, ...simpleContext } = context;
     const variables: VariableMap = { 
-        ...simpleContext, // Spread only the simple fields
+        ...simpleContext, 
         sourceText: sourceText, 
         sourceLang: context.sourceLanguage, 
         targetLang: context.targetLanguage, 
         domain: context.domain || 'general', 
         glossaryName: context.terminology || 'None' 
-        // Note: If you need terms in the prompt, format them into a string here
-        // e.g., formattedTerms: terms?.map(t => `${t.source}=${t.target}`).join(', ')
     };
 
-    // Log before replacing placeholders
+    // Use fillPlaceholders safely
     logger.debug(`[PromptProcessor.buildTranslationPrompt] Replacing placeholders in user prompt using fillPlaceholders...`);
     const finalUserPrompt = fillPlaceholders(userPromptTemplate, variables);
     
@@ -140,7 +145,6 @@ class PromptProcessor {
     };
   }
 
-  // Similar method for building review prompts
   async buildReviewPrompt(
     originalText: string,
     translatedText: string, 
@@ -155,10 +159,15 @@ class PromptProcessor {
       }
     }
 
-    const userPromptTemplate = template ? template.content : DEFAULT_REVIEW_USER_PROMPT;
-    const systemInstructionTemplate = template ? null : DEFAULT_REVIEW_SYSTEM_PROMPT;
+    // Check template content validity here too
+    const userPromptTemplate = (template && template.content) ? template.content : DEFAULT_REVIEW_USER_PROMPT;
+    const systemInstructionTemplate = (template && template.content) ? null : DEFAULT_REVIEW_SYSTEM_PROMPT;
+    
+    if (template && !template.content) {
+        logger.warn(`[PromptProcessor.buildReviewPrompt] Template ${template._id} found, but its content is missing. Falling back to default prompts.`);
+    }
 
-    // Prepare variables, excluding complex types
+    // Prepare variables map (variables)
     const { promptTemplateId, terms, ...simpleContext } = context;
     const variables: VariableMap = { 
         ...simpleContext, 
@@ -168,7 +177,6 @@ class PromptProcessor {
         targetLang: context.targetLanguage,
         domain: context.domain || 'general',
         glossaryName: context.terminology || 'None'
-        // Note: Format terms if needed for review prompt
     };
 
     // Use fillPlaceholders for review prompts too

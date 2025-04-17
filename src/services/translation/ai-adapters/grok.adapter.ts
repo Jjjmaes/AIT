@@ -8,6 +8,10 @@ import { TranslationOptions } from '../../../types/translation.types';
 import { ProcessedPrompt } from '../../../utils/promptProcessor'; // Assuming this structure is used
 import logger from '../../../utils/logger';
 import { AppError } from '../../../utils/errors';
+// Remove ProxyAgent, use axios and https-proxy-agent
+// import { ProxyAgent } from 'proxy-agent'; 
+import axios from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // Use a library like axios or node-fetch for making HTTP requests
 // For example, if using axios (ensure it's installed):
@@ -15,6 +19,9 @@ import { AppError } from '../../../utils/errors';
 // Or use Node's built-in fetch (available in Node 18+)
 
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
+// --- TEMPORARY DIAGNOSTIC --- 
+// const TEST_URL = 'https://www.google.com'; // Use Google for testing - REVERTED
+// --- END TEMPORARY DIAGNOSTIC ---
 const DEFAULT_GROK_MODEL = 'grok-3-latest'; // Or choose another default
 
 export class GrokAdapter extends BaseAIServiceAdapter implements ITranslationServiceAdapter {
@@ -32,7 +39,7 @@ export class GrokAdapter extends BaseAIServiceAdapter implements ITranslationSer
   }
 
   async translateText(
-    sourceText: string, // Note: Base class expects promptData, not sourceText directly here typically
+    sourceText: string, 
     promptData: ProcessedPrompt,
     options?: TranslationOptions & { model?: string; temperature?: number }
   ): Promise<TranslationResponse> {
@@ -40,82 +47,90 @@ export class GrokAdapter extends BaseAIServiceAdapter implements ITranslationSer
     const modelToUse = options?.aiModel || this.config.defaultModel || DEFAULT_GROK_MODEL;
     const temperature = options?.temperature ?? 0.3; // Default temperature
     const startTime = Date.now();
-    const TIMEOUT_MS = 30000; // 30 second timeout
+    // Use Axios timeout parameter, removing manual AbortController
+    // const TIMEOUT_MS = 60000; // Timeout handled by Axios
+    const AXIOS_TIMEOUT_MS = 60000; // 60 second timeout for Axios
 
     logger.debug(`[${this.serviceName}.${methodName}] Starting translation with model ${modelToUse}`, { sourceTextLength: sourceText.length });
     logger.debug(`[${this.serviceName}.${methodName}] Prompt Data:`, promptData); // Log prompts
 
+    // Create Agent based on environment variable - USING https-proxy-agent
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
+    let httpsAgent: HttpsProxyAgent<string> | undefined = undefined;
+    if (proxyUrl) {
+        // Validate proxy URL format for HttpsProxyAgent
+        if (!proxyUrl.startsWith('http://')) {
+            logger.warn(`[${this.serviceName}.${methodName}] HTTPS_PROXY URL does not start with 'http://'. HttpsProxyAgent might fail. URL: ${proxyUrl}`);
+            // Consider throwing an error or attempting to proceed cautiously.
+            // For now, let's try to proceed but log the warning.
+        }
+        logger.debug(`[${this.serviceName}.${methodName}] Using HTTP proxy for HTTPS request: ${proxyUrl}`);
+        httpsAgent = new HttpsProxyAgent(proxyUrl);
+    } else {
+        logger.debug(`[${this.serviceName}.${methodName}] No HTTPS_PROXY environment variable detected.`);
+    }
+
     const requestBody = {
       messages: [
-        // Use system prompt from promptData if available
-        ...(promptData.systemPrompt ? [{ role: 'system', content: promptData.systemPrompt }] : []), 
-        { role: 'user', content: promptData.userPrompt } // User prompt contains the text to translate
+        ...(promptData.systemPrompt ? [{ role: 'system', content: promptData.systemPrompt }] : []),
+        { role: 'user', content: promptData.userPrompt }
       ],
       model: modelToUse,
       temperature: temperature,
-      stream: false // Assuming non-streaming for translation
+      stream: false 
     };
 
-    let response: Response | null = null; 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    let axiosResponse: import('axios').AxiosResponse | null = null; // Define type explicitly if needed
+    // Remove AbortController as Axios handles timeouts
+    // const controller = new AbortController();
+    // const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      // Log the request body just before sending
       logger.debug(`[${this.serviceName}.${methodName}] Request Body to Grok:`, requestBody);
+      logger.debug(`[${this.serviceName}.${methodName}] Preparing to send request to Grok API via Axios with ${AXIOS_TIMEOUT_MS}ms timeout...`, { url: GROK_API_URL, model: modelToUse, usingProxy: !!proxyUrl });
 
-      logger.debug(`[${this.serviceName}.${methodName}] Preparing to send request to Grok API with ${TIMEOUT_MS}ms timeout...`, { url: GROK_API_URL, model: modelToUse });
-      
-      // --- HTTP Request Logic ---           
-      response = await fetch(GROK_API_URL, { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal // Add the AbortSignal for timeout
+      // --- Use Axios for the HTTP Request ---           
+      axiosResponse = await axios.post(GROK_API_URL, requestBody, {
+         headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Accept': 'application/json' // Good practice to add Accept header
+         },
+         // Pass the agent if a proxy is configured
+         ...(httpsAgent && { httpsAgent: httpsAgent }), 
+         // Disable Axios's default proxy env var reading, rely only on the agent
+         proxy: false, 
+         timeout: AXIOS_TIMEOUT_MS, // Use Axios's timeout
+         // signal: controller.signal, // Remove AbortController signal
       });
+      // --- End Axios Request ---
       
-      clearTimeout(timeoutId); // Clear the timeout if fetch completes
+      logger.debug(`[${this.serviceName}.${methodName}] Axios request completed. Status: ${axiosResponse?.status} ${axiosResponse?.statusText}`);
+      // clearTimeout(timeoutId); // Remove manual timeout clear
 
-      logger.debug(`[${this.serviceName}.${methodName}] Received response from Grok API. Status: ${response.status} ${response.statusText}`);
+      // Check if response is null or undefined right away (less likely with Axios successful await)
+      if (!axiosResponse) {
+          logger.error(`[${this.serviceName}.${methodName}] Axios POST returned null or undefined response object.`);
+          throw this.createError('GROK_AXIOS_NULL_RESPONSE', 'Axios POST operation completed but returned a null/undefined response.', null);
+      }
 
       const processingTime = Date.now() - startTime;
+      const responseData = axiosResponse.data; // Data is already parsed by Axios
 
-      let responseData: any; // To hold the parsed JSON
-      if (!response.ok) {
-        let errorBodyText = 'Failed to read error body';
-        try {
-           errorBodyText = await response.text(); // Try to get raw text body for errors
-        } catch (textError) {
-           logger.warn(`[${this.serviceName}.${methodName}] Could not read text body of error response.`, textError);
-        }
-        logger.error(`[${this.serviceName}.${methodName}] Grok API request failed`, { status: response.status, statusText: response.statusText, body: errorBodyText });
-        // Attempt to parse as JSON anyway, in case it contains structured error info
-        try { responseData = JSON.parse(errorBodyText); } catch { responseData = null; }
-        throw this.createError(`GROK_API_ERROR_${response.status}`, `Grok API Error (${response.status}): ${responseData?.error?.message || response.statusText}`, responseData);
+      // Check for logical errors within the response data if needed (based on Grok API docs)
+      // Grok might return 200 OK but have an error object in the body
+      if (responseData.error) {
+          logger.error(`[${this.serviceName}.${methodName}] Grok API returned an error in the response body`, { error: responseData.error });
+           throw this.createError(`GROK_API_BODY_ERROR`, `Grok API Error: ${responseData.error.message || 'Unknown error in response body'}`, responseData.error);
       }
-      
-      // --- Response Parsing --- 
-      logger.debug(`[${this.serviceName}.${methodName}] Attempting to parse JSON response...`);
-      try {
-          responseData = await response.json();
-      } catch (parseError: any) {
-           logger.error(`[${this.serviceName}.${methodName}] Failed to parse JSON response from Grok API.`, { error: parseError });
-           // Attempt to read raw text if JSON parsing fails
-           let rawBody = 'Failed to read raw body after JSON parse failure.';
-            try {
-                // Need to clone the response to read body again if needed, but response is already potentially consumed or errored.
-                // Best effort: log the error and throw.
-            } catch (e) {}
-           throw this.createError('GROK_RESPONSE_PARSE_ERROR', `Failed to parse JSON response: ${parseError.message}`, { originalError: parseError });
-      }
-      logger.debug(`[${this.serviceName}.${methodName}] Successfully parsed JSON response.`);
-            
+
+      // --- Response Parsing (Simpler with Axios) --- 
+      logger.debug(`[${this.serviceName}.${methodName}] Axios response data received.`);
+                  
       const translatedText = responseData.choices?.[0]?.message?.content?.trim() || '';
       if (!translatedText) {
          logger.warn(`[${this.serviceName}.${methodName}] Grok response parsed, but missing translated text.`, { responseData });
+         // Consider throwing an error if empty translation is unexpected
       }
 
       const tokenCount = responseData.usage ? { 
@@ -125,7 +140,7 @@ export class GrokAdapter extends BaseAIServiceAdapter implements ITranslationSer
       } : undefined; 
       // --- End Response Parsing --- 
 
-      logger.info(`[${this.serviceName}.${methodName}] Grok translation successful. Time: ${processingTime}ms`, { tokenCount });
+      logger.info(`[${this.serviceName}.${methodName}] Grok translation successful via Axios. Time: ${processingTime}ms`, { tokenCount });
 
       return {
         translatedText,
@@ -135,39 +150,50 @@ export class GrokAdapter extends BaseAIServiceAdapter implements ITranslationSer
       };
 
     } catch (error: any) {
-      clearTimeout(timeoutId); // Clear timeout in case of error too
+      // clearTimeout(timeoutId); // Remove manual timeout clear
       const processingTime = Date.now() - startTime;
       
-      // Log the raw error object FIRST
-      logger.error(`[${this.serviceName}.${methodName}] RAW ERROR caught in catch block:`, error);
+      logger.error(`[${this.serviceName}.${methodName}] RAW ERROR caught in Axios catch block:`, error);
 
-      // Check if the error is due to the abort signal (timeout)
-      if (error.name === 'AbortError') {
-           logger.error(`[${this.serviceName}.${methodName}] Grok API request timed out after ${TIMEOUT_MS}ms.`);
-           // Include original error details in the thrown AppError
-           throw this.createError('GROK_TIMEOUT', `Request timed out after ${TIMEOUT_MS}ms. Cause: ${error.message}`, error);
-      }
-      
-      // Log other errors
-      logger.error(`[${this.serviceName}.${methodName}] Error during Grok processing. Time: ${processingTime}ms`, { 
-          error: error?.message,
-          errorCode: error?.code,
-          responseStatus: response?.status, 
-          // Add cause if available (common in fetch errors)
-          cause: error?.cause,
-          stack: error?.stack 
-      });
+      // Check if it's an Axios error first
+      if (axios.isAxiosError(error)) {
+        // Handle Axios-specific errors (like timeout, network errors)
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        const responseStatus = error.response?.status;
+        const responseData = error.response?.data;
+        
+        logger.error(`[${this.serviceName}.${methodName}] Error during Grok Axios processing. Time: ${processingTime}ms`, { 
+            error: errorMessage,
+            errorCode: errorCode,
+            responseStatus: responseStatus, 
+            responseData: responseData,
+            stack: error?.stack 
+        });
 
-      if (error instanceof AppError) {
-          throw error; 
+        if (errorCode === 'ECONNABORTED' || errorCode === 'ETIMEDOUT') {
+             throw this.createError('GROK_TIMEOUT', `Request timed out after ${AXIOS_TIMEOUT_MS}ms. Axios Code: ${errorCode}`, error);
+        }
+        // Handle HTTP error statuses from the API
+        if (responseStatus) {
+             const apiErrorMessage = responseData?.error?.message || responseData?.message || error.message;
+             throw this.createError(`GROK_API_ERROR_${responseStatus}`, `Grok API Error (${responseStatus}): ${apiErrorMessage}`, responseData);
+        }
+        // Generic Axios/network error
+        throw this.createError(errorCode || 'GROK_AXIOS_REQUEST_FAILED', `Axios request failed: ${errorMessage}`, error);
+
+      } else {
+         // Handle non-Axios errors (e.g., unexpected errors)
+         logger.error(`[${this.serviceName}.${methodName}] Non-Axios error during Grok processing. Time: ${processingTime}ms`, { 
+            error: error?.message,
+            stack: error?.stack 
+         });
+         if (error instanceof AppError) {
+             throw error; // Re-throw known AppErrors
+         }
+         // Wrap unknown errors
+         throw this.createError('GROK_UNKNOWN_ERROR', `An unexpected error occurred: ${error.message}`, error);
       }
-      
-      // Construct a more detailed error message including the original error's message and cause
-      const originalErrorMessage = error?.message || 'Unknown error';
-      const originalErrorCause = error?.cause ? ` Cause: ${JSON.stringify(error.cause)}` : '';
-      const finalErrorMessage = `Failed to translate using Grok: ${originalErrorMessage}${originalErrorCause}`;
-      
-      throw this.createError(error.code || 'GROK_REQUEST_FAILED', finalErrorMessage, error);
     }
   }
 
