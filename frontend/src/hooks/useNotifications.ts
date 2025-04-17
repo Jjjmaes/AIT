@@ -28,7 +28,7 @@ export const useNotifications = () => {
     setError(null);
     
     try {
-      const response = await api.get('/api/notifications');
+      const response = await api.get('/notifications');
       if (response.data && response.data.data && response.data.data.notifications) {
         setNotifications(response.data.data.notifications);
         setUnreadCount(response.data.data.notifications.filter((n: Notification) => !n.isRead).length);
@@ -51,7 +51,7 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      await api.put(`/api/notifications/${notificationId}/read`);
+      await api.put(`/notifications/${notificationId}/read`);
       
       // 更新本地状态
       setNotifications(prev => 
@@ -73,18 +73,17 @@ export const useNotifications = () => {
   const markAllAsRead = useCallback(async () => {
     if (!user) return;
     
+    // Optimistic update: Mark all as read locally first
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, isRead: true }))
+    );
+    setUnreadCount(0);
+
     try {
-      await api.put('/api/notifications/read-all');
-      
-      // 更新本地状态
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, isRead: true }))
-      );
-      
-      // 更新未读数量
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('标记所有通知已读失败:', err);
+      await api.put('/notifications/read-all');
+      // No need to refetch, local state is already updated
+    } catch (error) {
+      console.error('标记所有通知已读失败:', error);
     }
   }, [user]);
 
@@ -93,7 +92,7 @@ export const useNotifications = () => {
     if (!user) return;
     
     try {
-      await api.delete(`/api/notifications/${notificationId}`);
+      await api.delete(`/notifications/${notificationId}`);
       
       // 更新本地状态
       setNotifications(prev => 

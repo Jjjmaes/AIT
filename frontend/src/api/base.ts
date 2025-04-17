@@ -5,7 +5,7 @@ const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 // Set baseURL to just the raw backend origin, without /api
 export const axiosInstance = axios.create({
-  baseURL: rawBaseUrl,
+  baseURL: `${rawBaseUrl}/api`,
   timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',

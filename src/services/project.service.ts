@@ -91,7 +91,7 @@ export interface ProjectService {
     limit?: number;
   }): Promise<{ segments: ISegment[], total: number, page: number, limit: number }>;
   updateFileProgress(fileId: string, userId: string): Promise<void>;
-  getRecentProjects(userId: string, limit?: number): Promise<IProject[]>;
+  getRecentProjects(userId: string, limit?: number): Promise<any[]>;
 }
 
 // Add a simple word count utility function (or import if exists)
@@ -788,7 +788,7 @@ export class ProjectService implements ProjectService {
   /**
    * 获取用户的近期项目
    */
-  async getRecentProjects(userId: string, limit: number = 5): Promise<IProject[]> {
+  async getRecentProjects(userId: string, limit: number = 5): Promise<any[]> {
     const methodName = 'getRecentProjects';
     validateId(userId, '用户');
     try {
@@ -800,9 +800,26 @@ export class ProjectService implements ProjectService {
       })
       .sort({ updatedAt: -1 }) // Sort by most recently updated
       .limit(limit)
-      .populate('manager', 'username email')
+      // Explicitly select fields needed by dashboard + lean()
+      .select('_id name languagePairs status progress deadline') 
+      .lean() 
       .exec();
-      return projects;
+
+      // Process projects to match frontend expectations
+      const processedProjects = projects.map(project => {
+        const firstPair = project.languagePairs?.[0];
+        return {
+          id: project._id.toString(), // Frontend expects id as string
+          name: project.name,
+          sourceLanguage: firstPair?.source || 'N/A', // Get from first language pair
+          targetLanguage: firstPair?.target || 'N/A', // Get from first language pair
+          progress: project.progress ?? 0, // Use progress field directly, default to 0 if undefined
+          status: project.status || '未知', // Use status field directly
+          deadline: project.deadline ? new Date(project.deadline).toLocaleDateString() : 'N/A', // Format deadline
+        };
+      });
+
+      return processedProjects;
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName} for user ${userId}:`, error);
       throw handleServiceError(error, this.serviceName, methodName, '获取近期项目');

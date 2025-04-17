@@ -13,7 +13,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from "../context/AuthContext";
 
 import { getProjectById, getProjects, Project } from '../api/projectService';
-import { getFilesByProjectId, startFileTranslation, FileType } from '../api/fileService';
+import { getFilesByProjectId, FileType } from '../api/fileService';
+import { startSingleFileAITranslation, StartSingleFileAIPayload, StartAITranslationResponse } from '../api/aiTranslationService';
 // Assuming PromptTemplate interface includes a 'type' field ('translation' | 'review')
 import { getPromptTemplates, PromptTemplate } from '../api/promptTemplateService';
 import { getAllAIConfigs, AIConfig } from '../api/aiConfigService';
@@ -176,9 +177,14 @@ const TranslationCenterPage: React.FC = () => {
     queryFn: () => getAllAIConfigs(),
     enabled: !!projectId,
     select: (res): AIConfig[] => {
-      if (res?.success && Array.isArray(res.data)) {
-        return res.data;
+      // Correctly access the nested 'configs' array
+      if (res?.success && Array.isArray(res.data?.configs)) { 
+        return res.data.configs; 
       }
+      // Log if structure is unexpected
+      if(res) { // Log only if res is not undefined
+        console.warn('[TranslationCenter] Unexpected AI config response structure:', res);
+      } 
       return [];
     }
   });
@@ -237,10 +243,23 @@ const TranslationCenterPage: React.FC = () => {
     // REMOVED unused startRequestPayload variable
 
     try {
-        const promises = selectedFileIds.map(fileId =>
-             // FIX: Call startFileTranslation with only 2 arguments
-             startFileTranslation(projectId, fileId)
-        );
+        // Map selected files to API calls using the correct function and payload
+        const promises = selectedFileIds.map(fileId => {
+            // Construct the payload matching the updated StartSingleFileAIPayload
+            const payload: StartSingleFileAIPayload = {
+                // Assuming aiModelId from state maps to aiConfigId backend expects
+                aiConfigId: translationSettings.aiModelId,
+                promptTemplateId: translationSettings.promptTemplateId,
+                // Keep other options nested if needed, or remove if not used
+                options: {
+                  tmId: translationSettings.useTranslationMemory ? translationSettings.translationMemoryId : null,
+                  tbId: translationSettings.useTerminology ? translationSettings.terminologyBaseId : null
+                }
+            };
+            // Call the correct function that sends the payload
+            return startSingleFileAITranslation(projectId!, fileId, payload);
+        });
+        // Use Promise.allSettled to handle individual failures
         const results = await Promise.allSettled(promises);
 
         let successCount = 0;
@@ -248,7 +267,7 @@ const TranslationCenterPage: React.FC = () => {
         results.forEach((result, index) => {
             const fileId = selectedFileIds[index];
             if (result.status === 'fulfilled' && result.value.success) {
-                console.log(`文件 ${fileId} 翻译启动成功`);
+                console.log(`文件 ${fileId} 翻译启动成功 (Job ID: ${result.value.jobId || 'N/A'})`);
                 successCount++;
             } else {
                 // Check if error is available and has a message

@@ -2,6 +2,15 @@ import OpenAI from 'openai';
 import { TranslationOptions, IAIProviderManager } from './types';
 import logger from '../utils/logger';
 
+// Define supported AI providers
+export enum AIProvider {
+    OPENAI = 'openai',
+    GOOGLE = 'google',
+    DEEPSEEK = 'deepseek',
+    GROK = 'grok' // Added Grok
+    // Add more providers as needed
+}
+
 export class AIProviderManager implements IAIProviderManager {
   private openai: OpenAI;
 

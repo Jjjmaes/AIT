@@ -20,7 +20,7 @@ export interface GetUsersResponse {
 
 // Function to fetch users, potentially filtering by role
 export const getUsers = async (params?: { role?: string }): Promise<GetUsersResponse> => {
-  const response = await api.get<GetUsersResponse>('/api/users', { params });
+  const response = await api.get<GetUsersResponse>('/users', { params });
   return response.data;
 };
 

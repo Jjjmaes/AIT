@@ -33,7 +33,7 @@ export interface PromptTemplatesResponse {
 
 // Function to fetch prompt templates
 export const getPromptTemplates = async (/* params?: GetPromptTemplatesParams */): Promise<PromptTemplatesResponse> => {
-  const response = await api.get<PromptTemplatesResponse>('/api/prompts' /*, { params }*/);
+  const response = await api.get<PromptTemplatesResponse>('/prompts' /*, { params }*/);
   // Return response.data as 'api' interceptor returns full response
   return response.data;
 };

@@ -1,18 +1,20 @@
 import { axiosInstance as api } from './base';
 
 // Define the structure of the payload expected by the backend FOR A SINGLE FILE
-// Payload only needs the options object, aiConfigId is determined server-side
+// Updated to match backend controller expectations (aiConfigId, promptTemplateId at top level)
 export interface StartSingleFileAIPayload {
-  options: { // Nest other configs under options
-    tmId: string | null;
-    tbId: string | null;
-    promptTemplateId: string | null;
+  aiConfigId: string; // Required by backend controller
+  promptTemplateId: string; // Required by backend controller
+  options?: { // Keep options for other, optional settings
+    tmId?: string | null;
+    tbId?: string | null;
     // Add other options if backend expects them
   };
 }
 
 // Define the structure of the response expected from the backend
-interface StartAITranslationResponse {
+// Added export
+export interface StartAITranslationResponse {
   success: boolean;
   message?: string;
   jobId?: string; // Backend returns jobId
@@ -25,7 +27,8 @@ export const startSingleFileAITranslation = async (
     fileId: string,
     payload: StartSingleFileAIPayload
 ): Promise<StartAITranslationResponse> => {
-    const apiUrl = `/api/projects/${projectId}/files/${fileId}/translate`;
+    // Remove leading /api/ assuming base URL already includes it
+    const apiUrl = `/projects/${projectId}/files/${fileId}/translate`;
     console.warn(`Calling AI translation endpoint: POST ${apiUrl}`, payload.options);
     try {
         // API call payload is just the payload object { options: { ... } }

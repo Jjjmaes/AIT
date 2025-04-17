@@ -33,7 +33,7 @@ export interface TranslationStatusResponse {
  * Start a translation job for selected files
  */
 export const startTranslation = async (data: TranslationStartRequest) => {
-  const response = await axiosInstance.post('/api/translation/start', data);
+  const response = await axiosInstance.post('/translation/start', data);
   return response.data;
 };
 
@@ -41,7 +41,7 @@ export const startTranslation = async (data: TranslationStartRequest) => {
  * Get translation job status
  */
 export const getTranslationStatus = async (jobId: string): Promise<TranslationStatusResponse> => {
-  const response = await axiosInstance.get(`/api/translation/status/${jobId}`);
+  const response = await axiosInstance.get(`/translation/status/${jobId}`);
   return response.data;
 };
 
@@ -49,6 +49,6 @@ export const getTranslationStatus = async (jobId: string): Promise<TranslationSt
  * Cancel a translation job
  */
 export const cancelTranslation = async (jobId: string) => {
-  const response = await axiosInstance.post(`/api/translation/cancel/${jobId}`);
+  const response = await axiosInstance.post(`/translation/cancel/${jobId}`);
   return response.data;
 }; 

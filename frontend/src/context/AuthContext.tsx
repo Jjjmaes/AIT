@@ -60,10 +60,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
 
     try {
-      console.log('[AuthContext] Calling /api/auth/profile using axiosInstance...');
+      console.log('[AuthContext] Calling /auth/profile using axiosInstance...');
       // Use the aliased axiosInstance (api)
-      const response = await api.get('/api/auth/profile');
-      console.log('[AuthContext] /api/auth/profile response received:', response.data);
+      const response = await api.get('/auth/profile');
+      console.log('[AuthContext] /auth/profile response received:', response.data);
 
       // --- Adjust based on ACTUAL profile response structure ---
       // Assuming profile returns { success: true, data: { user: {...} } }
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // --- End Adjustment ---
 
       if (userData && userData.id) {
-        console.log('[AuthContext] /api/auth/profile success. User data:', userData);
+        console.log('[AuthContext] /auth/profile success. User data:', userData);
         // Map backend data (which might have 'username') to frontend 'name'
         const userToSet: User = {
           id: userData.id,
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
         // --- End Validation ---
       } else {
-        console.error('[AuthContext] Failed to get valid user data from /api/auth/profile response:', response.data);
+        console.error('[AuthContext] Failed to get valid user data from /auth/profile response:', response.data);
         localStorage.removeItem('authToken'); // Use consistent key
         setUser(null);
       }
@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       console.log('[AuthContext] Attempting login API call using axiosInstance...');
       // Use the aliased axiosInstance (api)
-      const response = await api.post('/api/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       console.log('[AuthContext] Login API response received:', response.data);
 
       // --- Adjust based on ACTUAL login response structure ---

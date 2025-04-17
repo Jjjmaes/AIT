@@ -1,5 +1,6 @@
 // src/services/aiConfig.service.ts
 import mongoose from 'mongoose'; // Import mongoose
+// This now correctly uses the IAIProviderConfig from the model file
 import { AIProviderConfig, IAIProviderConfig } from '../models/aiConfig.model';
 import { handleServiceError, validateId } from '../utils/errorHandler';
 import logger from '../utils/logger';
@@ -16,6 +17,8 @@ export interface AIConfigPayload {
     isActive?: boolean; // Allow setting active status
     notes?: string;
 }
+
+// The conflicting local definition that was here has been removed.
 
 class AIConfigService {
     private serviceName = 'AIConfigService';
@@ -171,4 +174,4 @@ class AIConfigService {
     }
 }
 
-export const aiConfigService = new AIConfigService(); 
+export const aiConfigService = new AIConfigService();

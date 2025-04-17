@@ -198,48 +198,44 @@ export class FileController {
     const { projectId, fileId } = req.params;
     const userId = req.user?.id;
     const userRoles = req.user?.role ? [req.user.role] : [];
-    const options = req.body.options || {}; // Get options from body
+    
+    // <<< Get settings from request body >>>
+    const { 
+        promptTemplateId, 
+        aiConfigId, // Assuming frontend sends aiConfigId directly now
+        options = {} // Keep options for other potential settings
+    } = req.body;
 
     try {
       validateId(projectId, '项目');
       validateId(fileId, '文件');
       if (!userId) return next(new AppError('认证失败', 401));
 
-      // 1. Validate user permission and get project details
+      // <<< Validate required IDs from body >>>
+      if (!promptTemplateId) {
+        return next(new ValidationError('缺少必要的参数: promptTemplateId'));
+      }
+      if (!aiConfigId) {
+         return next(new ValidationError('缺少必要的参数: aiConfigId'));
+      }
+      validateId(promptTemplateId, '提示词模板');
+      validateId(aiConfigId, 'AI 配置');
+
+      // 1. Validate user permission (projectService.getProjectById already does this)
+      // We don't strictly need the project object here anymore unless we validate 
+      // if the chosen templates/configs are compatible, but let's keep it for now.
       const project = await projectService.getProjectById(projectId, userId, userRoles);
       validateEntityExists(project, '项目');
 
-      // 2. Determine AI Configuration ID
-      let aiConfigId = project.translationAIConfigId?.toString(); // Get from project
+      logger.info(`User ${userId} queuing translation for file ${fileId} in project ${projectId} using AI Config ${aiConfigId} and Prompt ${promptTemplateId}`);
 
-      if (!aiConfigId) {
-        // ---!!! HARDCODED FALLBACK (TEMPORARY) !!!---
-        // TODO: Replace this with proper error handling or default config lookup
-        // For now, assume a specific ID exists for testing. 
-        // You MUST create an AIProviderConfig with this ID in your DB.
-        const fallbackConfigId = 'HARDCODED_AI_CONFIG_ID_REPLACE_ME'; 
-        logger.warn(`${methodName}: Project ${projectId} has no AI config set. Using HARDCODED fallback ID: ${fallbackConfigId}`);
-        aiConfigId = fallbackConfigId;
-        // Optional: Validate fallback exists
-        // const fallbackConfig = await aiConfigService.getConfigById(aiConfigId);
-        // if (!fallbackConfig) {
-        //   throw new AppError(`Fallback AI config ID ${aiConfigId} not found`, 500);
-        // }
-      }
-      
-      // ---!!! Ensure aiConfigId is not undefined before proceeding !!!---
-      if (!aiConfigId) {
-         throw new AppError(`无法确定用于项目 ${projectId} 的 AI 配置`, 500);
-      }
-
-      logger.info(`User ${userId} queuing translation for file ${fileId} in project ${projectId} using AI Config ${aiConfigId}`);
-
-      // 3. Call QueueService to enqueue the job, passing the determined aiConfigId
+      // 3. Call QueueService to enqueue the job, passing the determined IDs
       const jobId = await translationQueueService.addFileTranslationJob(
         projectId,
         fileId,
-        aiConfigId, // Pass the determined ID
-        options,
+        aiConfigId,         // <<< Pass from req.body
+        promptTemplateId,   // <<< Pass from req.body
+        options,            // Pass remaining options
         userId,
         userRoles
       );
@@ -247,8 +243,8 @@ export class FileController {
       // 4. Return job ID or success message
       res.status(202).json({
         success: true,
-        message: '翻译请求已接收', // Updated message
-        jobId: jobId 
+        message: '翻译请求已接收',
+        jobId: jobId // Return job ID
       });
 
     } catch (error) {

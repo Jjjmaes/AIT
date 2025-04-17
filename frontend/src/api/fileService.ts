@@ -121,7 +121,7 @@ export interface DeleteFileResponse {
  * Get all files
  */
 export const getAllFiles = async (): Promise<FileType[]> => {
-  const response = await axiosInstance.get<GetFilesResponse>('/api/files');
+  const response = await axiosInstance.get<GetFilesResponse>('/files');
   return response.data.files;
 };
 
@@ -132,7 +132,7 @@ export const getFilesByProjectId = async (projectId: string): Promise<FileType[]
   try {
     // Backend seems to return { success: boolean, data: FileType[] }
     // Adjust the expected response type if needed, or use 'any' and check dynamically
-    const response = await axiosInstance.get<{ success: boolean; data?: FileType[]; message?: string }>(`/api/projects/${projectId}/files`);
+    const response = await axiosInstance.get<{ success: boolean; data?: FileType[]; message?: string }>(`/projects/${projectId}/files`);
     
     // Check if the request was successful and the data array exists
     if (response?.data?.success && Array.isArray(response.data.data)) {
@@ -153,7 +153,7 @@ export const getFilesByProjectId = async (projectId: string): Promise<FileType[]
  * Upload a file
  */
 export const uploadFile = async (file: File, projectId?: string): Promise<FileType> => {
-  const uploadUrl = projectId ? `/api/projects/${projectId}/files` : '/api/files/upload';
+  const uploadUrl = projectId ? `/projects/${projectId}/files` : '/files/upload';
   
   const formData = new FormData();
   formData.append('file', file);
@@ -192,7 +192,7 @@ export const uploadFile = async (file: File, projectId?: string): Promise<FileTy
  * Delete a file
  */
 export const deleteFile = async (fileId: string): Promise<boolean> => {
-  const response = await axiosInstance.delete<DeleteFileResponse>(`/api/files/${fileId}`);
+  const response = await axiosInstance.delete<DeleteFileResponse>(`/files/${fileId}`);
   return response.data.success;
 };
 
@@ -200,7 +200,7 @@ export const deleteFile = async (fileId: string): Promise<boolean> => {
  * Start translation process for a file
  */
 export const startFileTranslation = async (projectId: string, fileId: string): Promise<StartTranslationResponse> => {
-  const response = await axiosInstance.post<StartTranslationResponse>(`/api/projects/${projectId}/files/${fileId}/translate`);
+  const response = await axiosInstance.post<StartTranslationResponse>(`/projects/${projectId}/files/${fileId}/translate`);
   return response.data;
 };
 
@@ -208,7 +208,7 @@ export const startFileTranslation = async (projectId: string, fileId: string): P
  * Get file details
  */
 export const getFileDetails = async (fileId: string): Promise<FileType> => {
-  const response = await axiosInstance.get<FileDetailResponse>(`/api/files/${fileId}`);
+  const response = await axiosInstance.get<FileDetailResponse>(`/files/${fileId}`);
   return response.data.file;
 };
 
@@ -219,7 +219,7 @@ export const getFileSegments = async (
   fileId: string,
   params?: { page?: number; limit?: number; status?: string }
 ): Promise<GetSegmentsResponse> => {
-  const response = await axiosInstance.get<GetSegmentsResponse>(`/api/files/${fileId}/segments`, { params });
+  const response = await axiosInstance.get<GetSegmentsResponse>(`/files/${fileId}/segments`, { params });
   return response.data;
 };
 
@@ -230,7 +230,7 @@ export const updateSegment = async (
   segmentId: string,
   payload: UpdateSegmentPayload
 ): Promise<Segment> => {
-  const response = await axiosInstance.patch<UpdateSegmentResponse>(`/api/segments/${segmentId}`, payload);
+  const response = await axiosInstance.patch<UpdateSegmentResponse>(`/segments/${segmentId}`, payload);
   return response.data.segment;
 };
 

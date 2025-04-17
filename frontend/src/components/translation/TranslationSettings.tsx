@@ -117,9 +117,9 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
           >
             <Select placeholder="选择翻译提示词模板">
               {promptTemplates.map(template => (
-                <Option key={template.id} value={template.id}>
+                <Option key={template._id} value={template._id}>
                   {template.name}
-                  {template.id === project?.defaultTranslationPromptTemplate && ' (项目默认)'}
+                  {template._id === project?.defaultTranslationPromptTemplate && ' (项目默认)'}
                 </Option>
               ))}
               {promptTemplates.length === 0 && <Option value="" disabled>无可用翻译模板</Option>}
@@ -141,9 +141,9 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
           >
             <Select placeholder="选择审校提示词模板">
               {reviewPromptTemplates.map(template => (
-                <Option key={template.id} value={template.id}>
+                <Option key={template._id} value={template._id}>
                   {template.name}
-                  {template.id === project?.defaultReviewPromptTemplate && ' (项目默认)'}
+                  {template._id === project?.defaultReviewPromptTemplate && ' (项目默认)'}
                 </Option>
               ))}
               {reviewPromptTemplates.length === 0 && <Option value="" disabled>无可用审校模板</Option>}
@@ -166,11 +166,11 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
             <Radio.Group>
               <Space direction="vertical">
                 {aiConfigs?.map(config => (
-                  <Radio key={config.id} value={config.id}>
+                  <Radio key={config._id} value={config._id}>
                     <Space>
                       <ExperimentOutlined />
-                      <span>{config.name}</span>
-                      <Text type="secondary">{config.description}</Text>
+                      <span>{config.providerName}</span>
+                      <Text type="secondary">{config.notes}</Text>
                     </Space>
                   </Radio>
                 ))}

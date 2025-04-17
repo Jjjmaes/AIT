@@ -15,7 +15,8 @@ export interface TranslationJobData {
   fileId?: string; // Only for file type
   userId: string; // User who initiated the job
   requesterRoles: string[]; // Roles of the user who initiated
-  aiConfigId?: string; // Make AI Config ID optional for now
+  aiConfigId: string; // Make required again
+  promptTemplateId: string;
   options?: TranslationOptions; // Optional translation settings
 }
 
@@ -75,14 +76,14 @@ class TranslationQueueService {
   async addFileTranslationJob(
     projectId: string,
     fileId: string,
-    aiConfigId: string, // Keep required here, controller must provide it
+    aiConfigId: string, 
+    promptTemplateId: string,
     options: TranslationOptions, 
     userId: string, 
     requesterRoles: string[]
   ): Promise<string> {
     const methodName = 'addFileTranslationJob';
     const jobId = this.getJobId('file', fileId);
-    // aiConfigId is now optional in the interface, but we provide it here
     const jobData: TranslationJobData = { 
         type: 'file', 
         projectId, 
@@ -90,6 +91,7 @@ class TranslationQueueService {
         userId, 
         requesterRoles, 
         aiConfigId, 
+        promptTemplateId,
         options 
     };
     try {
@@ -110,13 +112,23 @@ class TranslationQueueService {
 
   async addProjectTranslationJob(
     projectId: string,
+    aiConfigId: string, 
+    promptTemplateId: string, 
     options: TranslationOptions,
     userId: string, // Pass userId
     requesterRoles: string[] // Pass requesterRoles
   ): Promise<string> {
      const methodName = 'addProjectTranslationJob';
      const jobId = this.getJobId('project', projectId);
-     const jobData: TranslationJobData = { type: 'project', projectId, options, userId, requesterRoles };
+     const jobData: TranslationJobData = { 
+        type: 'project', 
+        projectId, 
+        aiConfigId, 
+        promptTemplateId, 
+        options, 
+        userId, 
+        requesterRoles 
+     };
      try {
        // Add check for queue existence
        if (!this.queue) {

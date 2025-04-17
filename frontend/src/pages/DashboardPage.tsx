@@ -33,8 +33,8 @@ const DashboardPage = () => {
     const fetchDashboardData = async () => {
       try {
         const [statsResponse, projectsResponse] = await Promise.all([
-          api.get('/api/users/stats'),
-          api.get('/api/projects/recent')
+          api.get('/users/stats'),
+          api.get('/projects/recent')
         ]);
         
         setStats(statsResponse.data);
@@ -42,7 +42,7 @@ const DashboardPage = () => {
         if (projectsResponse.data && projectsResponse.data.success && projectsResponse.data.data) {
             setRecentProjects(projectsResponse.data.data.projects);
         } else {
-            console.error('Unexpected structure for /api/projects/recent:', projectsResponse.data);
+            console.error('Unexpected structure for /projects/recent:', projectsResponse.data);
             setRecentProjects([]);
         }
 

@@ -1,0 +1,623 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2" xmlns:mq="MQXliff" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
+<file original="test.docx" mq:id="cc595b45-9de1-46f3-96d5-eb5632961867" mq:projectid="13b0cb00-01ab-4820-91b4-661a8dd3dd26" source-language="zh-CN" target-language="en-us" datatype="x-docx">
+<header>
+<tool tool-id="MQ" tool-name="MemoQ" tool-version="10.5.5" tool-company="Kilgray" />
+<mq:export-path>D:\project\test\test_eng-US.docx</mq:export-path>
+<mq:docinformation mq:isabstract="isabstract" mq:hashistory="true" mq:docname="test.docx" mq:majorversion="1" mq:minorversion="1" mq:nosplitjoin="false" mq:langindepgroupid="58559518-d145-46c0-b44b-3d8ad0df69c2" mq:multidocgroupid="bd3a257b-6fcf-4bb1-a6ff-3fa958ddee81" mq:origfile="D:\project\test\test.docx" mq:numberofwords="1135" mq:filterconfigname="default" mq:filterconfigserverurl="" mq:changetrackingenabledstates="Off,Off,Off,Off">
+<mq:versioninfos mq:majorversion="1"><mq:minorversioninfo mq:minorversion="0" mq:comment="" mq:createdthroughview="false" mq:createreason="Import" mq:creationtime="546972566" mq:creatoruser="lingu" mq:tag=""><mq:details mq:type="MinorVersionDetailsImport"><![CDATA[<?xml version="1.0"?>
+<MinorVersionDetailsImport xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <FilePath>D:\project\test\test.docx</FilePath>
+</MinorVersionDetailsImport>]]></mq:details></mq:minorversioninfo>
+<mq:minorversioninfo mq:minorversion="1" mq:comment="" mq:createdthroughview="false" mq:createreason="BilingualExport" mq:creationtime="546972583" mq:creatoruser="lingu" mq:tag=""><mq:details mq:type="MinorVersionDetailsBilingExport"><![CDATA[<?xml version="1.0"?>
+<MinorVersionDetailsBilingExport xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <BilingualType>Xliff</BilingualType>
+  <TargetPath>D:\project\test\test.docx_eng-US.mqxliff</TargetPath>
+  <TwoColumpRtfProperties>MutipleDocuments</TwoColumpRtfProperties>
+  <BilingRtfProperties>EmptySegmentsWithMarkup</BilingRtfProperties>
+  <XliffProperties>IncludePreview</XliffProperties>
+</MinorVersionDetailsBilingExport>]]></mq:details></mq:minorversioninfo>
+</mq:versioninfos>
+<mq:tagdefinition alignhighlight="false" caseinsensitive="false" oeid="1200" oename="utf-16" rawhtml="false" showitags="true" basicformat="true" supersubscript="true" xmlcommands="true"><mq:tagdefelement name="b" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="btn" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="dt" filtered="true" required="true" translatable="true" /><mq:tagdefattribute name="name" filtered="false" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="i" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="underline-sng" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="rtl-on" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="rtl-off" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="rpr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="transform" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="idx" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="transform" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="idxm" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="l" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="depth" filtered="false" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="instr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="delinstr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="sym" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="font" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="char" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="mqc" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="pict" placeholder="true" tagrequired="Required"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="textpath1" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath2" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath3" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath4" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath5" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath6" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath7" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath8" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath9" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="textpath10" filtered="false" required="false" translatable="true" /></mq:tagdefelement><mq:tagdefelement name="altcontent" placeholder="true" tagrequired="Required"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="bmk" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="colFirst" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="colLast" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="displacedByCustomXml" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="transform" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="name" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="val" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="cmt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="transform" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="displacedByCustomXml" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="comment" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="creator" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="creationtime" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="day" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="month" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="monthL" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="year" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="yearL" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="dayL" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="pgNum" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:ch" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="o" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fld" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="val" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ruby" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="draw" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="mmq-alttitle" filtered="true" required="false" translatable="true" /><mq:tagdefattribute name="mmq-altdescr" filtered="true" required="false" translatable="true" /></mq:tagdefelement><mq:tagdefelement name="sdt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ptab" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="alignment" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="relativeTo" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="leader" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ent" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="customMarkFollows" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="underline-sng" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-sub" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-super" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fnt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="customMarkFollows" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="underline-sng" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-sub" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-super" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="hlnk" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="tgtFrame" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="tooltip" filtered="false" required="false" translatable="true" /><mq:tagdefattribute name="docLocation" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="history" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="anchor" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="href" filtered="true" required="false" translatable="true" /><mq:tagdefattribute name="fileName" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="entr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="underline-sng" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-sub" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-super" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fntr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="underline-sng" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-sub" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="vertAlign-super" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:nt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="type" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="text" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="val" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mo" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="rprid" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="font" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="ea" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="latin" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="cs" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="sym" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="u" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="type" filtered="false" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="c" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="lnk-c" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ext" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ln" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="lnk-m" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="eff-l" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="eff-c" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ul-f" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="ul-p" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-pt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-no" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-bl" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-gr" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-sd" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-gd" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-ug" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="fill-uf" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="km" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="size" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="strike" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="kern" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="cap" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="spc" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="normh" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="bline" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="underline-none" placeholder="false" tagrequired="Normal"></mq:tagdefelement><mq:tagdefelement name="mmq-moveFrom" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="author" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="date" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="mmq-commonId" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mmq-moveTo" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="author" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="date" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="mmq-commonId" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:cmt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="val" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="prv" filtered="false" required="false" translatable="false" /><mq:tagdefattribute name="id" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:pi" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="instruction" filtered="false" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:rxt" placeholder="false" tagrequired="Normal"><mq:tagdefattribute name="displaytext" filtered="true" required="true" translatable="false" /><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /><mq:tagdefattribute name="fmt_b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_u" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_sup" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_sub" filtered="true" required="false" translatable="false" /></mq:tagdefelement><mq:tagdefelement name="mq:rxt-req" placeholder="true" tagrequired="Required"><mq:tagdefattribute name="displaytext" filtered="true" required="true" translatable="false" /><mq:tagdefattribute name="val" filtered="true" required="true" translatable="false" /><mq:tagdefattribute name="fmt_b" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_i" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_u" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_sup" filtered="true" required="false" translatable="false" /><mq:tagdefattribute name="fmt_sub" filtered="true" required="false" translatable="false" /></mq:tagdefelement></mq:tagdefinition>
+<mq:doccomments />
+<mq:lqamodel><![CDATA[<XMLSerializedLQAModel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Version>1</Version><Name /><RevisionID>00000000-0000-0000-0000-000000000000</RevisionID><UseSeverityLevels>false</UseSeverityLevels><UsePenaltyPoints>false</UsePenaltyPoints><RequiresReviewerCommenting>false</RequiresReviewerCommenting><SeverityLevelNames /><ModelEntries /><PassFailCriterion><CountMultipleErrorOccuranceAsOne>false</CountMultipleErrorOccuranceAsOne><CritDefType>PenaltyPoints</CritDefType><PenaltyPointsNominator>0</PenaltyPointsNominator><PenaltyPointPerWordsDenominator>0</PenaltyPointPerWordsDenominator><NormalizedPenaltyScoreLimit>0</NormalizedPenaltyScoreLimit><CritDefinitionRules /></PassFailCriterion><QALQAMapping /><Timestamp>0001-01-01T00:00:00</Timestamp></XMLSerializedLQAModel>]]></mq:lqamodel>
+<mq:externalpreviewinfo>
+<mq:previewidsbylabels>
+<mq:previewidbylabel mq:label="1" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-1" />
+<mq:previewidbylabel mq:label="2" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-2" />
+<mq:previewidbylabel mq:label="3" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-3" />
+<mq:previewidbylabel mq:label="4" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-4" />
+<mq:previewidbylabel mq:label="5" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-5" />
+<mq:previewidbylabel mq:label="6" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-6" />
+<mq:previewidbylabel mq:label="7" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-7" />
+<mq:previewidbylabel mq:label="8" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-8" />
+<mq:previewidbylabel mq:label="9" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-9" />
+<mq:previewidbylabel mq:label="10" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-10" />
+<mq:previewidbylabel mq:label="11" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-11" />
+<mq:previewidbylabel mq:label="12" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-12" />
+<mq:previewidbylabel mq:label="13" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-13" />
+<mq:previewidbylabel mq:label="14" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-14" />
+<mq:previewidbylabel mq:label="15" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-15" />
+<mq:previewidbylabel mq:label="16" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-16" />
+<mq:previewidbylabel mq:label="17" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-17" />
+<mq:previewidbylabel mq:label="18" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-18" />
+<mq:previewidbylabel mq:label="19" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-19" />
+<mq:previewidbylabel mq:label="20" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-20" />
+<mq:previewidbylabel mq:label="21" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-21" />
+<mq:previewidbylabel mq:label="22" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-22" />
+<mq:previewidbylabel mq:label="23" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-23" />
+<mq:previewidbylabel mq:label="24" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-24" />
+<mq:previewidbylabel mq:label="25" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-25" />
+<mq:previewidbylabel mq:label="26" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-26" />
+<mq:previewidbylabel mq:label="27" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-27" />
+<mq:previewidbylabel mq:label="28" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-28" />
+<mq:previewidbylabel mq:label="29" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-29" />
+<mq:previewidbylabel mq:label="30" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-30" />
+<mq:previewidbylabel mq:label="31" mq:previewid="mQ-default-cbf36840-acd3-43c6-b38a-666e26f044ce-31" />
+</mq:previewidsbylabels>
+</mq:externalpreviewinfo>
+</mq:docinformation>
+</header>
+<body>
+<trans-unit id="1" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="911fb4bf-4fd0-4826-9376-c1b75f142460" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="1" mq:lastlabel="1" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="1">样品的稀释</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#1 / struct-rpr#1</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="2" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="50968115-cf1f-4914-96ab-79714ab2874c" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="2" mq:lastlabel="2" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="2">6.1<bpt id="1" rid="1">&lt;rpr id=&quot;1&quot;&gt;</bpt>.<ept id="2" rid="1">&lt;/rpr id=&quot;1&quot; transform=&quot;close&quot;&gt;</ept>1固体和半固体样品<bpt id="3" rid="2">&lt;rpr id=&quot;1&quot;&gt;</bpt>：<ept id="4" rid="2">&lt;/rpr id=&quot;1&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#2</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="3" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="15493825-e312-4cea-9485-001a4f63909b" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="2" mq:lastlabel="2" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="2">称取25<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>g<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>样品置于盛有225 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>无菌磷酸盐缓冲液或无菌生理盐水的无菌 均质杯内<bpt id="5" rid="3">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="6" rid="3">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept><bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>8<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept> 000 <bpt id="9" rid="5">&lt;rpr id=&quot;2&quot;&gt;</bpt>r/min<ept id="10" rid="5">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="11" rid="6">&lt;rpr id=&quot;4&quot;&gt;</bpt>〜<ept id="12" rid="6">&lt;/rpr id=&quot;4&quot; transform=&quot;close&quot;&gt;</ept>10 000 <bpt id="13" rid="7">&lt;rpr id=&quot;2&quot;&gt;</bpt>r/min<ept id="14" rid="7">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>均质1 <bpt id="15" rid="8">&lt;rpr id=&quot;2&quot;&gt;</bpt>min<ept id="16" rid="8">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="17" rid="9">&lt;rpr id=&quot;4&quot;&gt;</bpt>〜<ept id="18" rid="9">&lt;/rpr id=&quot;4&quot; transform=&quot;close&quot;&gt;</ept>2 <bpt id="19" rid="10">&lt;rpr id=&quot;2&quot;&gt;</bpt>min<ept id="20" rid="10">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="21" rid="11">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="22" rid="11">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept>或放入盛有225 <bpt id="23" rid="12">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="24" rid="12">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>稀释液的无菌均质袋 中<bpt id="25" rid="13">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="26" rid="13">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept>用拍击式均质器拍打<bpt id="27" rid="14">&lt;rpr id=&quot;2&quot;&gt;</bpt>lmin<ept id="28" rid="14">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="29" rid="15">&lt;rpr id=&quot;4&quot;&gt;</bpt>〜<ept id="30" rid="15">&lt;/rpr id=&quot;4&quot; transform=&quot;close&quot;&gt;</ept><bpt id="31" rid="16">&lt;rpr id=&quot;2&quot;&gt;</bpt>2min<ept id="32" rid="16">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="33" rid="17">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="34" rid="17">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept>制成<bpt id="35" rid="18">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="36" rid="18">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept> :</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#2</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve"> </mq:endingws>
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="4" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="5a76f5f6-fb85-420d-8a33-b6a4a4f456f4" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="2" mq:lastlabel="2" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="2"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>10<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的样品勻液。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#2</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="5" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="8782a3df-e41b-440a-a87e-0204a59465b7" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="3" mq:lastlabel="3" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="3">6.1.2液体样品：</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#3</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="6" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="4ebd467d-4c61-4050-8f92-323b459d0392" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="3" mq:lastlabel="3" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="3">以无菌吸管吸取25<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>样品置于盛有225 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>无菌磷酸盐缓冲液或无菌生理盐水的 无菌锥形瓶(瓶内可预置适当数量的无菌玻璃珠）中，充分混匀，或放入盛有225 <bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>稀释液的无菌均质 袋中<bpt id="7" rid="4">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="8" rid="4">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept>用拍击式均质器拍打<bpt id="9" rid="5">&lt;rpr id=&quot;2&quot;&gt;</bpt>lmin<ept id="10" rid="5">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="11" rid="6">&lt;rpr id=&quot;4&quot;&gt;</bpt>〜<ept id="12" rid="6">&lt;/rpr id=&quot;4&quot; transform=&quot;close&quot;&gt;</ept><bpt id="13" rid="7">&lt;rpr id=&quot;2&quot;&gt;</bpt>2min<ept id="14" rid="7">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="15" rid="8">&lt;rpr id=&quot;3&quot;&gt;</bpt>，<ept id="16" rid="8">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept>制成<bpt id="17" rid="9">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="18" rid="9">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept> :</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#3</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve"> </mq:endingws>
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="7" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="cf2414a6-e061-46ba-8692-1014616f3429" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="3" mq:lastlabel="3" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="3"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>10<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的样品匀液。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#3</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="8" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="8b715f77-885e-4677-a7e8-81f0f5af1800" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="3" mq:lastlabel="3" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="3">当结果要求为每<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>g<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>样品中菌落总数 时，按<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>6<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>操作。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#3</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="9" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="a5edca48-afe5-47d3-82d0-af8d787a89c4" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="4" mq:lastlabel="4" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="4">6.1.3用<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>lmL<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>无菌吸管或微量移液器吸取1:10样品匀液<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>lmL<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>,沿管壁缓慢注于盛有9<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>稀释液 的无菌试管中（注意吸管或吸头尖端不要触及稀释液面），在振荡器上振荡混匀，制成<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>:<bpt id="9" rid="5">&lt;rpr id=&quot;2&quot;&gt;</bpt>100<ept id="10" rid="5">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的样品 匀液。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#3</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="10" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="cadee96c-57f1-4c49-b188-81ac19a2e967" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="5" mq:lastlabel="5" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="5">6.1.4按6.1.3操作，制备<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>10<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>倍系列稀释样品匀液。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#4</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="11" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="e48a829d-a796-405b-98fa-5fe7def0baf5" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="5" mq:lastlabel="5" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="5">每递增稀释一次，换用<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>次<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>lmL<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>无菌吸管或 吸头。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#4</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="12" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="5f72d939-d6df-4407-bea3-9cd537a861b4" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="6" mq:lastlabel="6" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="6">6.1.5根据对样品污染状况的估计，选择1个<bpt id="1" rid="1">&lt;rpr id=&quot;5&quot;&gt;</bpt>〜<ept id="2" rid="1">&lt;/rpr id=&quot;5&quot; transform=&quot;close&quot;&gt;</ept>3个适宜稀释度的样品匀液（液体样品可包括原液），吸 取<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>1mL<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>样品匀液于无菌培养皿内，每个稀释度做两个培养皿。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#5</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="13" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="204ccce7-90c6-40cf-a4d7-09839b27ef40" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="6" mq:lastlabel="6" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="6">同时，分别吸取<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>1mL<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>空白稀释液加人 两个无菌培养皿内作空白对照。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#5</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="14" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="4d7911a4-c2f2-4f7f-8c43-016b0cfb2e2f" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="7" mq:lastlabel="7" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="7">6.1.6及时将15<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;5&quot;&gt;</bpt>〜<ept id="4" rid="2">&lt;/rpr id=&quot;5&quot; transform=&quot;close&quot;&gt;</ept>20<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>冷却至46°<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="9" rid="5">&lt;rpr id=&quot;5&quot;&gt;</bpt>〜<ept id="10" rid="5">&lt;/rpr id=&quot;5&quot; transform=&quot;close&quot;&gt;</ept>50°<bpt id="11" rid="6">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="12" rid="6">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的平板计数琼脂培养基（可放置于48°<bpt id="13" rid="7">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="14" rid="7">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>±2°<bpt id="15" rid="8">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="16" rid="8">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>恒温 装置中保温)倾注培养皿，并转动培养皿使其混合均匀。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#6</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="15" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="f84f504a-2166-475d-8f76-6de980738a27" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="8" mq:lastlabel="8" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="8"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>6<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;6&quot;&gt;</bpt>.<ept id="4" rid="2">&lt;/rpr id=&quot;6&quot; transform=&quot;close&quot;&gt;</ept><bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>2<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="7" rid="4">&lt;rpr id=&quot;0&quot;&gt;</bpt>培养<ept id="8" rid="4">&lt;/rpr id=&quot;0&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#7</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="16" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="460a2432-e86a-41b7-8c3d-443a8284aabc" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="9" mq:lastlabel="9" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="9">6.2.1水平放置待琼脂凝固后，将平板翻转，36 <bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>±1 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>培养48<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>h<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>±2<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>h<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#8</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="17" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="12d9ea9f-59fa-4210-a711-2f6af6e9c878" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="9" mq:lastlabel="9" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="9">水产品30 <bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>±1 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>C<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>培养 72<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>h<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>±3<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>h<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#8</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="18" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="9d2e8866-f735-49d4-8f59-21b3b3963bdd" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="9" mq:lastlabel="9" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="9">如果样品中可能含有在琼脂培养基表面蔓延生长的菌落，可在凝固后的琼脂培养基表面覆 盖一薄层平板计数琼脂培养基（约4<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>)，凝固后翻转平板，进行培养。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#8</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="19" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="d0634541-6c92-4bd4-8f3f-fcfdae1f151e" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="10" mq:lastlabel="10" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="10"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>6<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>2<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>2<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>如使用菌落总数测试片，应按照测试片所提供的相关技术规程操作。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#9</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="20" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="e3013c9f-d359-4bb3-a98e-e5ee29f03c77" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="11" mq:lastlabel="11" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="11"><bpt id="1" rid="1">&lt;rpr id=&quot;6&quot;&gt;</bpt>63<ept id="2" rid="1">&lt;/rpr id=&quot;6&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;0&quot;&gt;</bpt>菌落计数<ept id="4" rid="2">&lt;/rpr id=&quot;0&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#10</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="21" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="841f60d9-dc17-43d7-9940-ff8da575cf4e" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="12" mq:lastlabel="12" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="12">6.3.1可用肉眼观察，必要时用放大镜或菌落计数器，记录稀释倍数和相应的菌落数量。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#11</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="22" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="addb0eec-3fdb-4150-84d9-5d202f64a2bb" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="12" mq:lastlabel="12" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="12">菌落计数以 菌落形成单位<bpt id="1" rid="1">&lt;rpr id=&quot;3&quot;&gt;</bpt>（<ept id="2" rid="1">&lt;/rpr id=&quot;3&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>colony<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept> <bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>formingunit<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>，<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>)表示。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#11</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="23" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="c44183f1-6892-4be6-9cd7-93c8439ff9b1" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="13" mq:lastlabel="13" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="13">6.3.2选取菌落数在30<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;5&quot;&gt;</bpt>〜<ept id="4" rid="2">&lt;/rpr id=&quot;5&quot; transform=&quot;close&quot;&gt;</ept>300 <bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>之间、无蔓延菌落生长的平板计数菌落总数。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#12</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="24" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="c1e3eec5-898e-4bb0-81bb-c7953d0cc906" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="13" mq:lastlabel="13" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="13">低于30<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU <ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的平板记录具体菌落数，大于300 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>的可记录为多不可计。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#12</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="25" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="462a4e2c-117f-4d21-a688-3402853ad8f3" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="14" mq:lastlabel="14" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="14">6.3.3其中一个平板有较大片状菌落生长时，则不宜采用，而应以无较大片状菌落生长的平板作为该 稀释度的菌落数;若片状菌落不到平板的一半，而其余一半中菌落分布又很均匀，可计算半个平板后乘 以<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>2<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>,代表一个平板菌落数。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#13</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="26" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="00a73da2-a3db-4412-a964-4fac5964a184" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="15" mq:lastlabel="15" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="15">6.3.4当平板上出现菌落间无明显界线的链状生长时，则将每条单链作为一个菌落计数。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#14</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve"> </mq:endingws>
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="27" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="b8456eb4-2154-48b1-8e8d-b393ed5e7537" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="15" mq:lastlabel="15" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="15"><bpt id="1" rid="1">&lt;rpr id=&quot;7&quot;&gt;</bpt>7结果与报告 <ept id="2" rid="1">&lt;/rpr id=&quot;7&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;0&quot;&gt;</bpt>7.1菌落总数的计算方法<ept id="4" rid="2">&lt;/rpr id=&quot;0&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#14</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="28" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="8e65b2e3-e5d6-4ade-8065-cc57963bb66a" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="16" mq:lastlabel="16" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="16"><bpt id="1" rid="1">&lt;rpr id=&quot;8&quot;&gt;</bpt>7.1.1<ept id="2" rid="1">&lt;/rpr id=&quot;8&quot; transform=&quot;close&quot;&gt;</ept>若只有一个稀释度平板上的菌落数在适宜计数范围内，计算两个平板菌落数的平均值，再将平 均值乘以相应稀释倍数，作为每<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>g<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>(<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>mL<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>)样品中菌落总数结果，示例见<bpt id="7" rid="4">&lt;rpr id=&quot;2&quot;&gt;</bpt>B<ept id="8" rid="4">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.1。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#15</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="29" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="4416b1c2-93ca-4760-bfa4-e1a00d12f82e" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="17" mq:lastlabel="17" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="17"><bpt id="1" rid="1">&lt;rpr id=&quot;9&quot;&gt;</bpt><ph id="2">&lt;altcontent id=&quot;0&quot; /&gt;</ph><ph id="3">&lt;altcontent id=&quot;1&quot; /&gt;</ph><ph id="4">&lt;altcontent id=&quot;2&quot; /&gt;</ph><ph id="5">&lt;altcontent id=&quot;3&quot; /&gt;</ph><ept id="6" rid="1">&lt;/rpr id=&quot;9&quot; transform=&quot;close&quot;&gt;</ept><bpt id="7" rid="2">&lt;rpr id=&quot;8&quot;&gt;</bpt>7.1.2<ept id="8" rid="2">&lt;/rpr id=&quot;8&quot; transform=&quot;close&quot;&gt;</ept>若有两个连续稀释度的平板菌落数在适宜计数范围内时，按式（1)计算，示例见<bpt id="9" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>B<ept id="10" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.2。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#16</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="30" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="43a47acf-44d4-4ee0-839a-5de71f709489" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="18" mq:lastlabel="18" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="18"><bpt id="1" ctype="italic">{}</bpt>N —<ept id="1">{}</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#17</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="31" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="f1d274dc-232c-4aea-8276-dda9e8c856a8" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="19" mq:lastlabel="19" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="19"><bpt id="1" ctype="italic">{}</bpt>N —<ept id="1">{}</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#18</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="32" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="310d3217-ea5d-45fc-9193-06822f415929" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="20" mq:lastlabel="20" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="20"><bpt id="1" ctype="bold">{}</bpt>sc<ept id="1">{}</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#19</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="33" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="f0b84a2c-46e9-4ca9-93c0-05185c55ea11" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="21" mq:lastlabel="21" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="21"><bpt id="1" ctype="bold">{}</bpt>sc<ept id="1">{}</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#20</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="34" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="f5f9d058-b72c-4dd2-9621-385f9f8b836e" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="22" mq:lastlabel="22" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="22">(狀1 + 0<bpt id="1" rid="1">&lt;rpr id=&quot;10&quot;&gt;</bpt>.1??<ept id="2" rid="1">&lt;/rpr id=&quot;10&quot; transform=&quot;close&quot;&gt;</ept>2 )犱</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#21</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="35" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="2317b158-a511-4094-a7c2-63cf7ac42219" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="23" mq:lastlabel="23" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="23">(狀1 + 0<bpt id="1" rid="1">&lt;rpr id=&quot;10&quot;&gt;</bpt>.1??<ept id="2" rid="1">&lt;/rpr id=&quot;10&quot; transform=&quot;close&quot;&gt;</ept>2 )犱</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#22</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="36" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="02c320b8-3965-49e9-a192-f141e8ce8c5f" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="24" mq:lastlabel="24" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="24"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>(1<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;11&quot;&gt;</bpt> )<ept id="4" rid="2">&lt;/rpr id=&quot;11&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#23</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="37" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="d3db0d9f-589a-4a79-a8a4-384dd1b7ebd5" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="25" mq:lastlabel="25" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="25"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>(1<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept><bpt id="3" rid="2">&lt;rpr id=&quot;11&quot;&gt;</bpt> )<ept id="4" rid="2">&lt;/rpr id=&quot;11&quot; transform=&quot;close&quot;&gt;</ept></source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#24</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="38" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="a9299920-049c-4767-91b6-8f836d029166" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="26" mq:lastlabel="26" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="26">式中:</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#25</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="39" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="1ba05c0c-3e1f-4ff4-b864-a044db1efc73" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="27" mq:lastlabel="27" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="27"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>N<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>——样品中菌落数；</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#26</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="40" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="a9981e80-4b35-428a-a73d-d38cf8e78385" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="28" mq:lastlabel="28" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="28"><bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>SC<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>——平板(含适宜范围菌落数的平板）菌落数之和；</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#27</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="41" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="a679c45f-17e3-43be-b5bd-2cf016a701b2" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="29" mq:lastlabel="29" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="29">狀<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>1<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>——第一稀释度(低稀释倍数)平板个数；</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#28</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="42" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="d5ee5907-54b5-47a9-bff1-c24d55f953ce" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="30" mq:lastlabel="30" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="30">狀<bpt id="1" rid="1">&lt;rpr id=&quot;2&quot;&gt;</bpt>2——<ept id="2" rid="1">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>第二稀释度<bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>(<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>高稀释倍数)平板个数； <bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>d<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept> ——稀释因子（第一稀释度）。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#29</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+<trans-unit id="43" mq:minorversionend="1" mq:minorversionstart="0" mq:status="NotStarted" mq:segmentguid="e7d9b4e1-cada-453a-8168-c921c7463f47" mq:lastchangedtimestamp="0001-01-01T00:00:00Z" mq:maxlengthchars="-1" mq:nosplitjoin="false" mq:firstlabel="31" mq:lastlabel="31" mq:autosplitjoinstate="0" mq:lastmodifrole="0" mq:multipleexactmatch="false">
+<source xml:space="preserve" mq:segpart="31"><bpt id="1" rid="1">&lt;rpr id=&quot;8&quot;&gt;</bpt>7.1.3<ept id="2" rid="1">&lt;/rpr id=&quot;8&quot; transform=&quot;close&quot;&gt;</ept>若所有稀释度的平板上菌落数均大于300 <bpt id="3" rid="2">&lt;rpr id=&quot;2&quot;&gt;</bpt>CFU<ept id="4" rid="2">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>，则对稀释度最高的平板进行计数，其他平板可 记录为多不可计，结果按平均菌落数乘以最高稀释倍数计算，示例见<bpt id="5" rid="3">&lt;rpr id=&quot;2&quot;&gt;</bpt>B<ept id="6" rid="3">&lt;/rpr id=&quot;2&quot; transform=&quot;close&quot;&gt;</ept>.3。</source>
+<target xml:space="preserve"></target>
+<context-group>
+<context context-type="x-mmq-structural-context">trans-units / trans-unit#30</context>
+</context-group>
+<mq:minorversions>
+</mq:minorversions>
+<mq:startingws xml:space="preserve" />
+<mq:endingws xml:space="preserve" />
+<mq:commitinfos xmlns="MQXliff" /><mq:nosplitjoins />
+<mq:originalsource edited="false" />
+</trans-unit>
+</body>
+</file>
+</xliff>
