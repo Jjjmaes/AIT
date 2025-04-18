@@ -92,17 +92,27 @@ export interface UpdateSegmentResponse {
   message?: string;
 }
 
-// Update FileType to match backend IFile model
+// Update FileType to match backend IFile model more closely
 export interface FileType {
   _id: string; 
+  projectId?: string;
   fileName: string; 
   originalName?: string; 
   fileSize: number; 
   mimeType: string;
-  // Re-checked src/models/file.model.ts FileStatus enum again
+  // Add missing fields
+  type?: string; // Specific file type enum/string from backend?
+  progress?: number | { 
+      total?: number;
+      completed?: number;
+      translated?: number;
+      percentage?: number; 
+  }; // Can be number or object
   status: 'pending' | 'processing' | 'extracted' | 'translating' | 'translated' | 'reviewing' | 'review_completed' | 'completed' | 'error'; 
+  storageUrl?: string;
   createdAt: string; 
-  projectId?: string;
+  updatedAt?: string;
+  // Add other relevant fields from backend IFile if needed
 }
 
 // 添加缺失的类型定义

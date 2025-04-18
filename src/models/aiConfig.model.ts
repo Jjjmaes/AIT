@@ -1,17 +1,18 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
+import { IUser } from './user.model'; // Assuming IUser might be referenced
+// Remove local enum definition
+// export enum AIProvider {
+//     OPENAI = 'openai',
+//     GOOGLE = 'google',
+//     DEEPSEEK = 'deepseek',
+//     GROK = 'grok'
+// }
 
-// Enum for known providers (optional but good practice)
-export enum AIProvider {
-    OPENAI = 'OpenAI',
-    ANTHROPIC = 'Anthropic',
-    GOOGLE = 'Google',
-    DEEPSEEK = 'Deepseek',
-    GROK = 'Grok'
-    // Add others as needed
-}
+// Import the canonical AIProvider enum
+import { AIProvider } from '../services/ai-provider.manager';
 
 export interface IAIProviderConfig extends Document {
-    providerName: string; // Could use AIProvider enum later
+    providerName: AIProvider; // Use the imported enum
     apiKey: string; // Sensitive: Consider encryption at rest or env vars
     baseURL?: string;
     models: string[]; // List of available model names for this provider/key

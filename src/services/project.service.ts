@@ -17,6 +17,7 @@ import { processFile as processFileUtil } from '../utils/fileProcessor';
 import process from 'process';
 import * as fileUtils from '../utils/fileUtils';
 import { handleServiceError, validateId, validateEntityExists, isTestEnvironment, validateOwnership } from '../utils/errorHandler';
+import { sendSseUpdate } from '../app'; // Adjust path as needed!
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -652,48 +653,106 @@ export class ProjectService implements ProjectService {
   }
 
   /**
-   * 更新文件进度
+   * Calculates and updates the progress of a single file based on segment statuses.
+   * Also updates the file status to TRANSLATED or ERROR if applicable.
    */
   async updateFileProgress(fileId: string, userId: string): Promise<void> {
     const methodName = 'updateFileProgress';
     validateId(fileId, '文件');
-    
-    try { 
-      const file = await File.findById(fileId);
-      validateEntityExists(file, '文件');
-      
-      const project = await Project.findById(file.projectId);
-      validateEntityExists(project, '关联项目');
+    validateId(userId, '用户');
 
-      validateOwnership(project.manager, userId, '更新文件进度');
+    try {
+        const file = await File.findById(fileId);
+        validateEntityExists(file, '文件');
 
-      // ... aggregation ...
-      const stats = await Segment.aggregate([ /* ... */ ]);
-      // ... calculate counts ...
-      let completedCount = 0;
-      let translatedCount = 0;
-      let totalCount = 0;
-      stats.forEach(stat => { /* ... count logic ... */ });
-      const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : (file.segmentCount === 0 ? 100 : 0);
+        // Count segments in different states
+        const totalSegments = await Segment.countDocuments({ fileId: file._id });
+        const translatedOkSegments = await Segment.countDocuments({ 
+            fileId: file._id, 
+            status: { $in: [SegmentStatus.TRANSLATED, SegmentStatus.TRANSLATED_TM] } 
+        });
+        // Assuming 'completed' means reviewed and approved
+        const reviewedOkSegments = await Segment.countDocuments({ 
+            fileId: file._id, 
+            // CHECK ENUM: Use the correct status for 'Reviewed' or 'Completed' state
+            status: SegmentStatus.REVIEW_COMPLETED // Assuming REVIEW_COMPLETED exists
+        });
+        const failedSegments = await Segment.countDocuments({ 
+            fileId: file._id, 
+            status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] } 
+            // CHECK ENUM: Add review failure status if it exists
+        });
         
-      file.progress = {
-          total: totalCount,
-          completed: completedCount,
-          translated: translatedCount,
-          percentage: percentage
-      };
-      file.translatedCount = translatedCount;
-      file.reviewedCount = completedCount; 
-      file.segmentCount = totalCount; 
-
-      // ... status update ...
-      await file.save();
-      logger.info(`File progress updated for ${fileId}: ${percentage}%`);
+        // Calculate counts
+        const completedCount = reviewedOkSegments; // Segments fully reviewed
+        const translatedCount = translatedOkSegments + reviewedOkSegments; // Segments with any translation/review
         
-     } catch (error) {
-         // ... error handling ...
-     }
-   }
+        // Calculate percentage based on TRANSLATION completion (Option A)
+        const percentage = totalSegments > 0 ? Math.round((translatedCount / totalSegments) * 100) : (totalSegments === 0 ? 100 : 0);
+
+        // Assign the progress object
+        file.progress = {
+            total: totalSegments,
+            completed: completedCount, // Still represents reviewed count
+            translated: translatedCount, // Represents translated+reviewed count
+            percentage: percentage // NOW based on translatedCount
+        };
+        
+        // Determine overall File Status (logic might need slight adjustment based on percentage source)
+        const allProcessedCount = translatedCount + failedSegments; // Use translatedCount for processed check?
+        let finalStatus = file.status; // Start with current status
+
+        if (allProcessedCount >= totalSegments && totalSegments > 0) { 
+            if (failedSegments > 0) {
+                finalStatus = FileStatus.ERROR;
+                file.errorDetails = `${failedSegments} segment(s) failed during processing.`;
+            } else if (percentage === 100) {
+                // If 100% translated/reviewed, decide final state
+                // If review step exists, maybe set to REVIEWING or REVIEW_COMPLETED?
+                // For now, let's assume TRANSLATED is the goal state after translation finishes.
+                finalStatus = FileStatus.TRANSLATED; // Set to TRANSLATED when 100% translated
+                // Check if all are actually REVIEWED to set COMPLETED
+                if (completedCount === totalSegments) {
+                     finalStatus = FileStatus.COMPLETED; // Or REVIEW_COMPLETED?
+                }
+                file.errorDetails = undefined; 
+            } 
+             // Removed redundant else block from previous edit attempt
+        } else if (totalSegments > 0) { // If still processing
+             // If some translation has started, set status to TRANSLATING
+             if (translatedCount > 0 && finalStatus === FileStatus.PROCESSING || finalStatus === FileStatus.PENDING || finalStatus === FileStatus.EXTRACTED) {
+                 finalStatus = FileStatus.TRANSLATING;
+             }
+             // Add logic here if you have a distinct REVIEWING status to set
+        } else { // If totalSegments is 0 (empty file)
+            finalStatus = FileStatus.COMPLETED; // Mark empty files as completed
+            // Ensure progress object is consistent for empty files
+            file.progress = { total: 0, completed: 0, translated: 0, percentage: 100 }; 
+        }
+
+        file.status = finalStatus; // Update status
+        
+        // Also update the separate count fields if they are still used
+        file.segmentCount = totalSegments;
+        file.translatedCount = translatedCount;
+        file.reviewedCount = completedCount;
+        
+        await file.save();
+        logger.info(`[${this.serviceName}.${methodName}] Updated file ${fileId} progress to ${file.progress.percentage}% and status to ${file.status}. Counts(T/C/F): ${translatedCount}/${completedCount}/${failedSegments}`);
+        
+        // *** SEND SSE UPDATE ***
+        // Log the userId right before sending the update
+        logger.debug(`[${this.serviceName}.${methodName}] Preparing to send SSE update for file ${fileId} to user ${userId}`);
+        sendSseUpdate(userId, 'fileProgressUpdate', { 
+            fileId: file._id.toString(), 
+            progress: file.progress.percentage, // Send the calculated percentage
+            status: file.status // Send the determined status
+        });
+
+    } catch (error) {
+        logger.error(`Error in ${this.serviceName}.${methodName} for file ${fileId}:`, error);
+    }
+  }
 
   /**
    * 更新项目进度

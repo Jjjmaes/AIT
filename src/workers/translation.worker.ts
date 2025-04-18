@@ -1,3 +1,5 @@
+import 'reflect-metadata'; // MUST be the first import
+
 import { Worker, Job, JobProgress } from 'bullmq';
 import Redis from 'ioredis';
 import logger from '../utils/logger';
@@ -236,8 +238,19 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
 
         // Update progress (percentage)
         const progress = totalSegments > 0 ? Math.round(((processedSegments + erroredSegments) / totalSegments) * 100) : 100;
-        logger.debug(`[Worker Job ${job.id}] Updating progress: ${progress}% (${processedSegments + erroredSegments}/${totalSegments})`);
+        logger.debug(`[Worker Job ${job.id}] Updating BullMQ progress: ${progress}% (${processedSegments + erroredSegments}/${totalSegments})`);
         await job.updateProgress(progress);
+
+        // **NOW, explicitly update the File document and trigger SSE**
+        try {
+            logger.debug(`[Worker Job ${job.id}] Calling projectService.updateFileProgress for file ${currentFileId}...`);
+            await projectService.updateFileProgress(currentFileId, userId); 
+            logger.debug(`[Worker Job ${job.id}] Finished projectService.updateFileProgress for file ${currentFileId}.`);
+        } catch (updateError: any) { 
+            // Log if updating the file progress itself fails, but don't fail the whole job for this
+            logger.error(`[Worker Job ${job.id}] Error calling updateFileProgress for file ${currentFileId}: ${updateError.message}`, updateError);
+        } 
+        // --- End File Progress Update ---
     }
 
     // Use logger.info for final job outcome

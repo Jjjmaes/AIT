@@ -4,7 +4,13 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ValidationError, UnauthorizedError } from '../utils/errors';
 import multer from 'multer';
-import { ProjectService, CreateProjectDto, UpdateProjectDto } from '../services/project.service';
+import { 
+    ProjectService as ProjectServiceClass, 
+    projectService, 
+    CreateProjectDto, 
+    UpdateProjectDto, 
+    UploadFileDto
+} from '../services/project.service';
 import { validateRequest } from '../middleware/validate.middleware';
 import { createProjectSchema, updateProjectSchema, projectProgressSchema } from '../schemas/project.schema';
 import { fileUploadConfig } from '../config/upload.config';
@@ -12,13 +18,10 @@ import logger from '../utils/logger';
 import { ProjectStatus } from '../models/project.model';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
-import { UploadFileDto } from '../services/project.service';
 import { Types } from 'mongoose';
 import { IProjectProgress } from '../types/project.types';
 
 export const upload = multer(fileUploadConfig);
-
-const projectService = new ProjectService();
 
 export default class ProjectController {
   /**

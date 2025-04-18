@@ -14,21 +14,19 @@ import { projectService, ProjectService } from './project.service';
 import { handleServiceError, validateId, validateEntityExists, validateOwnership } from '../utils/errorHandler';
 import { NotFoundError, AppError, ValidationError } from '../utils/errors';
 import { Types } from 'mongoose';
-import { aiServiceFactory } from './translation/aiServiceFactory';
-import { promptProcessor, ProcessedPrompt, PromptBuildContext } from '../utils/promptProcessor';
+import { AIServiceFactory, aiServiceFactory } from './translation/ai-adapters/ai-service.factory';
 import { translationQueueService } from './translationQueue.service';
 import { segmentService } from './segment.service';
-import { IPromptTemplate } from '../models/promptTemplate.model';
-import { AIServiceFactory } from './translation/ai-adapters/ai-service.factory';
-import { AIProvider, AIServiceConfig } from '../types/ai-service.types';
-import { config } from '../config';
-import { BaseAIServiceAdapter } from './translation/ai-adapters/base.adapter';
-import { terminologyService, TerminologyService } from './terminology.service';
-import { ITermEntry } from '../models/terminology.model';
-import { translationMemoryService, TranslationMemoryService } from './translationMemory.service';
+import { IPromptTemplate, PromptTemplate } from '../models/promptTemplate.model';
 import { aiConfigService } from './aiConfig.service';
+import { terminologyService, TerminologyService } from './terminology.service';
+import { translationMemoryService, TranslationMemoryService } from './translationMemory.service';
+import { ITermEntry } from '../models/terminology.model';
 import { IAIProviderConfig } from '../models/aiConfig.model';
+import { AIProvider } from '../services/ai-provider.manager';
 import User from '../models/user.model';
+import { encoding_for_model, TiktokenModel } from "tiktoken";
+import { promptProcessor, PromptBuildContext, ProcessedPrompt } from '../utils/promptProcessor';
 
 // Define and export TranslationUnit interface needed by file processors
 export interface TranslationUnit {
@@ -40,16 +38,16 @@ export interface TranslationUnit {
 
 export class TranslationService {
   private serviceName = 'TranslationService';
-  private aiServiceFactory: AIServiceFactory;
-  private terminologyService: TerminologyService;
-  private projectService: ProjectService;
-  private translationMemoryService: TranslationMemoryService;
 
-  constructor() {
-    this.aiServiceFactory = AIServiceFactory.getInstance();
-    this.terminologyService = terminologyService;
-    this.projectService = projectService;
-    this.translationMemoryService = translationMemoryService;
+  constructor(
+    private segmentSvc: typeof segmentService,
+    private projectSvc: ProjectService,
+    private translationMemorySvc: TranslationMemoryService,
+    private terminologySvc: TerminologyService,
+    private aiConfigSvc: typeof aiConfigService,
+    private aiSvcFactory: AIServiceFactory,
+    private promptProc: typeof promptProcessor
+  ) {
   }
 
   async translateSegment(
@@ -61,9 +59,6 @@ export class TranslationService {
     options?: TranslationOptions
   ): Promise<ISegment> {
     const methodName = 'translateSegment';
-    // Add detailed logs for entry and parameters
-    logger.debug(`[${this.serviceName}.${methodName}] ENTER - segmentId: ${segmentId}, userId: ${userId}, aiConfigId: ${aiConfigId}, promptTemplateId: ${promptTemplateId}`, { options });
-    
     validateId(segmentId, '段落');
     validateId(userId, '用户');
     validateId(aiConfigId, 'AI 配置');
@@ -81,7 +76,7 @@ export class TranslationService {
 
       const file = await File.findById(segment.fileId).exec();
       validateEntityExists(file, '关联文件');
-      const project = await this.projectService.getProjectById(file.projectId.toString(), userId, requesterRoles);
+      const project = await this.projectSvc.getProjectById(file.projectId.toString(), userId, requesterRoles);
       validateEntityExists(project, '关联项目');
       
       // Use nullish coalescing for metadata
@@ -94,8 +89,7 @@ export class TranslationService {
       }
 
       // --- Check Translation Memory --- 
-      logger.debug(`[${this.serviceName}.${methodName}] Checking Translation Memory for segment ${segmentId}...`);
-      const tmMatches = await this.translationMemoryService.findMatches(
+      const tmMatches = await this.translationMemorySvc.findMatches(
           segment.sourceText,
           sourceLang,
           targetLang,
@@ -105,7 +99,7 @@ export class TranslationService {
       const exactMatch = tmMatches.find(match => match.score === 100); // Check for 100% score
 
       if (exactMatch) {
-          logger.info(`[${this.serviceName}.${methodName}] Found 100% TM match for segment ${segmentId}.`);
+          logger.info(`[${methodName}] Found 100% TM match for segment ${segmentId}.`);
           const tmUpdateData: Partial<ISegment> = {
               translation: exactMatch.entry.targetText,
               status: SegmentStatus.TRANSLATED_TM, // New status
@@ -128,34 +122,31 @@ export class TranslationService {
               logger.error(`Failed to update file progress for ${file._id} after TM match on segment ${segmentId}:`, err);
           });
           
-          logger.info(`[${this.serviceName}.${methodName}] Segment ${segmentId} translated successfully using TM.`);
+          logger.info(`Segment ${segmentId} translated successfully using TM.`);
           return updatedSegment;
       }
       // --- End TM Check --- 
-      logger.debug(`[${this.serviceName}.${methodName}] No 100% TM match found. Proceeding with AI for segment ${segmentId}.`);
 
       // --- If no 100% TM match, proceed with AI Translation ---
-      // Log before updating status
-      logger.debug(`[${this.serviceName}.${methodName}] Updating segment ${segmentId} status to TRANSLATING.`);
+      logger.debug(`[${methodName}] No 100% TM match found for segment ${segmentId}. Proceeding with AI.`);
+      
       await segmentService.updateSegment(segmentId, { status: SegmentStatus.TRANSLATING });
 
       // --- Fetch Terminology --- 
       let terms: ITermEntry[] = [];
       try {
           if (project.terminology) {
-              const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());
+              const terminologyList = await this.terminologySvc.getTerminologyById(project.terminology.toString());
               if (terminologyList?.terms) {
                   terms = terminologyList.terms;
-                  logger.info(`[${this.serviceName}.${methodName}] Fetched ${terms.length} terms for project ${project._id}.`);
+                  logger.info(`[${methodName}] Fetched ${terms.length} terms for project ${project._id}.`);
               }
           }
       } catch (error) {
-          logger.error(`[${this.serviceName}.${methodName}] Failed to fetch terminology for project ${project._id}. Proceeding without terms.`, { error });
+          logger.error(`[${methodName}] Failed to fetch terminology for project ${project._id}. Proceeding without terms.`, { error });
       }
       // ---------------------------
       
-      // Log before fetching AI config
-      logger.debug(`[${this.serviceName}.${methodName}] Fetching AI Config ${aiConfigId}...`);
       const aiConfig: IAIProviderConfig | null = await aiConfigService.getConfigById(aiConfigId);
       if (!aiConfig) {
           throw new AppError(`AI 配置 ${aiConfigId} 未找到`, 404);
@@ -163,7 +154,6 @@ export class TranslationService {
       if (!aiConfig.providerName || !aiConfig.models || aiConfig.models.length === 0) {
         throw new AppError(`AI 配置 ${aiConfigId} 缺少提供商或模型信息`, 404);
       }
-      logger.debug(`[${this.serviceName}.${methodName}] Fetched AI Config: ${aiConfig.providerName}`);
 
       const promptContext: PromptBuildContext = {
         promptTemplateId: promptTemplateId,
@@ -174,17 +164,13 @@ export class TranslationService {
         // Include other context variables if needed by templates
       };
 
-      // Log before building prompt
-      logger.debug(`[${this.serviceName}.${methodName}] Building translation prompt...`);
-      const promptData: ProcessedPrompt = await promptProcessor.buildTranslationPrompt(
+      const promptData: ProcessedPrompt = await this.promptProc.buildTranslationPrompt(
         segment.sourceText,
         promptContext
       );
-      logger.debug(`[${this.serviceName}.${methodName}] Prompt built.`); // Maybe log promptData.userPrompt length if needed
 
       // Determine the model to use (from options, or AIConfig default)
       const modelToUse = options?.aiModel || aiConfig.models[0]; // Use first model as default for now
-      logger.debug(`[${this.serviceName}.${methodName}] Determined AI Model to use: ${modelToUse}`);
 
       // Convert providerName string to AIProvider enum
       const providerEnumKey = aiConfig.providerName.toUpperCase() as keyof typeof AIProvider;
@@ -194,11 +180,9 @@ export class TranslationService {
         throw new AppError(`Unsupported AI provider name: ${aiConfig.providerName}`, 400);
       }
 
-      // Log before getting adapter
-      logger.debug(`[${this.serviceName}.${methodName}] Getting AI adapter for provider: ${providerEnumValue}`);
       // Get the adapter using the AIProvider enum value
       // Pass only the provider enum, assuming factory handles config loading
-      const adapter = this.aiServiceFactory.getAdapter(providerEnumValue);
+      const adapter = this.aiSvcFactory.getAdapter(providerEnumValue);
       
       // Validate adapter existence
       if (!adapter) {
@@ -219,8 +203,6 @@ export class TranslationService {
         domain: promptContext.domain
       };
 
-      // Log before calling adapter.translateText
-      logger.debug(`[${this.serviceName}.${methodName}] Calling adapter.translateText for segment ${segmentId}...`, { adapterOptions });
       let promptTemplateObjectId: Types.ObjectId | undefined = undefined;
       if (promptTemplateId instanceof Types.ObjectId) {
         promptTemplateObjectId = promptTemplateId;
@@ -238,11 +220,7 @@ export class TranslationService {
           adapterOptions // Pass the combined options
       );
       const processingTime = Date.now() - startTime;
-      // Log after successful adapter call
-      logger.debug(`[${this.serviceName}.${methodName}] adapter.translateText successful for segment ${segmentId}. Time: ${processingTime}ms. Response length: ${response?.translatedText?.length ?? 0}`);
 
-      // Log before preparing update data
-      logger.debug(`[${this.serviceName}.${methodName}] Preparing update data for segment ${segmentId}...`);
       const updateData: Partial<ISegment> = {
         translation: response.translatedText,
         status: SegmentStatus.TRANSLATED,
@@ -259,28 +237,19 @@ export class TranslationService {
         error: undefined
       };
 
-      // Log before updating segment in DB
-      logger.debug(`[${this.serviceName}.${methodName}] Saving translated segment ${segmentId} to DB...`);
       const updatedSegment = await segmentService.updateSegment(segmentId, updateData);
       validateEntityExists(updatedSegment, '更新后的段落');
-      logger.debug(`[${this.serviceName}.${methodName}] Segment ${segmentId} saved successfully.`);
 
-      // Log before updating file progress
-      logger.debug(`[${this.serviceName}.${methodName}] Updating file progress for file ${file._id} due to segment ${segmentId}...`);
       projectService.updateFileProgress(file._id.toString(), userId).catch(err => {
           logger.error(`Failed to update file progress for ${file._id} after segment ${segmentId} translation:`, err);
       });
 
-      // Log successful exit
-      logger.info(`[${this.serviceName}.${methodName}] EXIT - Segment ${segmentId} translated successfully using AI.`);
+      logger.info(`Segment ${segmentId} translated successfully using AI.`);
       return updatedSegment;
 
     } catch (error) {
-      // Log the error within the service method
-      logger.error(`[${this.serviceName}.${methodName}] ERROR for segment ${segmentId}: ${error instanceof Error ? error.message : 'Unknown error'}`, { error }); // Log full error object
+      logger.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
       try {
-          // Log before attempting to mark segment as error
-          logger.warn(`[${this.serviceName}.${methodName}] Attempting to mark segment ${segmentId} as ERROR in DB due to previous failure.`);
           await segmentService.updateSegment(segmentId, { status: SegmentStatus.ERROR, error: (error instanceof Error ? error.message : '未知翻译错误') });
       } catch (updateError) {
           logger.error(`Failed to mark segment ${segmentId} as ERROR after translation failure:`, updateError);
@@ -509,23 +478,19 @@ export class TranslationService {
   }
 }
 
-export const translationService = new TranslationService(); 
+// Instantiate with required dependencies
+export const translationService = new TranslationService(
+  segmentService,
+  projectService,
+  translationMemoryService,
+  terminologyService,
+  aiConfigService,
+  aiServiceFactory,
+  promptProcessor
+); 
 
 // Removed the local buildTranslationPrompt function and related interfaces
 /*
 // Placeholder for prompt building logic - Now needs context object
-interface ProcessedPrompt {
-    systemInstruction: string;
-    userPrompt: string;
-}
-interface PromptBuildContext {
-  promptTemplateId?: string | Types.ObjectId;
-  sourceLanguage?: string;
-  targetLanguage?: string;
-  domain?: string;
-  terms?: ITermEntry[]; // Added terms
-}
-const buildTranslationPrompt = (sourceText: string, context: PromptBuildContext): ProcessedPrompt => {
-    // ... implementation ...
-}; 
+// ... rest of commented out code ...
 */ 

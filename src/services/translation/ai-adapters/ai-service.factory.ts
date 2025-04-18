@@ -200,4 +200,7 @@ export class AIServiceFactory {
   public getReviewAdapter(provider: AIProvider): ReviewAdapter | undefined {
     return this.reviewAdapters.get(provider);
   }
-} 
+}
+
+// Export the singleton instance
+export const aiServiceFactory = AIServiceFactory.getInstance(); 
