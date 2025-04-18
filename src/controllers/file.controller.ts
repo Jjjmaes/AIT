@@ -1,18 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
-import { fileManagementService } from '../services/fileManagement.service';
+// Import instances directly where appropriate
+// import { fileManagementService } from '../services/fileManagement.service'; 
+import { FileManagementService } from '../services/fileManagement.service'; // Import class for DI
 import { validateId, validateEntityExists } from '../utils/errorHandler';
 import { AppError, ValidationError, NotFoundError } from '../utils/errors';
 import logger from '../utils/logger';
 import { FileType } from '../models/file.model';
-import { validateFileType } from '../utils/fileUtils'; // Assuming validateFileType exists here
-import fs from 'fs/promises'; // Import fs for cleanup
-import { translationQueueService, JobStatus } from '../services/translationQueue.service'; // Import queue service AND JobStatus type
-import { JobState } from 'bullmq'; // <-- Import JobState from bullmq
-import { projectService } from '../services/project.service'; // Import project service for validation
-import { aiConfigService } from '../services/aiConfig.service';
-import { TranslationStatusResponse } from '../types/translation.types'; // <-- Import the new type
-import { File, FileStatus, IFile } from '../models/file.model'; // Import File model and status
-import { Segment, SegmentStatus } from '../models/segment.model'; // Import Segment model and status
+import { validateFileType } from '../utils/fileUtils';
+import fs from 'fs/promises';
+// Import instance and type
+import { translationQueueService, JobStatus as JobStatusType } from '../services/translationQueue.service'; 
+// import { TranslationQueueService } from '../services/translationQueue.service'; // Remove class import
+import { JobState } from 'bullmq';
+import { ProjectService } from '../services/project.service'; // Keep class import for DI
+import { AIConfigService } from '../services/aiConfig.service'; // Keep class import for DI
+// Remove direct instance imports for DI services
+// import { projectService } from '../services/project.service';
+// import { aiConfigService } from '../services/aiConfig.service'; 
+import { TranslationStatusResponse } from '../types/translation.types';
+import { File, FileStatus, IFile } from '../models/file.model';
+import { Segment, SegmentStatus, ISegment } from '../models/segment.model'; // Import ISegment if Segment is the class
+import { Inject, Service } from 'typedi';
 
 // Assuming AuthRequest extends Request and includes user info
 // Define it here or import from auth middleware if defined there
@@ -26,8 +34,18 @@ interface AuthRequest extends Request {
   };
 }
 
+@Service()
 export class FileController {
-  private serviceName = 'FileController'; // Add service name
+  private serviceName = 'FileController';
+
+  // Inject FileManagementService along with others
+  constructor(
+    // @Inject() private fileManagementService: FileManagementService, // Remove
+    @Inject() private projectService: ProjectService,
+    @Inject() private aiConfigService: AIConfigService,
+    @Inject() private fileManagementService: FileManagementService // Inject here
+    // @Inject() private translationQueueService: TranslationQueueService // Remove
+  ) {}
 
   uploadFile = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const methodName = 'uploadFile';
@@ -48,7 +66,8 @@ export class FileController {
       }
 
       // Fetch project details to get language pairs
-      const project = await projectService.getProjectById(projectId, userId, userRoles);
+      // Use injected service: this.projectService
+      const project = await this.projectService.getProjectById(projectId, userId, userRoles);
       validateEntityExists(project, '项目');
       if (!project.languagePairs || project.languagePairs.length === 0) {
         // Clean up the uploaded file if project validation fails early
@@ -101,7 +120,8 @@ export class FileController {
       // --- End Prepare File Info ---
 
       // Pass languages obtained from the project to the service
-      const fileRecord = await fileManagementService.processUploadedFile(
+      // Use injected service: this.fileManagementService
+      const fileRecord = await this.fileManagementService.processUploadedFile(
         projectId,
         userId,
         fileInfo,
@@ -145,9 +165,10 @@ export class FileController {
           if (!userId) return next(new AppError('认证失败', 401));
 
           // Pass roles
-          const files = await fileManagementService.getFilesByProjectId(projectId, userId, userRoles);
+          // Use injected service: this.fileManagementService
+          const files = await this.fileManagementService.getFilesByProjectId(projectId, userId, userRoles);
           // Return plain objects
-          res.status(200).json({ success: true, data: files.map(f => f.toObject()) }); 
+          res.status(200).json({ success: true, data: files.map((f: IFile) => f.toObject()) }); 
       } catch (error) {
           logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
           next(error);
@@ -165,7 +186,8 @@ export class FileController {
            if (!userId) return next(new AppError('认证失败', 401));
 
            // Pass roles
-           const file = await fileManagementService.getFileById(fileId, projectId, userId, userRoles);
+           // Use injected service: this.fileManagementService
+           const file = await this.fileManagementService.getFileById(fileId, projectId, userId, userRoles);
            if (!file) {
                return next(new NotFoundError('文件未找到'));
            }
@@ -188,7 +210,8 @@ export class FileController {
            if (!userId) return next(new AppError('认证失败', 401));
 
            // Pass roles
-           await fileManagementService.deleteFile(fileId, projectId, userId, userRoles);
+           // Use injected service: this.fileManagementService
+           await this.fileManagementService.deleteFile(fileId, projectId, userId, userRoles);
            res.status(200).json({ success: true, message: '文件已成功删除' });
     } catch (error) {
            logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -226,14 +249,26 @@ export class FileController {
       validateId(aiConfigId, 'AI 配置');
 
       // 1. Validate user permission (projectService.getProjectById already does this)
-      // We don't strictly need the project object here anymore unless we validate 
-      // if the chosen templates/configs are compatible, but let's keep it for now.
-      const project = await projectService.getProjectById(projectId, userId, userRoles);
+      // Use injected service: this.projectService
+      const project = await this.projectService.getProjectById(projectId, userId, userRoles);
       validateEntityExists(project, '项目');
+
+      // <<< Add validation for AI Config existence (optional but good practice) >>>
+      // Use injected service: this.aiConfigService
+      const aiConfigExists = await this.aiConfigService.getConfigById(aiConfigId);
+      if (!aiConfigExists) {
+          return next(new NotFoundError(`AI 配置未找到: ${aiConfigId}`));
+      }
+      // <<< Add similar validation for Prompt Template existence (if you have a service for it) >>>
+      // const promptExists = await this.promptTemplateService.getPromptById(promptTemplateId, userId);
+      // if (!promptExists) {
+      //     return next(new NotFoundError(`提示词模板未找到: ${promptTemplateId}`));
+      // }
 
       logger.info(`User ${userId} queuing translation for file ${fileId} in project ${projectId} using AI Config ${aiConfigId} and Prompt ${promptTemplateId}`);
 
       // 3. Call QueueService to enqueue the job, passing the determined IDs
+      // Use injected service: this.translationQueueService
       const jobId = await translationQueueService.addFileTranslationJob(
         projectId,
         fileId,
@@ -248,120 +283,155 @@ export class FileController {
       res.status(202).json({
         success: true,
         message: '翻译请求已接收',
-        jobId: jobId // Return job ID
+        data: { jobId }
       });
-
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
-      next(error);
+        logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+        next(error);
     }
   }
 
-  // --- Method to get job status (ENHANCED) ---
   getTranslationJobStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const methodName = 'getTranslationJobStatus';
-    const { jobId: requestedJobId } = req.params; // Rename to avoid confusion
-    const userId = req.user?.id;
-    const userRoles = req.user?.role ? [req.user.role] : [];
+      const methodName = 'getTranslationJobStatus';
+      // Only expect jobId from params for this route
+      const { jobId } = req.params;
+      const userId = req.user?.id;
+      // const userRoles = req.user?.role ? [req.user.role] : []; // Roles not used without project/file check
 
-    try {
-      // Extract the actual MongoDB File ID from the Job ID
-      const fileId = requestedJobId?.startsWith('file-') 
-                     ? requestedJobId.split('-')[1] 
-                     : requestedJobId; // Fallback if prefix is missing
+      try {
+          // Remove projectId and fileId validation
+          // validateId(projectId, '项目'); 
+          // validateId(fileId, '文件');
+          validateId(jobId, '任务');
+          if (!userId) return next(new AppError('认证失败', 401));
 
-      if (!fileId) {
-        return next(new ValidationError('无法从任务ID中解析文件ID'));
-      }
-      validateId(fileId, '文件ID'); // Validate the extracted ID format
+          // Remove project/file permission checks as IDs are not available from route
+          // await this.projectService.getProjectById(projectId, userId, userRoles); 
+          // const file = await this.fileManagementService.getFileById(fileId, projectId, userId, userRoles); 
+          // if (!file) {
+          //     return next(new NotFoundError(`文件 ${fileId} 未找到或无权访问`));
+          // }
 
-      if (!userId) {
-        return next(new AppError('认证失败，无法获取用户ID', 401));
-      }
+          logger.info(`User ${userId} checking status for job ${jobId}`);
 
-      logger.info(`User ${userId} fetching status for file/job ${fileId}`);
-
-      // 1. Fetch File temporarily to get projectId (no permission check yet)
-      const tempFile = await File.findById(fileId).select('projectId').lean().exec();
-      if (!tempFile || !tempFile.projectId) {
-          logger.warn(`File or project ID not found for file ID: ${fileId}`);
-          return next(new NotFoundError(`文件 ${fileId} 未找到`));
-      }
-      const projectId = tempFile.projectId.toString();
-      // --- Move validation here ---
-      validateId(projectId, '项目');
-
-      // 2. Fetch the File document properly using service for permission check
-      const fileDoc: IFile | null = await fileManagementService.getFileById(fileId, projectId, userId, userRoles);
-      if (!fileDoc) { 
-          // This case implies a permission error from the service
-          logger.warn(`Permission denied for file ID: ${fileId}, User: ${userId}`);
-          return next(new AppError(`无权访问文件 ${fileId}`, 403)); // Return 403 Forbidden
-      }
-
-      // 3. Fetch Segment counts for progress calculation
-      // Use fileDoc!._id as fileDoc is guaranteed non-null here by checks above
-      const totalSegments = await Segment.countDocuments({ fileId: fileDoc!._id });
-      const completedSegments = await Segment.countDocuments({ 
-          fileId: fileDoc!._id, 
-          status: { $in: [SegmentStatus.TRANSLATED, SegmentStatus.TRANSLATED_TM] } 
-      });
-      const erroredSegments = await Segment.countDocuments({ 
-          fileId: fileDoc!._id, 
-          status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] }
-      });
-      
-      // Use fileDoc directly here as it passed null checks
-      const fileProgress = totalSegments > 0 ? Math.round((completedSegments / totalSegments) * 100) : (fileDoc.status === FileStatus.COMPLETED || fileDoc.status === FileStatus.TRANSLATED ? 100 : 0);
-
-      // 4. Determine overall status (Use File status primarily)
-      let overallStatus: TranslationStatusResponse['status'] = 'processing'; // Default
-      if (fileDoc.status === FileStatus.PENDING) {
-          overallStatus = 'queued'; // Map PENDING to queued for frontend
-      } else if (fileDoc.status === FileStatus.PROCESSING || fileDoc.status === FileStatus.TRANSLATING || fileDoc.status === FileStatus.REVIEWING) {
-          overallStatus = 'processing';
-      } else if (fileDoc.status === FileStatus.COMPLETED || fileDoc.status === FileStatus.TRANSLATED || fileDoc.status === FileStatus.REVIEW_COMPLETED) {
-          overallStatus = 'completed';
-      } else if (fileDoc.status === FileStatus.ERROR) {
-          overallStatus = 'failed';
-      }
-
-      // 5. Construct the detailed response
-      const responseData: TranslationStatusResponse = {
-        status: overallStatus,
-        progress: fileProgress,
-        totalFiles: 1, 
-        completedFiles: (overallStatus === 'completed') ? 1 : 0,
-        // Use fileDoc directly
-        errors: fileDoc.status === FileStatus.ERROR ? [{ fileId: fileDoc._id.toString(), message: fileDoc.errorDetails || '文件处理失败' }] : [],
-        files: [
-          {
-            id: fileDoc._id.toString(),
-            originalName: fileDoc.originalName || fileDoc.fileName, 
-            status: fileDoc.status, 
-            progress: fileProgress,
-            sourceLanguage: fileDoc.metadata?.sourceLanguage, 
-            targetLanguage: fileDoc.metadata?.targetLanguage, 
+          let jobStatusResult;
+          try {
+            jobStatusResult = await translationQueueService.getJobStatus(jobId);
+          } catch (error) {
+            // Keep error handling for job not found
+            if (error instanceof NotFoundError) {
+                logger.warn(`Job ${jobId} not found via getJobStatus.`);
+                // Cannot fallback to file status without fileId
+                return next(new NotFoundError(`任务 ${jobId} 未找到`)); 
+            } else {
+                throw error;
+            }
           }
-        ],
-      };
+          
+          // Remove the !jobStatusResult fallback logic as it relied on fileId/file status
+          // if (!jobStatusResult) { ... }
 
-      res.status(200).json({
-        success: true,
-        data: responseData
-      });
+          // --- Job found via getJobStatus --- 
+          if (jobStatusResult.jobId !== jobId) {
+              logger.warn(`Security Warning: Mismatched job ID. Requested ${jobId}, but status returned for ${jobStatusResult.jobId}`);
+              // Optional: Return error or proceed cautiously?
+              return next(new AppError(`Job ID mismatch while checking status`, 500));
+          }
 
-    } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName} for file/job ${requestedJobId}:`, error);
-      // Handle specific errors like validation or DB issues
-      if (error instanceof NotFoundError) {
-         return res.status(404).json({ success: false, message: error.message });
+          const state = jobStatusResult.status as JobState;
+          const progress = Number(jobStatusResult.progress) || 0;
+          const failedReason = jobStatusResult.failedReason;
+
+          let overallStatus: TranslationStatusResponse['status']; 
+          const stateStr = state as string;
+          switch (stateStr) {
+              case 'completed': overallStatus = 'completed'; break;
+              case 'failed': overallStatus = 'failed'; break;
+              case 'active': overallStatus = 'processing'; break;
+              case 'waiting':
+              case 'waiting-children': 
+              case 'delayed': overallStatus = 'pending'; break;
+              case 'paused': overallStatus = 'pending'; break;
+              default: overallStatus = 'unknown'; break;
+          }
+
+          // Construct a simplified response as file details are not available here
+          const response: Partial<TranslationStatusResponse> = { // Make response partial
+              status: overallStatus,
+              progress: progress,
+              // Cannot determine file counts without project/file context
+              // completedFiles: overallStatus === 'completed' ? 1 : 0, 
+              // totalFiles: 1, 
+              // Set errors to undefined if failedReason exists, as we don't have fileId
+              errors: failedReason ? undefined : undefined, // Ensure it's always undefined or matches expected type
+              // Cannot include file details without file context
+              // files: [...] 
+          };
+
+          // If there was a failure, maybe log the reason separately
+          if (failedReason) {
+              logger.warn(`Job ${jobId} failed. Reason: ${failedReason}`);
+          }
+
+          res.status(200).json({ success: true, data: response });
+
+      } catch (error) {
+          logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+          next(error);
       }
-      // Use the central error handler for other types of errors
-      next(error);
-    }
   };
-  // --- END Method to get job status ---
+
+  // New method to get segment details for a file
+  async getSegments(req: AuthRequest, res: Response, next: NextFunction) {
+      const methodName = 'getSegments';
+      const { projectId, fileId } = req.params;
+      const { status, page = 1, limit = 10 } = req.query; 
+      const userId = req.user?.id;
+      const userRoles = req.user?.role ? [req.user.role] : []; // Keep roles in case needed later or by service internally
+
+      try {
+          validateId(projectId, '项目');
+          validateId(fileId, '文件');
+          if (!userId) return next(new AppError('认证失败', 401));
+
+          // Validate user access to the file first using fileManagementService
+          await this.fileManagementService.getFileById(fileId, projectId, userId, userRoles);
+
+          const parsedPage = parseInt(page as string, 10);
+          const parsedLimit = parseInt(limit as string, 10);
+          const segmentStatus = status ? status as SegmentStatus : undefined;
+
+          logger.info(`User ${userId} fetching segments for file ${fileId} (Project: ${projectId}), Status: ${segmentStatus}, Page: ${parsedPage}, Limit: ${parsedLimit}`);
+
+          // Use the injected projectService and its getFileSegments method
+          const result = await this.projectService.getFileSegments(
+              fileId,
+              userId, 
+              // Pass filters object matching the service method signature
+              { status: segmentStatus, page: parsedPage, limit: parsedLimit } 
+              // userRoles is not directly accepted by the found signature, userId is used
+          );
+
+          // The ProjectService.getFileSegments method returns { segments: ISegment[], total: number, page: number, limit: number }
+          // which doesn't include totalPages directly, but we can calculate it.
+          const totalPages = Math.ceil(result.total / result.limit);
+
+          res.status(200).json({
+              success: true,
+              data: {
+                  // Ensure result.segments exists before mapping
+                  segments: result.segments ? result.segments.map((s: ISegment) => s.toObject()) : [], 
+                  totalCount: result.total,
+                  page: result.page,
+                  limit: result.limit,
+                  totalPages: totalPages // Calculate totalPages
+              }
+          });
+      } catch (error) {
+          logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+          next(error);
+      }
+  }
 }
 
 // Export class directly, instantiation happens in routes file

@@ -1,3 +1,4 @@
+import { Service } from 'typedi';
 import { 
   AIServiceConfig, 
   AIProvider, 
@@ -10,23 +11,17 @@ import { ReviewAdapter } from './review.adapter';
 import logger from '../../../utils/logger';
 
 /**
- * AI服务工厂类 - 单例模式
+ * AI服务工厂类 - 单例模式 (Managed by TypeDI)
  */
+@Service()
 export class AIServiceFactory {
-  private static instance: AIServiceFactory;
   private adapters: Map<AIProvider, BaseAIServiceAdapter>;
   private reviewAdapters: Map<AIProvider, ReviewAdapter>;
 
-  private constructor() {
+  constructor() {
     this.adapters = new Map();
     this.reviewAdapters = new Map();
-  }
-
-  public static getInstance(): AIServiceFactory {
-    if (!AIServiceFactory.instance) {
-      AIServiceFactory.instance = new AIServiceFactory();
-    }
-    return AIServiceFactory.instance;
+    logger.info('[AIServiceFactory] Instance created by TypeDI.');
   }
 
   /**
@@ -201,6 +196,3 @@ export class AIServiceFactory {
     return this.reviewAdapters.get(provider);
   }
 }
-
-// Export the singleton instance
-export const aiServiceFactory = AIServiceFactory.getInstance(); 

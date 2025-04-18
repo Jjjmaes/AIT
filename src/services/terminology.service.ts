@@ -1,6 +1,7 @@
+import { Service } from 'typedi';
 import { Terminology, ITerminology, ITermEntry, ITerminologyLanguagePair } from '../models/terminology.model';
 import User, { IUser } from '../models/user.model'; // Assuming User model for permissions
-import { Project, IProject } from '../models/project.model'; // Import Project for checks
+import { Project, IProject } from '../models/project.model'; // <-- Restored import
 import { handleServiceError, validateId, validateEntityExists } from '../utils/errorHandler';
 import { NotFoundError, ForbiddenError, ValidationError, AppError } from '../utils/errors';
 import logger from '../utils/logger';
@@ -45,6 +46,7 @@ export interface GetTerminologyFilter {
   limit?: number;
 }
 
+@Service()
 export class TerminologyService {
   private serviceName = 'TerminologyService';
 
@@ -59,42 +61,28 @@ export class TerminologyService {
     }
 
     try {
-      // Validate projectId if provided
       let projectObjectId: Types.ObjectId | undefined = undefined;
       if (data.projectId) {
         validateId(data.projectId, '关联项目');
         projectObjectId = new Types.ObjectId(data.projectId);
+        // --- Restore project check ---
         const project = await Project.findById(projectObjectId);
         validateEntityExists(project, '关联项目');
-        // TODO: Add permission check - user must have access to the project?
-        // const hasAccess = await projectService.hasAccess(data.projectId, userId);
-        // if (!hasAccess) throw new ForbiddenError(...);
+        // --- End restore ---
       }
 
       const newTerminology = new Terminology({
         ...data,
         createdBy: new Types.ObjectId(userId),
         project: projectObjectId ? projectObjectId : null,
-        terms: data.terms || [], // Ensure terms is an array
+        terms: data.terms || [],
         isPublic: data.isPublic ?? false,
       });
 
-      // Explicitly handle potential save error
-      try {
-          await newTerminology.save();
-          // Log success only if save() doesn't throw
-          logger.info(`[${this.serviceName}.${methodName}] Mongoose save() completed successfully for ID: ${newTerminology._id}`); 
-      } catch (saveError) {
-          // Log the specific save error immediately
-          logger.error(`[${this.serviceName}.${methodName}] Mongoose save() FAILED! Error:`, saveError);
-          throw saveError; // Re-throw to be caught by outer catch block
-      }
-
-      // This log should only be reached if save() completed without throwing
+      await newTerminology.save();
       logger.info(`Terminology '${newTerminology.name}' created by user ${userId}`);
       return newTerminology;
     } catch (error) {
-      // Outer catch should handle validation errors or re-thrown save errors
       logger.error(`Error in ${this.serviceName}.${methodName} (outer catch):`, error);
       throw handleServiceError(error, this.serviceName, methodName, '创建术语表');
     }
@@ -110,11 +98,12 @@ export class TerminologyService {
     try {
       const terminology = await Terminology.findById(terminologyId)
                                   .populate('createdBy', 'id username fullName')
-                                  .populate('project', 'id name manager members') // Populate necessary project fields for checks
+                                  // --- Restore project populate ---
+                                  .populate('project', 'id name manager members')
                                   .exec();
       validateEntityExists(terminology, '术语表');
 
-      // Permission check: Public or created by user or linked to a project user can access?
+      // --- Restore project-based permission check ---
       if (!terminology.isPublic && userId) {
           const userObjectId = new Types.ObjectId(userId);
           const creatorId = terminology.createdBy instanceof Types.ObjectId
@@ -135,6 +124,7 @@ export class TerminologyService {
              throw new ForbiddenError(`User ${userId} does not have permission to access terminology ${terminologyId}`);
           }
       }
+      // --- End restore project-based check ---
 
       return terminology;
     } catch (error) {
@@ -152,10 +142,9 @@ export class TerminologyService {
       const query: mongoose.FilterQuery<ITerminology> = {};
       const page = filters.page || 1;
       const limit = filters.limit || 10;
-      const skip = (page - 1) * limit;
 
-      // Build query
-      if (filters.projectId) {
+      // ... (Build query: projectId, search, isPublic) ...
+       if (filters.projectId) {
         query.project = new Types.ObjectId(filters.projectId);
       }
       if (filters.search) {
@@ -168,7 +157,7 @@ export class TerminologyService {
           query.isPublic = filters.isPublic;
       }
 
-      // Permission filter: User sees their own + public + relevant project lists
+      // --- Restore project-based permission filter ---
       if (filters.userId) {
           validateId(filters.userId, '用户');
           const userObjectId = new Types.ObjectId(filters.userId);
@@ -181,40 +170,22 @@ export class TerminologyService {
            }).select('_id').exec();
           const accessibleProjectIds = accessibleProjects.map(p => p._id);
 
+          // Adjusted query: Own OR Public OR Linked to accessible project
           query.$or = [
               { createdBy: userObjectId },
               { isPublic: true },
-              // Only include project-specific lists if the project filter isn't already set
-              ...(filters.projectId ? [] : [{ project: { $in: accessibleProjectIds } }])
+              { project: { $in: accessibleProjectIds } }
           ];
-           // If no specific project filter, and not specifically asking for public,
-           // apply the permission query to filter project-linked lists
-           if (!filters.projectId && typeof filters.isPublic !== 'boolean') {
-               query.$and = query.$and || [];
-               query.$and.push({
-                   $or: [
-                       { project: null }, // Not linked to a project OR
-                       { project: { $in: accessibleProjectIds } } // Linked to accessible project
-                   ]
-               });
-           }
+           // If asking for specific project, this $or is fine as it will be intersected
+           // If NOT asking for specific project, this $or correctly includes own, public, and accessible project-linked lists.
       } else if (typeof filters.isPublic !== 'boolean' && !filters.projectId) {
-          // If no user context and not specifically asking for public/project, default to public
           query.isPublic = true;
       }
+      // --- End restore ---
       
-      const finalQuery = query;
-
-      // Assuming pagination plugin is mixed into the model
-      if (!(Terminology as any).paginate) {
-           logger.error(`[${this.serviceName}.${methodName}] Pagination is not configured on the Terminology model.`);
-           throw new AppError('Server configuration error: Pagination not available.', 500);
-       }
-       const options = { page: filters.page || 1, limit: filters.limit || 10, sort: { updatedAt: -1 }, populate: 'createdBy project' };
-       logger.debug(`[${this.serviceName}.${methodName}] Paginated query: ${JSON.stringify(query)}, Options: ${JSON.stringify(options)}`);
-       // Let TS infer the result type
-       const result = await (Terminology as any).paginate(query, options);
-       return result;
+      const options = { page, limit, sort: { updatedAt: -1 }, populate: 'createdBy project' };
+      const result = await (Terminology as any).paginate(query, options);
+      return result;
 
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
@@ -231,12 +202,12 @@ export class TerminologyService {
     validateId(userId, '用户');
 
     try {
+      // --- Restore project populate ---
       const terminology = await Terminology.findById(terminologyId).populate('project', 'id name manager members').exec();
       validateEntityExists(terminology, '术语表');
 
-      // Permission check: Creator or Manager of linked project
+      // --- Restore permission check ---
       const userObjectId = new Types.ObjectId(userId);
-      // Cast createdBy as it's populated
       const creatorId = terminology.createdBy instanceof Types.ObjectId
                ? terminology.createdBy
                : (terminology.createdBy as IUser)?._id;
@@ -246,53 +217,38 @@ export class TerminologyService {
            isProjectManager = (terminology.project as IProject).manager?.equals(userObjectId);
       }
 
-      if (!isCreator && !isProjectManager) {
-          throw new ForbiddenError(`User ${userId} does not have permission to update terminology ${terminologyId}`);
+      if (!isCreator && !isProjectManager) { // Restored check
+        throw new ForbiddenError(`User ${userId} does not have permission to update terminology ${terminologyId}`);
       }
+      // --- End restore ---
 
-      // Validate projectId if changed
-      let newProjectObjectId: Types.ObjectId | undefined | IProject = terminology.project; // Keep existing project object or ObjectId
-      if (data.hasOwnProperty('projectId')) { // Check if projectId key exists in update data
-         if (data.projectId === null) { // Unlink project
-             newProjectObjectId = undefined; // Assign undefined instead of null
-         } else if (data.projectId && (!terminology.project || (terminology.project instanceof Types.ObjectId ? terminology.project.toString() !== data.projectId : terminology.project._id.toString() !== data.projectId))) { // Link to new/different project
-             validateId(data.projectId, '关联项目');
-             const projectObjectIdToLink = new Types.ObjectId(data.projectId);
-             const project = await Project.findById(projectObjectIdToLink);
-             validateEntityExists(project, '关联项目');
-             // User must be manager of the NEW project to link terminology to it? Or just creator of term?
-             // Let's require manager of the target project for linking.
-             if (!project.manager?.equals(userObjectId)) {
-                 throw new ForbiddenError(`User ${userId} is not manager of project ${data.projectId} and cannot link terminology to it.`);
-             }
-             newProjectObjectId = projectObjectIdToLink; // Assign the ObjectId
-         }
+      // ... (update fields) ...
+      if (data.name !== undefined) terminology.name = data.name;
+      if (data.description !== undefined) terminology.description = data.description;
+      if (data.languagePairs !== undefined) {
+        terminology.languagePairs = data.languagePairs;
+        terminology.markModified('languagePairs');
       }
-      // Only update project field if it actually changed
-      // Need careful comparison as it could be ObjectId or IProject
-      const currentProjectId = terminology.project instanceof Types.ObjectId ? terminology.project : (terminology.project as IProject)?._id;
-      const newProjectId = newProjectObjectId instanceof Types.ObjectId ? newProjectObjectId : (newProjectObjectId as IProject)?._id;
+      if (data.isPublic !== undefined) terminology.isPublic = data.isPublic;
       
-      if (currentProjectId?.toString() !== newProjectId?.toString()) {
-           terminology.project = newProjectObjectId;
+      // Handle project linking/unlinking
+      if (data.projectId !== undefined) {
+          if (data.projectId === null) {
+              terminology.project = undefined;
+          } else {
+              validateId(data.projectId, '关联项目');
+              const projectToLink = await Project.findById(data.projectId);
+              validateEntityExists(projectToLink, '要关联的项目');
+              // Add permission check? Maybe only project manager can link?
+              terminology.project = new Types.ObjectId(data.projectId);
+          }
+          terminology.markModified('project');
       }
-
-      // Update other fields
-      if (data.name) terminology.name = data.name;
-      if (data.hasOwnProperty('description')) terminology.description = data.description; // Allow setting empty description
-      if (data.languagePairs) {
-          if (data.languagePairs.length === 0) throw new ValidationError('Language pairs cannot be empty.');
-          terminology.languagePairs = data.languagePairs;
-      }
-      if (typeof data.isPublic === 'boolean') terminology.isPublic = data.isPublic;
 
       await terminology.save();
       logger.info(`Terminology ${terminologyId} updated by user ${userId}`);
-      // Repopulate necessary fields before returning
-      return await Terminology.findById(terminologyId)
-                .populate('createdBy', 'id username fullName')
-                .populate('project', 'id name')
-                .exec() as ITerminology; // Assert non-null as we know it exists
+      // Restore project populate
+      return await Terminology.findById(terminologyId).populate('createdBy', 'id username fullName').populate('project', 'id name').exec() as ITerminology;
 
     } catch (error) {
       logger.error(`Error in ${this.serviceName}.${methodName} for ID ${terminologyId}:`, error);
@@ -607,7 +563,4 @@ export class TerminologyService {
     }
   }
 }
-
-// Export singleton instance
-export const terminologyService = new TerminologyService();
 

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { SegmentStatus } from '../models/segment.model';
-import { reviewService } from '../services/review.service';
-import aiReviewService from '../services/ai-review.service';
+import { ReviewService } from '../services/review.service';
+import { AIReviewService } from '../services/ai-review.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UnauthorizedError, NotFoundError, AppError } from '../utils/errors';
 import { QueueTaskType } from '../services/translation/queue/queue-task.interface';
@@ -10,6 +10,7 @@ import { AIProvider } from '../types/ai-service.types';
 import logger from '../utils/logger';
 import { IIssue, IssueSeverity, IssueStatus } from '../models/segment.model';
 import { Types } from 'mongoose';
+import { Container } from 'typedi';
 
 // 自定义错误类
 class BadRequestError extends AppError {
@@ -40,6 +41,7 @@ interface ReviewTaskOptions {
  * POST /api/review/segment
  */
 async function requestSegmentReview(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId, options } = req.body;
 
@@ -124,6 +126,7 @@ async function requestSegmentReview(req: Request, res: Response): Promise<void> 
  * POST /api/review/segment/complete
  */
 async function completeSegmentReview(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId, finalTranslation, acceptedChanges, modificationDegree } = req.body;
 
@@ -171,6 +174,7 @@ async function completeSegmentReview(req: Request, res: Response): Promise<void>
  * GET /api/review/segment/:segmentId
  */
 async function getSegmentReviewResult(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId } = req.params;
 
@@ -209,6 +213,7 @@ async function getSegmentReviewResult(req: Request, res: Response): Promise<void
  * POST /api/review/segment/:segmentId/finalize
  */
 async function finalizeSegmentReview(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId } = req.params;
 
@@ -242,6 +247,7 @@ async function finalizeSegmentReview(req: Request, res: Response, next: NextFunc
  * POST /api/review/segment/issue
  */
 async function addSegmentIssue(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId, type, description, position, suggestion, severity } = req.body;
 
@@ -292,6 +298,7 @@ async function addSegmentIssue(req: Request, res: Response): Promise<void> {
  * PUT /api/review/segment/issue/:issueId/resolve
  */
 async function resolveSegmentIssue(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentId, issueId } = req.params;
     const { resolution } = req.body;
@@ -339,6 +346,7 @@ async function resolveSegmentIssue(req: Request, res: Response): Promise<void> {
  */
 async function batchUpdateSegmentStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const methodName = 'batchUpdateSegmentStatus';
+  const reviewService = Container.get(ReviewService);
   try {
     const { segmentIds, status } = req.body;
 
@@ -379,6 +387,8 @@ async function batchUpdateSegmentStatus(req: AuthRequest, res: Response, next: N
  * POST /api/review/text
  */
 async function reviewTextDirectly(req: Request, res: Response): Promise<void> {
+  const reviewService = Container.get(ReviewService);
+  const aiReviewService = Container.get(AIReviewService);
   try {
     const { original, translation, sourceLanguage, targetLanguage, model, customPrompt } = req.body;
 
@@ -427,6 +437,9 @@ async function reviewTextDirectly(req: Request, res: Response): Promise<void> {
  */
 async function getSupportedReviewModels(req: Request, res: Response): Promise<void> {
   try {
+    // Get AIReviewService instance
+    const aiReviewService = Container.get(AIReviewService);
+
     // 获取用户身份
     const userId = (req as AuthRequest).user?.id;
     if (!userId) {
@@ -770,6 +783,7 @@ async function cancelReviewTask(req: Request, res: Response): Promise<void> {
  */
 async function getReviewableSegments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const methodName = 'getReviewableSegments';
+  const reviewService = Container.get(ReviewService);
   try {
     const { fileId } = req.params;
     const userId = req.user?.id;
@@ -821,6 +835,7 @@ async function getReviewableSegments(req: AuthRequest, res: Response, next: Next
  */
 async function finalizeFileReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const methodName = 'finalizeFileReview';
+  const reviewService = Container.get(ReviewService);
   try {
     const { fileId } = req.params;
     const userId = req.user?.id;

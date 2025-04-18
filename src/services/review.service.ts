@@ -1,9 +1,10 @@
+import { Inject, Service } from 'typedi';
 import { aiServiceFactory } from '../services/translation/aiServiceFactory';
-import aiReviewServiceInstance, { AIReviewService } from './ai-review.service';
+import { AIReviewService } from './ai-review.service';
 import { Segment, SegmentStatus, IssueType, ReviewScoreType, ISegment, IIssue, IssueSeverity, IssueStatus, IReviewScore } from '../models/segment.model';
 import { File, FileStatus, IFile } from '../models/file.model';
 import Project, { IProject } from '../models/project.model';
-import { IPromptTemplate } from '../models/promptTemplate.model';
+import { IPromptTemplate, PromptTemplate } from '../models/promptTemplate.model';
 import { AppError, NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../utils/errors';
 import logger from '../utils/logger';
 import mongoose, { Types } from 'mongoose';
@@ -11,7 +12,7 @@ import { AIProvider } from '../types/ai-service.types';
 import { AIReviewResponse, AIReviewIssue } from './translation/ai-adapters/review.adapter';
 import { handleServiceError, validateId, validateEntityExists, validateOwnership } from '../utils/errorHandler';
 import User, { IUser } from '../models/user.model';
-import { promptProcessor } from '../utils/promptProcessor';
+import { PromptProcessor, PromptBuildContext } from '../utils/promptProcessor';
 import { config } from '../config';
 import { TranslationMemoryService } from './translationMemory.service';
 
@@ -36,14 +37,16 @@ interface CompleteReviewData {
 /**
  * 审校服务类
  */
+@Service()
 export class ReviewService /* implements IReviewService */ {
   private serviceName = 'ReviewService';
-  private aiReviewService: AIReviewService;
-  private translationMemoryService: TranslationMemoryService;
 
-  constructor(aiRevService: AIReviewService = aiReviewServiceInstance) {
-    this.aiReviewService = aiRevService;
-    this.translationMemoryService = new TranslationMemoryService();
+  constructor(
+    @Inject() private aiReviewService: AIReviewService,
+    @Inject() private translationMemoryService: TranslationMemoryService,
+    @Inject() private promptProcessor: PromptProcessor
+  ) {
+    logger.info(`[${this.serviceName}] Initialized with injected services.`);
   }
 
   /**
@@ -56,7 +59,7 @@ export class ReviewService /* implements IReviewService */ {
     validateId(userId, '用户');
     let segment: ISegment | null = null;
     let file: IFile | null = null;
-    let project: (IProject & { reviewPromptTemplate?: IPromptTemplate | Types.ObjectId | string, defaultReviewPromptTemplate?: IPromptTemplate | Types.ObjectId | string }) | null = null;
+    let project: (IProject & { reviewPromptTemplate?: IPromptTemplate | Types.ObjectId | null, defaultReviewPromptTemplate?: IPromptTemplate | Types.ObjectId | null }) | null = null;
     let templateIdToUse: string | undefined = undefined;
 
     try {
@@ -92,19 +95,23 @@ export class ReviewService /* implements IReviewService */ {
       // 6. Prepare Prompt Context & Build Prompt
       if (options?.promptTemplateId) {
         templateIdToUse = options.promptTemplateId;
-      } else if (project.reviewPromptTemplate) {
-        templateIdToUse = project.reviewPromptTemplate._id?.toString() ?? project.reviewPromptTemplate.toString();
-      } else if (project.defaultReviewPromptTemplate) {
-        templateIdToUse = project.defaultReviewPromptTemplate._id?.toString() ?? project.defaultReviewPromptTemplate.toString();
+      } else if (project.reviewPromptTemplate && !(project.reviewPromptTemplate instanceof Types.ObjectId)) {
+        templateIdToUse = project.reviewPromptTemplate._id?.toString();
+      } else if (project.defaultReviewPromptTemplate && !(project.defaultReviewPromptTemplate instanceof Types.ObjectId)) {
+        templateIdToUse = project.defaultReviewPromptTemplate._id?.toString();
       }
-      const promptContext = {
+      const sourceLang = file.metadata?.sourceLanguage;
+      const targetLang = file.metadata?.targetLanguage;
+      if (!sourceLang || !targetLang) {
+          throw new AppError('File metadata is missing source or target language.', 500);
+      }
+      const promptContext: PromptBuildContext = {
         promptTemplateId: templateIdToUse,
-        sourceLanguage: file.metadata?.sourceLanguage ?? undefined,
-        targetLanguage: file.metadata?.targetLanguage ?? undefined,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
         domain: project.domain,
-        industry: project.industry,
       };
-      const reviewPromptData = await promptProcessor.buildReviewPrompt(
+      const reviewPromptData = await this.promptProcessor.buildReviewPrompt(
         segment.sourceText,
         segment.translation!,
         promptContext
@@ -117,8 +124,8 @@ export class ReviewService /* implements IReviewService */ {
       // 8. Execute AI review using AIReviewService (NO direct client call)
       logger.info(`[${methodName}] Calling AIReviewService for segment ${segmentId}`);
       const reviewOptionsForAIService = {
-        sourceLanguage: file.metadata?.sourceLanguage ?? 'en',
-        targetLanguage: file.metadata?.targetLanguage ?? 'en',
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
         provider: aiProvider,
         model: model,
         apiKey: options?.apiKey || undefined,
@@ -940,6 +947,3 @@ export class ReviewService /* implements IReviewService */ {
     }
   }
 }
-
-// 创建并导出默认实例
-export const reviewService = new ReviewService();

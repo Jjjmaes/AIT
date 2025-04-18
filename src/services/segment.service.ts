@@ -1,3 +1,4 @@
+import { Service } from 'typedi';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
 import { handleServiceError, validateId, validateEntityExists } from '../utils/errorHandler';
 import logger from '../utils/logger';
@@ -12,7 +13,8 @@ export interface ISegmentService {
   // Add other methods like delete as needed
 }
 
-class SegmentService implements ISegmentService {
+@Service()
+export class SegmentService implements ISegmentService {
   private serviceName = 'SegmentService';
 
   async getSegmentById(segmentId: string): Promise<ISegment> {
@@ -92,7 +94,4 @@ class SegmentService implements ISegmentService {
   
   // Add delete method if required later
   // async deleteSegmentsByFileId(fileId: string): Promise<{ deletedCount: number }> { ... }
-}
-
-// Export singleton instance
-export const segmentService = new SegmentService(); 
+} 

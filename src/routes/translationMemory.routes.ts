@@ -1,13 +1,18 @@
 import { Router } from 'express';
+// Import Controller class and Container
 import { 
-    translationMemoryController, 
+    TranslationMemoryController, // Import class
     tmxUploadMiddleware, 
     addTMEntryValidators 
 } from '../controllers/translationMemory.controller';
+import { Container } from 'typedi'; // Import Container
 import { authenticateJwt } from '../middleware/auth.middleware';
-import { authorizeRoles } from '../middleware/auth.middleware'; // Assuming roles might be needed later
+// import { authorizeRoles } from '../middleware/auth.middleware'; // Assuming roles might be needed later
 
 const router = Router();
+
+// Get controller instance from container
+const translationMemoryController = Container.get(TranslationMemoryController);
 
 // === Translation Memory Routes ===
 

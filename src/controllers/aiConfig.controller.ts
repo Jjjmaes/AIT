@@ -1,11 +1,13 @@
 // src/controllers/aiConfig.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { AIProviderConfig, IAIProviderConfig } from '../models/aiConfig.model'; // Correct model import
-// Import the service instance directly and the payload type
-import { aiConfigService, AIConfigPayload } from '../services/aiConfig.service'; 
+// Remove direct service import
+// import { aiConfigService, AIConfigPayload } from '../services/aiConfig.service'; 
+import { AIConfigService, AIConfigPayload } from '../services/aiConfig.service'; // Keep Payload type, import Service Class
 import { validateId } from '../utils/errorHandler'; // Assuming this is the correct path/export for validation
 import logger from '../utils/logger';
-import { AppError } from '../utils/errors'; // Assuming AppError is defined here for custom errors
+import { AppError, NotFoundError } from '../utils/errors'; // Removed unused ValidationError
+import { Inject, Service } from 'typedi'; // Import typedi
 
 // Interface for Request object potentially augmented by authentication middleware
 interface AuthRequest extends Request {
@@ -25,9 +27,12 @@ interface SelectableAIModel {
   provider: string;
 }
 
+@Service() // Add Service decorator
 export class AIConfigController {
   private serviceName = 'AIConfigController';
-  // Service instance is imported, no need to instantiate: private aiConfigService = new AIConfigService();
+  
+  // Inject AIConfigService
+  constructor(@Inject() private aiConfigService: AIConfigService) {}
 
   // --- Method to get active models formatted for selection UI ---
   // Note: This uses the Model directly for robustness, avoiding service dependency here.
@@ -68,14 +73,14 @@ export class AIConfigController {
       }
   }
 
-  // --- CRUD Methods using aiConfigService and next(error) pattern --- 
+  // --- CRUD Methods using injected service --- 
 
   public getAllConfigs = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
       const methodName = 'getAllConfigs';
       logger.info(`Entering ${this.serviceName}.${methodName}`);
       try {
-          // Assuming admin check happens in middleware
-          const configs = await aiConfigService.getAllConfigs();
+          // Use injected service
+          const configs = await this.aiConfigService.getAllConfigs();
           // Service should handle masking of sensitive data like API keys
           res.status(200).json({ success: true, data: { configs } });
       } catch (error) {
@@ -89,12 +94,12 @@ export class AIConfigController {
       const { configId } = req.params;
       try {
           logger.info(`Entering ${this.serviceName}.${methodName} for ID: ${configId}`);
-          validateId(configId, 'AI 配置'); // Validate ID format
-          // Assuming admin check happens in middleware
-          const config = await aiConfigService.getConfigById(configId);
+          validateId(configId, 'AI 配置');
+          // Use injected service
+          const config = await this.aiConfigService.getConfigById(configId);
           if (!config) {
-              // Throw standard AppError for central handler
-              throw new AppError('AI Configuration not found', 404); 
+              // Use NotFoundError for consistency
+              throw new NotFoundError('AI Configuration not found'); 
           }
           // Service should handle masking of sensitive data
           res.status(200).json({ success: true, data: { config } });
@@ -109,9 +114,8 @@ export class AIConfigController {
       const payload: AIConfigPayload = req.body;
       try {
           logger.info(`Entering ${this.serviceName}.${methodName}`);
-          // Assuming admin check happens in middleware
-          // TODO: Add detailed payload validation here or in middleware/service
-          const newConfig = await aiConfigService.createConfig(payload);
+          // Use injected service
+          const newConfig = await this.aiConfigService.createConfig(payload);
           // Service should mask API key before returning
           res.status(201).json({ success: true, data: { config: newConfig }, message: 'AI Configuration created successfully' });
       } catch (error) {
@@ -127,11 +131,10 @@ export class AIConfigController {
       try {
           logger.info(`Entering ${this.serviceName}.${methodName} for ID: ${configId}`);
           validateId(configId, 'AI 配置');
-          // Assuming admin check happens in middleware
-          // TODO: Add detailed payload validation
-          const updatedConfig = await aiConfigService.updateConfig(configId, payload);
+          // Use injected service
+          const updatedConfig = await this.aiConfigService.updateConfig(configId, payload);
            if (!updatedConfig) {
-              throw new AppError('AI Configuration not found', 404);
+              throw new NotFoundError('AI Configuration not found');
           }
           // Service should mask API key
           res.status(200).json({ success: true, data: { config: updatedConfig }, message: 'AI Configuration updated successfully' });
@@ -147,9 +150,8 @@ export class AIConfigController {
       try {
           logger.info(`Entering ${this.serviceName}.${methodName} for ID: ${configId}`);
           validateId(configId, 'AI 配置');
-          // Assuming admin check happens in middleware
-          // Service method should throw an error if config not found or delete fails
-          await aiConfigService.deleteConfig(configId);
+          // Use injected service
+          await this.aiConfigService.deleteConfig(configId);
           // If service call completes without throwing, it succeeded
           res.status(200).json({ success: true, message: 'AI 配置已删除' });
       } catch (error) {

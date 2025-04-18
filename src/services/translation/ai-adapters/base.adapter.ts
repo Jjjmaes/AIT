@@ -5,6 +5,24 @@ import { AIProvider } from '../../../types/ai-service.types';
 // Force export AIModelInfo (even if imported)
 export type { AIModelInfo };
 
+// Define a generic structure for chat messages
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+// Define a generic structure for the response needed from chat completion
+export interface ChatCompletionResponse {
+  content: string | null; // The main response message content
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  model: string; // The model actually used
+  error?: string; // Optional error message
+}
+
 // Response structure for translation
 export interface TranslationResponse {
   translatedText: string;
@@ -22,6 +40,11 @@ export interface ITranslationServiceAdapter {
     options?: TranslationOptions & { model?: string; temperature?: number } // Allow specific model/temp override
   ): Promise<TranslationResponse>;
   
+  executeChatCompletion(
+    messages: ChatMessage[],
+    options: { model?: string; temperature?: number; max_tokens?: number; /* other relevant options */ }
+  ): Promise<ChatCompletionResponse>;
+
   getAvailableModels?(): Promise<AIModelInfo[]>;
 }
 
@@ -37,6 +60,12 @@ export abstract class BaseAIServiceAdapter implements ITranslationServiceAdapter
   abstract translateText(sourceText: string, promptData: any, options?: TranslationOptions & { model?: string; temperature?: number }): Promise<TranslationResponse>;
   abstract validateApiKey(): Promise<boolean>;
   abstract getAvailableModels(): Promise<AIModelInfo[]>;
+
+  // New method for direct chat completion
+  abstract executeChatCompletion(
+    messages: ChatMessage[],
+    options: { model?: string; temperature?: number; max_tokens?: number; /* other relevant options */ }
+  ): Promise<ChatCompletionResponse>;
 
   protected createError(code: string, message: string, details?: any): Error {
     const error = new Error(message);

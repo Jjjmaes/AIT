@@ -1,5 +1,6 @@
 // src/services/aiConfig.service.ts
 import mongoose from 'mongoose'; // Import mongoose
+import { Service } from 'typedi'; // Import Service
 // This now correctly uses the IAIProviderConfig from the model file
 import { AIProviderConfig, IAIProviderConfig } from '../models/aiConfig.model';
 import { handleServiceError, validateId } from '../utils/errorHandler';
@@ -20,7 +21,8 @@ export interface AIConfigPayload {
 
 // The conflicting local definition that was here has been removed.
 
-class AIConfigService {
+@Service()
+export class AIConfigService {
     private serviceName = 'AIConfigService';
 
     /**
@@ -173,5 +175,3 @@ class AIConfigService {
         }
     }
 }
-
-export const aiConfigService = new AIConfigService();

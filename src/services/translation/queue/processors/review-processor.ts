@@ -1,12 +1,15 @@
 import { QueueTask, QueueTaskStatus, QueueTaskType } from '../queue-task.interface';
 import logger from '../../../../utils/logger';
-import aiReviewService from '../../../../services/ai-review.service';
+import { AIReviewService } from '../../../../services/ai-review.service';
+import { ReviewService } from '../../../../services/review.service';
 import { ISegment, Segment, SegmentStatus, IIssue, IssueType, IssueSeverity, IssueStatus } from '../../../../models/segment.model';
 import { AIProvider } from '../../../../types/ai-service.types';
 import { ReviewOptions } from '../../../../services/translation/ai-adapters/review.adapter';
 import mongoose from 'mongoose';
 import { File, FileStatus, IFile } from '../../../../models/file.model';
-import { promptProcessor } from '../../../../utils/promptProcessor';
+import { PromptProcessor } from '../../../../utils/promptProcessor';
+import { Container } from 'typedi';
+import { NotFoundError } from '../../../../utils/errors';
 
 /**
  * 队列任务处理器接口
@@ -49,6 +52,18 @@ interface ReviewTaskOptions {
  * 负责处理队列中的审校任务
  */
 export class ReviewTaskProcessor implements TaskProcessor {
+  private aiReviewService: AIReviewService;
+  private reviewService: ReviewService;
+  private promptProcessor: PromptProcessor;
+
+  constructor() {
+    // Get instances from TypeDI container
+    this.aiReviewService = Container.get(AIReviewService);
+    this.reviewService = Container.get(ReviewService);
+    this.promptProcessor = Container.get(PromptProcessor);
+    logger.info('[ReviewProcessor] Initialized and got service instances.');
+  }
+
   // 处理任务时的默认批量大小
   private readonly DEFAULT_BATCH_SIZE = 10;
   // 默认并发数
@@ -60,55 +75,62 @@ export class ReviewTaskProcessor implements TaskProcessor {
    * 处理队列中的审校任务
    */
   async process(task: QueueTask): Promise<any> {
-    logger.info(`Processing review task: ${task.id}`, {
-      taskId: task.id,
-      taskType: task.type,
-      dataType: task.data.taskType
-    });
-    
-    const startTime = Date.now();
+    const { taskType, segmentId, userId, options } = task.data;
+    logger.info(`[ReviewProcessor] Processing task ${task.id}: ${taskType} for segment ${segmentId || 'N/A'}`);
 
-    try {
-      let result;
-      
-      switch (task.data.taskType) {
-        case 'segmentReview':
-          result = await this.processSegmentReview(task);
-          break;
-        case 'batchSegmentReview':
-          result = await this.processBatchSegmentReview(task);
-          break;
-        case 'fileReview':
-          result = await this.processFileReview(task);
-          break;
-        case 'textReview':
-          result = await this.processTextReview(task);
-          break;
-        default:
-          throw new Error(`Unsupported review task type: ${task.data.taskType}`);
+    if (taskType === 'segmentReview') {
+      if (!segmentId || !userId) {
+        throw new Error(`Task ${task.id} is missing segmentId or userId for segmentReview.`);
       }
-      
-      const duration = Date.now() - startTime;
-      logger.info(`Review task ${task.id} processed successfully in ${duration}ms`, {
-        taskId: task.id,
-        duration,
-        result: typeof result === 'object' ? '(object)' : result
-      });
-      
-      return result;
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      logger.error(`Review task processing failed: ${task.id} after ${duration}ms`, {
-        taskId: task.id, 
-        error: error.message,
-        stack: error.stack,
-        duration
-      });
-      
-      // 重新抛出错误，让队列系统处理重试逻辑
-      throw error;
-    } finally {
-      logger.debug(`Review task ${task.id} processing completed in ${Date.now() - startTime}ms`);
+
+      try {
+        // Pass options directly; reviewService.startAIReview handles defaults/validation internally
+        const result = await this.reviewService.startAIReview(segmentId, userId, [], options);
+        logger.info(`[ReviewProcessor] Completed segmentReview task ${task.id} successfully for segment ${segmentId}`);
+        return { success: true, segmentId: result._id };
+      } catch (error: any) {
+        logger.error(`[ReviewProcessor] Error processing segmentReview task ${task.id} for segment ${segmentId}:`, error);
+        if (error instanceof NotFoundError) {
+          throw new Error(`Segment ${segmentId} not found for review task ${task.id}.`);
+        }
+        throw error;
+      }
+    } else if (taskType === 'textReview') {
+      const { originalText, translatedText, options: textOptions } = task.data;
+      if (!originalText || !translatedText) {
+        throw new Error(`Task ${task.id} is missing originalText or translatedText for textReview.`);
+      }
+      try {
+        const sourceLang = textOptions?.sourceLanguage || 'en';
+        const targetLang = textOptions?.targetLanguage || 'zh-CN';
+
+        if (!textOptions?.sourceLanguage || !textOptions?.targetLanguage) {
+          logger.warn(`[ReviewProcessor] Task ${task.id} (textReview) missing source/target language in options. Using defaults: ${sourceLang}/${targetLang}`);
+        }
+        
+        // Construct valid options object without explicit type
+        const aiReviewOpts = {
+          ...textOptions,
+          sourceLanguage: sourceLang,
+          targetLanguage: targetLang,
+        };
+
+        const result = await this.aiReviewService.reviewText(originalText, translatedText, aiReviewOpts);
+        logger.info(`[ReviewProcessor] Completed textReview task ${task.id} successfully.`);
+        return { success: true, result };
+      } catch (error) {
+        logger.error(`[ReviewProcessor] Error processing textReview task ${task.id}:`, error);
+        throw error;
+      }
+    } else if (taskType === 'batchSegmentReview') {
+      logger.warn(`[ReviewProcessor] Task type 'batchSegmentReview' (task ${task.id}) processing not yet implemented.`);
+      return { success: false, message: 'Batch segment review not implemented' };
+    } else if (taskType === 'fileReview') {
+      logger.warn(`[ReviewProcessor] Task type 'fileReview' (task ${task.id}) processing not yet implemented.`);
+      return { success: false, message: 'File review not implemented' };
+    } else {
+      logger.error(`[ReviewProcessor] Unknown task type '${taskType}' for task ${task.id}.`);
+      throw new Error(`Unsupported review task type: ${taskType}`);
     }
   }
 
@@ -159,7 +181,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
     try {
       // 执行AI审校
       logger.info(`Starting AI review for segment ${segmentId} using model ${reviewOptions.model || 'default'}`);
-      const reviewResult = await aiReviewService.reviewTranslation(
+      const reviewResult = await this.aiReviewService.reviewTranslation(
         segment.sourceText,
         segment.translation || '',
         {
@@ -401,7 +423,7 @@ export class ReviewTaskProcessor implements TaskProcessor {
     try {
       // 执行AI审校
       logger.info(`Starting direct text AI review using model ${reviewOptions.model || 'default'}`);
-      const reviewResult = await aiReviewService.reviewTranslation(
+      const reviewResult = await this.aiReviewService.reviewTranslation(
         originalText,
         translatedText,
         {

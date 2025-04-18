@@ -297,12 +297,22 @@ const TranslationCenterPage: React.FC = () => {
                 key: 'translationResult', // Use a different key
                 duration: 5
             });
-            // Set the polling job ID to the ID of the FIRST selected file
-            const firstFileId = selectedFileIds.length > 0 ? selectedFileIds[0] : null;
-            setPollingJobId(firstFileId);
-            setCurrentStep(2);
-            // Optionally refetch project files data to show updated status (like 'processing')
-            queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
+            
+            // --- FIX: Store the ACTUAL Job ID for polling ---
+            // Find the first successful result to get its jobId
+            const firstSuccessfulResult = results.find(r => r.status === 'fulfilled' && r.value.success);
+            const actualJobId = firstSuccessfulResult?.status === 'fulfilled' ? firstSuccessfulResult.value.jobId : null;
+            
+            if (actualJobId) {
+                 setPollingJobId(actualJobId); // <-- Set the correct jobId
+                 setCurrentStep(2);
+                 queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
+            } else {
+                 // Handle case where successCount > 0 but couldn't find a jobId (shouldn't happen ideally)
+                 message.error({ content: `翻译已启动，但未能获取Job ID进行状态跟踪。`, key: 'translationResult', duration: 5 });
+                 setPollingJobId(null);
+            }
+
         } else {
             message.error({ content: `所有 ${failureCount}个文件启动翻译失败。请检查控制台获取详情。`, key: 'translationResult', duration: 5 });
             setPollingJobId(null); // Ensure no polling if all fail

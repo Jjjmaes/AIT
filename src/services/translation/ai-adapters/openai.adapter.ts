@@ -1,6 +1,12 @@
 import { OpenAI } from 'openai';
 import { TranslationOptions } from '../../../types/translation.types';
-import { BaseAIServiceAdapter, TranslationResponse, AIModelInfo } from './base.adapter';
+import {
+  BaseAIServiceAdapter,
+  TranslationResponse,
+  AIModelInfo,
+  ChatMessage,
+  ChatCompletionResponse
+} from './base.adapter';
 import { ReviewAdapter, AIReviewResponse, AIReviewIssue } from './review.adapter';
 import { IssueSeverity, IssueType } from '../../../models/segment.model';
 import { AIServiceConfig, AIProvider } from '../../../types/ai-service.types';
@@ -65,6 +71,62 @@ export class OpenAIAdapter extends BaseAIServiceAdapter {
       logger.error('OpenAI translateText error:', error);
       const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown OpenAI error';
       throw new AppError(`OpenAI translation failed: ${errorMessage}`, 500);
+    }
+  }
+
+  async executeChatCompletion(
+    messages: ChatMessage[],
+    options: { model?: string; temperature?: number; max_tokens?: number; }
+  ): Promise<ChatCompletionResponse> {
+    const model = options?.model || this.config.defaultModel || 'gpt-3.5-turbo';
+    const temperature = options?.temperature ?? this.config.temperature ?? 0.3;
+    const max_tokens = options?.max_tokens ?? this.config.maxTokens;
+    const startTime = Date.now();
+
+    // Ensure messages have the correct type expected by the OpenAI SDK
+    const apiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    try {
+      logger.debug(`Calling OpenAI chat completion: model=${model}, temp=${temperature}, max_tokens=${max_tokens}`);
+      const completion = await this.openai.chat.completions.create({
+        model: model,
+        messages: apiMessages,
+        temperature: temperature,
+        max_tokens: max_tokens,
+        // Consider adding response_format if JSON is always expected for specific tasks
+        // response_format: { type: 'json_object' }, 
+      });
+
+      const processingTime = Date.now() - startTime;
+      const content = completion.choices[0]?.message?.content ?? null;
+      const usage = completion.usage;
+
+      logger.debug(`OpenAI chat completion completed in ${processingTime}ms. Tokens: ${usage?.total_tokens}`);
+
+      return {
+        content: content,
+        usage: usage ? {
+          prompt_tokens: usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens,
+          total_tokens: usage.total_tokens,
+        } : undefined,
+        model: model, // Return the model used
+      };
+
+    } catch (error: any) {
+      logger.error('OpenAI executeChatCompletion error:', error);
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown OpenAI error';
+      // Return error details in the response object
+      return {
+          content: null,
+          model: model,
+          error: `OpenAI chat completion failed: ${errorMessage}`
+      };
+      // Alternatively, rethrow a structured error:
+      // throw new AppError(`OpenAI chat completion failed: ${errorMessage}`, 500, { provider: 'openai' });
     }
   }
 
@@ -191,12 +253,12 @@ export class OpenAIAdapter extends BaseAIServiceAdapter {
   }
 
   async validateApiKey(): Promise<boolean> {
+    // Basic validation: Try listing models
     try {
-          // Make a simple, cheap API call to check if key is valid (e.g., list models)
-          await this.openai.models.list(); 
+      await this.openai.models.list();
       return true;
     } catch (error) {
-          logger.error('OpenAI API key validation failed:', error);
+      logger.error('OpenAI API key validation failed:', error);
       return false;
     }
   }

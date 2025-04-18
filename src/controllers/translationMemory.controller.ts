@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { translationMemoryService, AddTMEntryDto, CreateTMSetDto } from '../services/translationMemory.service';
+import { TranslationMemoryService, AddTMEntryDto, CreateTMSetDto } from '../services/translationMemory.service';
 import logger from '../utils/logger';
-import { AppError, ValidationError } from '../utils/errors';
+import { AppError, ValidationError, UnauthorizedError } from '../utils/errors';
 import { authenticateJwt } from '../middleware/auth.middleware'; // Use correct export name
 import { body, validationResult } from 'express-validator'; // For input validation
 import multer from 'multer';
-import { TranslationMemoryService } from '../services/translationMemory.service';
-import { Container } from 'typedi';
+import { Inject, Service } from 'typedi'; // Import Inject, Service
 import { AuthRequest } from '../middleware/auth.middleware';
 import { TranslationMemory } from '../models/translationMemory.model'; // Corrected model path
 import { TranslationMemorySet } from '../models/translationMemorySet.model'; // Corrected model path
-import { UnauthorizedError } from '../utils/errors';
 
 // Extend Express Request interface to include user property and file
 interface AuthenticatedRequest extends Request {
@@ -25,9 +23,13 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 } // Example: 10MB limit
 }); 
 
-
+@Service() // Add Service decorator
 export class TranslationMemoryController {
-  public translationMemoryService = Container.get(TranslationMemoryService);
+  // Remove direct Container.get
+  // public translationMemoryService = Container.get(TranslationMemoryService);
+
+  // Inject service via constructor
+  constructor(@Inject() private translationMemoryService: TranslationMemoryService) {}
 
   /**
    * @desc    Add a single Translation Memory entry
@@ -59,7 +61,8 @@ export class TranslationMemoryController {
     };
 
     try {
-      const result = await translationMemoryService.addEntry(entryDto);
+      // Use injected service
+      const result = await this.translationMemoryService.addEntry(entryDto);
       res.status(201).json({ 
         message: `TM entry successfully ${result.status}.`, 
         data: result.entry 
@@ -93,7 +96,8 @@ export class TranslationMemoryController {
 
     try {
       logger.info(`User ${userId} initiating TMX import for project ${projectId || 'global'}`);
-      const result = await translationMemoryService.importTMX(tmxContent, projectId, userId);
+      // Use injected service
+      const result = await this.translationMemoryService.importTMX(tmxContent, projectId, userId);
       res.status(200).json({
         message: `TMX import process completed. Added: ${result.addedCount}, Updated: ${result.updatedCount}, Skipped/Errors: ${result.skippedCount}.`,
         details: result
@@ -134,7 +138,8 @@ export class TranslationMemoryController {
     };
 
     try {
-        const newTMSet = await translationMemoryService.createTMSet(userId, setData);
+        // Use injected service
+        const newTMSet = await this.translationMemoryService.createTMSet(userId, setData);
         res.status(201).json({ success: true, data: newTMSet });
         logger.info(`User ${userId} created TM Set ID ${newTMSet._id}`);
     } catch (error) {
@@ -159,6 +164,7 @@ export class TranslationMemoryController {
       logger.info(`[${methodName}] User ${req.user.id} attempting to create TM Set: ${tmSetData.name}`);
       
       // Correct argument order: userId first, then DTO data
+      // Use injected service
       const newTmSet = await this.translationMemoryService.createTMSet(req.user.id, tmSetData);
       
       logger.info(`[${methodName}] TM Set created successfully: ${newTmSet._id} by User ${req.user.id}`);
@@ -177,6 +183,7 @@ export class TranslationMemoryController {
         throw new UnauthorizedError('Authentication required.');
       }
       logger.info(`[${methodName}] User ${req.user.id} requesting all TM Sets`); // Use req.user.id
+      // Use injected service
       const tmSets = await this.translationMemoryService.getAllTMSets(req.user.id); // Use req.user.id
       logger.info(`[${methodName}] Found ${tmSets.length} TM Sets for User ${req.user.id}`);
       res.status(200).json({ data: tmSets, message: 'Translation Memory Sets retrieved successfully' });
@@ -197,9 +204,6 @@ export const addTMEntryValidators = [
     body('targetText', 'Target text is required').notEmpty().isString(),
     body('projectId', 'Project ID must be a valid MongoDB ObjectId if provided').optional().isMongoId(),
 ];
-
-// Export singleton instance and multer middleware
-export const translationMemoryController = new TranslationMemoryController();
 
 // Define and export the multer middleware for the 'tmxfile' field
 export const tmxUploadMiddleware = upload.single('tmxfile'); 

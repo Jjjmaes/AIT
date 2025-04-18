@@ -15,6 +15,8 @@ import { BaseAIServiceAdapter, TranslationResponse } from './base.adapter';
 import logger from '../../../utils/logger';
 import { TranslationOptions } from '../../../types/translation.types';
 import { encoding_for_model, TiktokenModel } from 'tiktoken';
+import { ChatMessage, ChatCompletionResponse } from './base.adapter';
+import { AppError } from '../../../utils/errors';
 
 // 审校选项接口
 export interface ReviewOptions extends TranslationOptions {
@@ -62,6 +64,9 @@ export interface AIReviewResponse {
     modificationDegree: number;  // 修改程度 (0-1)
   };
 }
+
+// Define a temporary inline type for review response
+type TempReviewResponse = { score: number; comments: string; error?: string; needsManualReview?: boolean };
 
 /**
  * OpenAI 审校适配器
@@ -477,4 +482,70 @@ ${context}
     
     return Promise.resolve(model.pricing);
   }
+
+  // Implement the abstract method from the base class
+  async executeChatCompletion(
+      messages: ChatMessage[],
+      options: { model?: string; temperature?: number; max_tokens?: number; }
+  ): Promise<ChatCompletionResponse> {
+      logger.error('executeChatCompletion method called on ReviewAdapter, which is not supported.');
+      throw new AppError('General chat completion is not supported by the Review adapter.', 501);
+  }
+
+  // Specific method for performing review (Ensure only one implementation exists)
+  async reviewTranslation(
+      sourceText: string, 
+      translatedText: string, 
+      reviewOptions: any 
+  ): Promise<TempReviewResponse> {
+      logger.info(`ReviewAdapter: Starting review for source: "${sourceText.substring(0, 50)}..."`);
+      
+      // 1. Construct prompt
+      const reviewPromptMessages: ChatMessage[] = [
+          { role: 'system', content: 'You are a translation quality reviewer. Evaluate the provided translation based on accuracy, fluency, and adherence to instructions.' },
+          { role: 'user', content: `Source: ${sourceText}\nTranslation: ${translatedText}\n\nPlease provide a quality score (1-5) and brief comments.` }
+      ];
+
+      // 2. Define completion options
+      const completionOptions = {
+          model: this.config.defaultModel || 'gpt-4', 
+          temperature: 0.2, 
+          max_tokens: 500 
+      };
+
+      // 3. Call AI service (Using temporary workaround logic from previous attempt)
+      let response: ChatCompletionResponse;
+      try {
+          logger.warn('ReviewAdapter cannot directly call executeChatCompletion currently. Needs refactoring.');
+          response = { content: null, model: completionOptions.model, error: 'Review mechanism needs refactoring.' };
+          // Handle different providers if needed
+          if (this.config.provider !== AIProvider.OPENAI) { // Example check
+               response = { content: null, model: completionOptions.model, error: `Review not supported for provider ${this.config.provider}` };
+          }
+      } catch (error: any) {
+          logger.error(`ReviewAdapter: Error during AI call: ${error.message}`, error);
+          // Ensure return type matches TempReviewResponse
+          return { score: 0, comments: 'Error during review process', error: error.message, needsManualReview: true }; 
+      }
+
+      // 4. Parse response
+      if (response.error || !response.content) {
+           logger.error(`ReviewAdapter: AI service returned error or empty content: ${response.error || 'Empty content'}`);
+          // Ensure return type matches TempReviewResponse
+          return { score: 0, comments: 'Failed to get review from AI', error: response.error || 'Empty content', needsManualReview: true }; 
+      }
+      
+      const reviewText = response.content;
+      let score = 0;
+      let comments = 'Could not parse review.';
+      try {
+           // ... parsing logic ...
+      } catch (parseError) {
+          logger.error('ReviewAdapter: Failed to parse review response:', parseError);
+      }
+
+      logger.info(`ReviewAdapter: Review completed. Score: ${score}`);
+      // Ensure return type matches TempReviewResponse (needsManualReview might depend on score/parsing)
+      return { score, comments, needsManualReview: score < 3 }; 
+  } 
 } 

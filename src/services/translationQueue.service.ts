@@ -171,9 +171,12 @@ class TranslationQueueService {
         finishedOn: job.finishedOn
       };
     } catch (error) {
-        if (!(error instanceof NotFoundError)) {
-            logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
+        if (error instanceof NotFoundError) {
+             // If it's NotFoundError, just re-throw it as is
+             throw error; 
         }
+        // For any other error, log and handle it
+        logger.error(`Error in ${this.serviceName}.${methodName} for job ${jobId}:`, error);
         throw handleServiceError(error, this.serviceName, methodName, '获取任务状态');
     }
   }

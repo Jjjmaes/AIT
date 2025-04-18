@@ -5,8 +5,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { ValidationError, UnauthorizedError } from '../utils/errors';
 import multer from 'multer';
 import { 
-    ProjectService as ProjectServiceClass, 
-    projectService, 
+    ProjectService,
     CreateProjectDto, 
     UpdateProjectDto, 
     UploadFileDto
@@ -19,11 +18,17 @@ import { ProjectStatus } from '../models/project.model';
 import { SegmentStatus } from '../models/segment.model';
 import { FileStatus, IFile } from '../models/file.model';
 import { Types } from 'mongoose';
-import { IProjectProgress } from '../types/project.types';
+// import { IProjectProgress } from '../types/project.types';
+import { Container, Inject, Service } from 'typedi';
 
 export const upload = multer(fileUploadConfig);
 
+@Service()
 export default class ProjectController {
+
+  // Restore constructor injection
+  constructor(@Inject() private projectService: ProjectService) {}
+
   /**
    * 创建新项目
    */
@@ -62,7 +67,8 @@ export default class ProjectController {
         deadline: validatedData.deadline ? new Date(validatedData.deadline) : undefined,
       };
 
-      const project = await projectService.createProject(createDto);
+      // Use constructor-injected service
+      const project = await this.projectService.createProject(createDto);
       
       logger.info(`Project ${project.id} created successfully by user ${userId}`);
       
@@ -90,7 +96,8 @@ export default class ProjectController {
 
       const { status, priority, search, page, limit } = req.query;
       
-      const result = await projectService.getUserProjects(userId, {
+      // Use constructor-injected service
+      const result = await this.projectService.getUserProjects(userId, {
         status: status as ProjectStatus,
         priority: priority ? parseInt(priority as string, 10) : undefined,
         search: search as string,
@@ -128,7 +135,7 @@ export default class ProjectController {
 
       const { projectId } = req.params;
       
-      const project = await projectService.getProjectById(projectId, userId, userRoles);
+      const project = await this.projectService.getProjectById(projectId, userId, userRoles);
       
       res.status(200).json({
         success: true,
@@ -192,7 +199,7 @@ export default class ProjectController {
         return res.status(400).json({ success: false, message: '没有提供可更新的字段' });
       }
 
-      const project = await projectService.updateProject(projectId, userId, updateDto);
+      const project = await this.projectService.updateProject(projectId, userId, updateDto);
       
       logger.info(`Project ${projectId} updated successfully by user ${userId}`);
       
@@ -220,7 +227,7 @@ export default class ProjectController {
       
       logger.info(`User ${userId} deleting project ${projectId}`);
       
-      const result = await projectService.deleteProject(projectId, userId);
+      const result = await this.projectService.deleteProject(projectId, userId);
       
       logger.info(`Project ${projectId} deleted successfully by user ${userId}`);
       
@@ -264,7 +271,7 @@ export default class ProjectController {
         fileType: category
       };
 
-      const uploadedFile = await projectService.uploadProjectFile(projectId, userId, fileData);
+      const uploadedFile = await this.projectService.uploadProjectFile(projectId, userId, fileData);
 
       res.status(201).json({
         success: true,
@@ -295,7 +302,7 @@ export default class ProjectController {
         throw new UnauthorizedError('未授权的访问');
       }
       
-      const files = await projectService.getProjectFiles(projectId, userId, userRoles);
+      const files = await this.projectService.getProjectFiles(projectId, userId, userRoles);
       
       // Log before sending response
       logger.debug(`[Controller/${methodName}] SUCCESS - Found ${files.length} files. Sending response.`);
@@ -327,7 +334,7 @@ export default class ProjectController {
       
       logger.info(`User ${userId} processing file ${fileId}`);
       
-      await projectService.processFile(fileId, userId);
+      await this.projectService.processFile(fileId, userId);
       
       logger.info(`File ${fileId} processed successfully`);
       
@@ -354,7 +361,7 @@ export default class ProjectController {
       const { fileId } = req.params;
       const { status, page, limit } = req.query;
       
-      const result = await projectService.getFileSegments(fileId, userId, {
+      const result = await this.projectService.getFileSegments(fileId, userId, {
         status: status as SegmentStatus,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined
@@ -381,7 +388,7 @@ export default class ProjectController {
       }
       const { fileId } = req.params;
 
-      await projectService.updateFileProgress(fileId, userId);
+      await this.projectService.updateFileProgress(fileId, userId);
 
       res.status(200).json({
         success: true,
@@ -410,7 +417,7 @@ export default class ProjectController {
         throw new ValidationError(JSON.stringify(validationResult.error.flatten()));
       }
 
-      const project = await projectService.updateProjectProgress(projectId, userId, validationResult.data);
+      const project = await this.projectService.updateProjectProgress(projectId, userId, validationResult.data);
 
       res.status(200).json({
         success: true,
@@ -454,7 +461,7 @@ export default class ProjectController {
       // Optional limit from query, default to 5
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 5;
 
-      const projects = await projectService.getRecentProjects(userId, limit);
+      const projects = await this.projectService.getRecentProjects(userId, limit);
       
       res.status(200).json({
         success: true,

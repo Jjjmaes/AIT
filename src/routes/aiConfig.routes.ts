@@ -3,9 +3,11 @@ import { Router } from 'express';
 import { AIConfigController } from '../controllers/aiConfig.controller';
 import { authenticateJwt } from '../middleware/auth.middleware';
 // import { requireAdmin } from '../middleware/role.middleware'; // TODO: Add role middleware later
+import { Container } from 'typedi'; // Import Container
 
 const router = Router();
-const aiConfigController = new AIConfigController();
+// Use Container.get to resolve AIConfigController instance with dependencies
+const aiConfigController = Container.get(AIConfigController);
 
 // Route to get active AI models for selection
 // Use authenticateJwt middleware

@@ -2,13 +2,14 @@ import mongoose from 'mongoose';
 import { File, IFile, FileStatus, FileType } from '../models/file.model';
 import { Segment, ISegment, SegmentStatus } from '../models/segment.model';
 import { FileProcessorFactory } from './fileProcessing/fileProcessor.factory';
-import { projectService } from './project.service';
+import { ProjectService } from './project.service';
 import { handleServiceError, validateId, validateEntityExists } from '../utils/errorHandler';
 import { AppError, NotFoundError, ValidationError } from '../utils/errors';
 import logger from '../utils/logger';
 import path from 'path';
 import fs from 'fs/promises';
 import { IFileProcessor } from './fileProcessing/types';
+import { Container, Inject, Service } from 'typedi';
 
 // Define the structure for file info received after upload middleware
 interface UploadedFileInfo {
@@ -21,8 +22,12 @@ interface UploadedFileInfo {
     filename: string;       // Generated unique filename for storage
 }
 
-class FileManagementService {
+@Service()
+export class FileManagementService {
     private serviceName = 'FileManagementService';
+
+    // Restore constructor injection
+    constructor(@Inject() private projectService: ProjectService) {}
 
     /**
      * Processes an uploaded file: stores it, creates DB entry, extracts segments.
@@ -49,8 +54,8 @@ class FileManagementService {
         let fileRecord: IFile | null = null; // Keep track of the created file record for potential cleanup
 
         try {
-            // 1. Validate Project and User Permissions (implicitly via projectService)
-            const project = await projectService.getProjectById(projectId, userId, requesterRoles);
+            // Use constructor-injected service
+            const project = await this.projectService.getProjectById(projectId, userId, requesterRoles);
             validateEntityExists(project, '项目');
 
             // 2. Create File Record in DB (initially PENDING)
@@ -149,8 +154,8 @@ class FileManagementService {
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
-             // Ensure user has access to the project first
-            await projectService.getProjectById(projectId, userId, requesterRoles);
+             // Use constructor-injected service
+            await this.projectService.getProjectById(projectId, userId, requesterRoles);
             const file = await File.findOne({ _id: new mongoose.Types.ObjectId(fileId), projectId: new mongoose.Types.ObjectId(projectId) }).exec();
             validateEntityExists(file, '文件');
             return file;
@@ -165,8 +170,8 @@ class FileManagementService {
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
-             // Ensure user has access to the project first
-            await projectService.getProjectById(projectId, userId, requesterRoles);
+             // Use constructor-injected service
+            await this.projectService.getProjectById(projectId, userId, requesterRoles);
             const files = await File.find({ projectId: new mongoose.Types.ObjectId(projectId) }).sort({ createdAt: -1 }).exec();
             return files;
         } catch (error) {
@@ -181,7 +186,7 @@ class FileManagementService {
         validateId(projectId, '项目');
         validateId(userId, '用户');
         try {
-            // Ensure user has access and get the file record
+            // Use this.getFileById which uses the constructor-injected service
             const file = await this.getFileById(fileId, projectId, userId, requesterRoles); 
             if (!file) {
                 throw new NotFoundError('无法找到要删除的文件'); // Should be caught by getFileById, but double check
@@ -212,6 +217,4 @@ class FileManagementService {
 
     // TODO: Add methods for updating file status, downloading files etc.
 
-}
-
-export const fileManagementService = new FileManagementService(); 
+} 

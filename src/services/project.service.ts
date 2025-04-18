@@ -17,7 +17,8 @@ import { processFile as processFileUtil } from '../utils/fileProcessor';
 import process from 'process';
 import * as fileUtils from '../utils/fileUtils';
 import { handleServiceError, validateId, validateEntityExists, isTestEnvironment, validateOwnership } from '../utils/errorHandler';
-import { sendSseUpdate } from '../app'; // Adjust path as needed!
+// import { sendSseUpdate } from '../app'; // <-- COMMENT OUT for worker compatibility
+import { Service } from 'typedi';
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -101,6 +102,7 @@ const countWords = (text: string): number => {
   return text.trim().split(/\s+/).length;
 };
 
+@Service()
 export class ProjectService implements ProjectService {
   private serviceName = 'ProjectService'; // Add service name for logging
 
@@ -738,62 +740,85 @@ export class ProjectService implements ProjectService {
         file.reviewedCount = completedCount;
         
         await file.save();
-        logger.info(`[${this.serviceName}.${methodName}] Updated file ${fileId} progress to ${file.progress.percentage}% and status to ${file.status}. Counts(T/C/F): ${translatedCount}/${completedCount}/${failedSegments}`);
-        
-        // *** SEND SSE UPDATE ***
-        // Log the userId right before sending the update
-        logger.debug(`[${this.serviceName}.${methodName}] Preparing to send SSE update for file ${fileId} to user ${userId}`);
-        sendSseUpdate(userId, 'fileProgressUpdate', { 
-            fileId: file._id.toString(), 
-            progress: file.progress.percentage, // Send the calculated percentage
-            status: file.status // Send the determined status
-        });
+        logger.info(`Updated file ${fileId} progress`);
+
+        // Emit SSE update - COMMENT OUT
+        /*
+        if (!isTestEnvironment()) { // Check if not in test environment
+            const userId = file.uploadedBy?.toString(); 
+            if (!userId) {
+               logger.warn(`Cannot send SSE update for file ${fileId} because uploadedBy user ID is missing.`);
+               return; // Exit if no user ID
+            }
+            // Log the userId right before sending the update
+            logger.debug(`[${this.serviceName}.${methodName}] Preparing to send SSE update for file ${fileId} to user ${userId}`);
+           // sendSseUpdate(userId, 'fileProgressUpdate', { 
+           //     fileId: file._id.toString(), 
+           //     progress: file.progress.percentage, // Send the calculated percentage
+           //     status: file.status // Send the determined status
+           // });
+        }
+        */
 
     } catch (error) {
-        logger.error(`Error in ${this.serviceName}.${methodName} for file ${fileId}:`, error);
+        logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+        throw handleServiceError(error, this.serviceName, methodName, '更新文件进度');
     }
   }
 
   /**
-   * 更新项目进度
+   * 更新项目进度 (例如，从外部调用或计划任务)
+   * @param projectId 项目ID
+   * @param userId 执行操作的用户ID (用于权限检查)
+   * @param data 包含进度百分比和状态的对象
+   * @returns 更新后的项目文档
    */
   async updateProjectProgress(projectId: string, userId: string, data: IProjectProgress): Promise<IProject> {
     const methodName = 'updateProjectProgress';
     validateId(projectId, '项目');
-    validateId(userId, '用户'); // Validate userId as well
-    if (!data || typeof data.completionPercentage !== 'number' || data.completionPercentage < 0 || data.completionPercentage > 100) {
-      throw new ValidationError('无效的项目进度数据');
-    }
-    
-    try { // Wrap in try/catch
-      const project = await Project.findById(projectId);
+    validateId(userId, '用户');
+    try {
+      const project = await this.getProjectById(projectId, userId, []); // Use existing method to get project & check auth
       validateEntityExists(project, '项目');
+      
+      // Update progress fields using correct names from IProjectProgress
+      project.progress = data.completionPercentage; // Use completionPercentage
 
-      validateOwnership(project.manager, userId, '更新项目进度');
-
-      // 更新进度
-      project.progress = data.completionPercentage;
-
-      // 更新状态
-      if (data.completionPercentage === 100 && project.status !== ProjectStatus.COMPLETED) {
-        project.status = ProjectStatus.COMPLETED;
-        if (!project.completedAt) {
-          project.completedAt = new Date(); // Set completedAt
-        }
-      } else if (data.completionPercentage < 100 && project.status === ProjectStatus.COMPLETED) {
-         // If progress drops below 100, revert status and clear completedAt
-         project.status = ProjectStatus.IN_PROGRESS;
-         project.completedAt = undefined; 
-      } else if (data.completionPercentage > 0 && project.status === ProjectStatus.PENDING) {
-        project.status = ProjectStatus.IN_PROGRESS;
+      // Determine status based on percentage
+      if (data.completionPercentage === 100) {
+          project.status = ProjectStatus.COMPLETED;
+          if (!project.completedAt) {
+              project.completedAt = new Date();
+          }
+      } else if (data.completionPercentage > 0 && project.status !== ProjectStatus.COMPLETED) {
+          // If progress > 0 and not already completed, mark as in progress
+          project.status = ProjectStatus.IN_PROGRESS;
+          project.completedAt = undefined; // Clear completedAt if no longer 100%
+      } else if (data.completionPercentage === 0 && project.status !== ProjectStatus.PENDING) {
+          // Optional: If progress drops to 0, revert to PENDING?
+          // project.status = ProjectStatus.PENDING;
+          // project.completedAt = undefined; // Clear completedAt 
       }
+      // Note: We might need more sophisticated status logic depending on requirements
 
       await project.save();
-      logger.info(`Project progress updated: ${project.id} to ${data.completionPercentage}%`);
-      return project as IProject;
+      logger.info(`Updated project ${projectId} progress by user ${userId}`);
+
+      // Emit SSE update - COMMENT OUT
+      /*
+      if (!isTestEnvironment()) { // Conditionally send SSE update
+        sendSseUpdate(project.manager.toString(), 'project_progress', { 
+          projectId: project._id.toString(),
+          progress: project.progress, // Send the updated progress percentage
+          status: project.status     // Send the updated status
+        });
+      }
+      */
+
+      return project;
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName} for project ${projectId}:`, error);
-      throw handleServiceError(error, this.serviceName, methodName, '项目进度');
+      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
+      throw handleServiceError(error, this.serviceName, methodName, '更新项目进度');
     }
   }
 
@@ -886,5 +911,4 @@ export class ProjectService implements ProjectService {
   }
 }
 
-// 使用单例模式
-export const projectService = new ProjectService();
+// NOTE: No manual instantiation to remove here, but ensure the class has the decorator.

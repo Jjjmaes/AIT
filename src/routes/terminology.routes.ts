@@ -1,13 +1,17 @@
 console.log('--- Loading terminology.routes.ts ---'); // Diagnostic log
 import { Router } from 'express';
 import { authenticateJwt } from '../middleware/auth.middleware';
-// Import controller and the new CSV upload middleware
-import { terminologyController, termsCsvUploadMiddleware } from '../controllers/terminology.controller';
+// Import Controller class and Container
+import { TerminologyController, termsCsvUploadMiddleware } from '../controllers/terminology.controller';
+import { Container } from 'typedi';
 // Optional: Add validation middleware if needed
 // import { validateRequest } from '../middleware/validate.middleware';
 // import { terminologyValidator } from '../validators/terminologyValidator'; // Assuming validators exist
 
 const router = Router();
+
+// Get controller instance from container
+const terminologyController = Container.get(TerminologyController);
 
 // Apply authentication middleware to all terminology routes
 router.use(authenticateJwt);

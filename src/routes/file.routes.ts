@@ -4,9 +4,10 @@ import { authenticateJwt } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
 import { validateProcessFile, validateUpdateFileProgress } from '../validators/fileValidator';
 import { upload } from '../controllers/project.controller';
+import { Container } from 'typedi';
 
 const router = Router();
-const fileController = new FileController();
+const fileController = Container.get(FileController);
 
 // 文件处理路由 - Commented out routes using non-existent FileController methods
 /*

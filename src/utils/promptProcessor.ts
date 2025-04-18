@@ -1,3 +1,4 @@
+import { Service } from 'typedi';
 import { PromptTemplate, IPromptTemplate, PromptTemplateType } from '../models/promptTemplate.model';
 import logger from './logger';
 import { Types } from 'mongoose';
@@ -35,7 +36,7 @@ interface VariableMap {
  * Fills placeholders in a prompt string with provided variable values.
  * Placeholders are in the format {{variable_name}}.
  */
-function fillPlaceholders(prompt: string | null | undefined, variables: VariableMap): string {
+export function fillPlaceholders(prompt: string | null | undefined, variables: VariableMap): string {
   // Gracefully handle null or undefined prompt input
   if (prompt === null || prompt === undefined) {
     logger.warn('[fillPlaceholders] Received null or undefined prompt input. Returning empty string.');
@@ -56,7 +57,8 @@ function fillPlaceholders(prompt: string | null | undefined, variables: Variable
   return processedPrompt;
 }
 
-class PromptProcessor {
+@Service()
+export class PromptProcessor {
 
   private async findTemplate(templateId: string | Types.ObjectId): Promise<IPromptTemplate | null> {
     if (!templateId) return null;
@@ -194,10 +196,64 @@ class PromptProcessor {
       userPrompt: finalUserPrompt,
     };
   }
-}
 
-// Export singleton instance
-export const promptProcessor = new PromptProcessor(); 
+  /**
+   * Builds only the base system prompt based on context and template ID.
+   * Excludes sourceText from placeholder filling.
+   * @param context - The prompt build context.
+   * @returns The processed system prompt string, or null if no system prompt is defined.
+   */
+  async buildBaseSystemPrompt(
+    context: PromptBuildContext
+  ): Promise<string | null> {
+    const methodName = 'buildBaseSystemPrompt';
+    logger.debug(`[PromptProcessor.${methodName}] ENTER - context:`, context);
+
+    let template: IPromptTemplate | null = null;
+    if (context.promptTemplateId) {
+      logger.debug(`[PromptProcessor.${methodName}] Finding template ID: ${context.promptTemplateId}`);
+      template = await this.findTemplate(context.promptTemplateId);
+      // Assuming translation type for now, might need context for type later
+      if (!template || template.type !== PromptTemplateType.TRANSLATION) { 
+        logger.warn(`[PromptProcessor.${methodName}] Translation template ${context.promptTemplateId} not found or wrong type. Using default system prompt.`);
+        template = null; 
+      }
+    }
+
+    // Determine the system prompt template to use
+    // TODO: Revisit how system prompt is determined. Does template.content contain both?
+    // Or should template have a separate systemPrompt field?
+    // --- FIX: Always use the default system prompt for now, regardless of custom template existence ---
+    const systemInstructionTemplate = DEFAULT_TRANSLATION_SYSTEM_PROMPT;
+    
+    // Log if a custom template was found but its content is missing (relevant for user prompt later)
+    if (template && !template.content) {
+         logger.warn(`[PromptProcessor.${methodName}] Template ${template._id} found, but its content is missing. User prompt might be affected.`);
+    }
+
+    // This check is no longer needed as we always assign a system prompt template
+    // if (!systemInstructionTemplate) {
+
+    // Prepare variables map, EXCLUDING sourceText
+    const { promptTemplateId, terms, ...simpleContext } = context;
+    const variables: VariableMap = { 
+        ...simpleContext, 
+        // sourceText: undefined, // Explicitly exclude
+        sourceLang: context.sourceLanguage, 
+        targetLang: context.targetLanguage, 
+        domain: context.domain || 'general', 
+        glossaryName: context.terminology || 'None', 
+         // Format terms if provided (example, adjust formatting as needed)
+        terms: terms?.map(t => `${t.source}=${t.target}`).join(', ') || 'None' 
+    };
+
+    logger.debug(`[PromptProcessor.${methodName}] Replacing placeholders in system instruction using fillPlaceholders...`);
+    const finalSystemInstruction = fillPlaceholders(systemInstructionTemplate, variables);
+
+    logger.debug(`[PromptProcessor.${methodName}] EXIT - Returning processed system prompt.`);
+    return finalSystemInstruction;
+  }
+}
 
 /**
  * Processes a translation prompt using an optional template.
@@ -264,4 +320,4 @@ export function processReviewPrompt(template: IPromptTemplate | null | undefined
         systemPrompt: systemInstruction, // Use the determined system instruction (null in this case)
         userPrompt: finalUserPrompt
     };
-} 
+}

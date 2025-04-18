@@ -1,20 +1,23 @@
+import { Inject, Service } from 'typedi';
 import { AIProvider, AIServiceConfig } from '../types/ai-service.types';
-import { AIServiceFactory } from './translation/ai-adapters';
+import { aiServiceFactory } from './translation/aiServiceFactory';
 import { ReviewAdapter, ReviewOptions, AIReviewResponse } from './translation/ai-adapters/review.adapter';
 import logger from '../utils/logger';
 import { ReviewScoreType, IssueType } from '../models/segment.model';
-import { promptTemplateService, PromptTemplateService } from './promptTemplate.service';
+import { PromptTemplateService } from './promptTemplate.service';
 import { PromptTemplateType, IPromptTemplate } from '../models/promptTemplate.model';
-import { terminologyService, TerminologyService } from './terminology.service';
+import { TerminologyService } from './terminology.service';
 import { ITermEntry } from '../models/terminology.model';
-import { projectService, ProjectService } from './project.service';
+import { ProjectService } from './project.service';
 import { validateEntityExists } from '../utils/errorHandler';
+import { AppError } from '../utils/errors';
+import { handleServiceError } from '../utils/errorHandler';
 
 // Define interface for review options
 interface AIReviewOptions {
   sourceLanguage: string;
   targetLanguage: string;
-  provider?: AIProvider;
+  provider?: AIProvider | string; // Allow string for flexibility
   model?: string;
   apiKey?: string;
   customPrompt?: string;
@@ -31,44 +34,35 @@ interface AIReviewOptions {
 }
 
 /**
- * AI审校服务
- * 提供独立的AI审校功能，可以被其他服务或控制器调用
+ * Service responsible for interacting with different AI models for translation review.
+ * Acts as a higher-level service coordinating AI interactions.
  */
+@Service()
 export class AIReviewService {
-  private aiServiceFactory: AIServiceFactory;
-  private promptTemplateService: PromptTemplateService;
-  private terminologyService: TerminologyService;
-  private projectService: ProjectService;
+  private serviceName = 'AIReviewService';
+  private aiServiceFactory: any;
 
   constructor(
-    promptSvc: PromptTemplateService = promptTemplateService,
-    aiFactory: AIServiceFactory = AIServiceFactory.getInstance(),
-    termSvc: TerminologyService = terminologyService,
-    projSvc: ProjectService = projectService
+    @Inject(() => TerminologyService) private terminologyService: TerminologyService,
+    @Inject(() => ProjectService) private projectService: ProjectService,
+    @Inject(() => PromptTemplateService) private promptTemplateService: PromptTemplateService
   ) {
-    this.aiServiceFactory = aiFactory;
-    this.promptTemplateService = promptSvc;
-    this.terminologyService = termSvc;
-    this.projectService = projSvc;
+    this.aiServiceFactory = aiServiceFactory;
+    logger.info(`[${this.serviceName}] Initialized with imported aiServiceFactory and injected TerminologyService, ProjectService, PromptTemplateService.`);
   }
 
   /**
    * 获取AI审校适配器
    */
-  private getReviewAdapter(config: {
-    provider: AIProvider;
-    apiKey: string;
-    model: string;
-  }): ReviewAdapter {
-    const adapterConfig: AIServiceConfig = {
-      provider: config.provider,
-      apiKey: config.apiKey,
-      model: config.model,
-      temperature: 0.3,
-      maxTokens: 4000
-    };
-
-    return this.aiServiceFactory.createReviewAdapter(adapterConfig);
+  private getReviewAdapter(provider?: AIProvider | string, config?: AIServiceConfig): ReviewAdapter {
+    const aiProviderEnum = provider ? provider as AIProvider : AIProvider.OPENAI;
+    const adapter = this.aiServiceFactory.getReviewAdapter(aiProviderEnum, config);
+    if (!adapter) {
+        const providerName = provider || 'default';
+        logger.error(`[${this.serviceName}] Could not get review adapter for provider: ${providerName}`);
+        throw new AppError(`Unsupported or unconfigured AI provider: ${providerName}`, 400);
+    }
+    return adapter;
   }
 
   /**
@@ -85,47 +79,42 @@ export class AIReviewService {
     const methodName = 'reviewTranslation';
     logger.debug(`[${methodName}] Starting review process.`);
     try {
-      // 获取API密钥（首选传入的，否则使用环境变量）
-      const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        logger.error(`[${methodName}] API key is missing.`);
-        throw new Error('未配置API密钥');
+      const provider = options.provider;
+      const model = options.model;
+
+      const aiProviderEnum = (provider ? provider as AIProvider : AIProvider.OPENAI);
+
+      const serviceConfig: AIServiceConfig | undefined = options.apiKey
+        ? {
+            provider: aiProviderEnum,
+            apiKey: options.apiKey,
+            model: model,
+          }
+        : undefined;
+
+      let terms: ITermEntry[] = [];
+      if (options.projectId && options.userId) {
+          try {
+              const project = await this.projectService.getProjectById(
+                  options.projectId,
+                  options.userId,
+                  options.requesterRoles || []
+              );
+              validateEntityExists(project, '关联项目 for terminology');
+              if (project.terminology) {
+                  const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());
+                  if (terminologyList?.terms) {
+                      terms = terminologyList.terms;
+                      logger.info(`[${methodName}] Fetched ${terms.length} terms for project ${options.projectId}.`);
+                  }
+              }
+          } catch (error) {
+              logger.error(`[${methodName}] Failed to fetch project or terminology for project ${options.projectId}. Proceeding without terms.`, { error });
+          }
       }
 
-      // 获取提供商（首选传入的，否则默认为OpenAI）
-      const provider = options.provider || AIProvider.OPENAI;
+      let effectivePrompt = options.customPrompt;
 
-      // 获取模型（首选传入的，否则使用默认值）
-      const model = options.model || 'gpt-3.5-turbo';
-
-       // --- Fetch Terminology if projectId is available ---
-       let terms: ITermEntry[] = [];
-       if (options.projectId && options.userId) { // Check for userId too
-           try {
-               // Pass roles from options
-               const project = await this.projectService.getProjectById(
-                   options.projectId, 
-                   options.userId, 
-                   options.requesterRoles || [] // Pass roles, default to empty array
-               );
-               validateEntityExists(project, '关联项目 for terminology');
-               if (project.terminology) {
-                   const terminologyList = await this.terminologyService.getTerminologyById(project.terminology.toString());
-                   if (terminologyList?.terms) {
-                       terms = terminologyList.terms;
-                       logger.info(`[${methodName}] Fetched ${terms.length} terms for project ${options.projectId}.`);
-                   }
-               }
-           } catch (error) {
-               logger.error(`[${methodName}] Failed to fetch project or terminology for project ${options.projectId}. Proceeding without terms.`, { error });
-           }
-       }
-       // ---------------------------------------------------
-
-       // 获取并渲染提示模板
-       let effectivePrompt = options.customPrompt;
-
-      // Fetch and process prompt template
       if (!effectivePrompt && options.promptTemplateId) {
         logger.debug(`[${methodName}] Attempting to fetch prompt template ID: ${options.promptTemplateId}`);
         try {
@@ -135,81 +124,67 @@ export class AIReviewService {
 
           if (template && template.type === PromptTemplateType.REVIEW) {
             logger.info(`[${methodName}] Using prompt template ID: ${options.promptTemplateId}`);
-            // Start with the base user prompt from the template
             let promptText = template.content
               .replace('{SOURCE_LANGUAGE}', options.sourceLanguage)
               .replace('{TARGET_LANGUAGE}', options.targetLanguage)
               .replace('{ORIGINAL_CONTENT}', original)
               .replace('{TRANSLATED_CONTENT}', translation);
 
-            // Inject terminology if available
             if (terms.length > 0) {
                 const formattedTerms = terms.map(term => `[${term.source} -> ${term.target}]`).join(', ');
-                // Prepend a clear instruction about terminology
-                const terminologyInstruction = `Strictly adhere to the following terminology: ${formattedTerms}.\n\n`; 
-                // Check if a placeholder exists for more structured injection (optional)
+                const terminologyInstruction = `Strictly adhere to the following terminology: ${formattedTerms}.\n\n`;
                 if (promptText.includes('{TERMINOLOGY_LIST}')) {
-                    promptText = promptText.replace('{TERMINOLOGY_LIST}', formattedTerms); // Replace placeholder if exists
+                    promptText = promptText.replace('{TERMINOLOGY_LIST}', formattedTerms);
                     logger.info(`[${methodName}] Injected ${terms.length} terms into {TERMINOLOGY_LIST} placeholder.`);
                 } else {
-                    // Otherwise, prepend the instruction to the main prompt text
-                    promptText = terminologyInstruction + promptText; 
+                    promptText = terminologyInstruction + promptText;
                     logger.warn(`[${methodName}] Prompt template ${options.promptTemplateId} lacks {TERMINOLOGY_LIST} placeholder. Prepending terminology instruction.`);
                 }
+            } else {
+                 promptText = promptText.replace('{TERMINOLOGY_LIST}', '');
             }
             effectivePrompt = promptText;
           } else {
             logger.warn(`[${methodName}] Prompt template ${options.promptTemplateId} not found or not a REVIEW template. Falling back.`);
           }
         } catch (error) {
-          // Catch errors specifically from fetching/processing the template
           logger.error(`[${methodName}] Error processing prompt template ${options.promptTemplateId}. Falling back.`, { error });
-          // effectivePrompt remains null or the original customPrompt, allowing fallback
         }
       }
-      // This handles the case where a customPrompt was provided initially
-      else if (effectivePrompt && terms.length > 0) { 
-         // Inject terms into the custom prompt if provided
+      else if (effectivePrompt && terms.length > 0) {
          const formattedTerms = terms.map(term => `[${term.source} -> ${term.target}]`).join(', ');
          const terminologyInstruction = `Strictly adhere to the following terminology: ${formattedTerms}.\n\n`;
          effectivePrompt = terminologyInstruction + effectivePrompt;
          logger.info(`[${methodName}] Injected ${terms.length} terms into custom review prompt.`);
       }
-       else if (!effectivePrompt) { // Log if still no prompt after checking template and custom
+       else if (!effectivePrompt) {
          logger.debug(`[${methodName}] No prompt template ID or customPrompt provided/processed. Using default adapter prompt.`);
       }
 
-      // 获取审校适配器
-      logger.debug(`[${methodName}] Getting review adapter for provider: ${provider}, model: ${model}`);
-      const reviewAdapter = this.getReviewAdapter({
-        provider,
-        apiKey,
-        model
-      });
+      logger.debug(`[${methodName}] Getting review adapter for provider: ${provider || 'default'}, model: ${model || 'default'}`);
+      const reviewAdapter = this.getReviewAdapter(provider, serviceConfig);
 
-      // 构建审校选项
-      const reviewOptions: ReviewOptions = {
-        sourceLanguage: options.sourceLanguage,
-        targetLanguage: options.targetLanguage,
+      const adapterReviewOptions: ReviewOptions = {
         originalContent: original,
         translatedContent: translation,
-        customPrompt: effectivePrompt, // Pass the potentially modified prompt
+        aiModel: model,
+        customPrompt: effectivePrompt,
         requestedScores: options.requestedScores,
         checkIssueTypes: options.checkIssueTypes,
         contextSegments: options.contextSegments,
-        projectId: options.projectId // Pass projectId if needed by adapter
+        useTerminology: terms.length > 0,
+        sourceLanguage: options.sourceLanguage,
+        targetLanguage: options.targetLanguage,
       };
 
-      // --- Execute review and return --- 
-      logger.debug(`[${methodName}] Executing adapter review.`);
-      const reviewResult = await reviewAdapter.reviewText(reviewOptions); 
+      logger.debug(`[${methodName}] Executing adapter review with options: ${JSON.stringify(adapterReviewOptions)}`);
+      const reviewResult = await reviewAdapter.reviewText(adapterReviewOptions);
       logger.debug(`[${methodName}] Review process completed successfully.`);
       return reviewResult;
 
     } catch (error: any) {
       logger.error(`[${methodName}] Error during review process:`, error);
-      // Rethrow or handle error appropriately
-      throw error; // Rethrowing for now
+      throw handleServiceError(error, this.serviceName, methodName, 'AI审校');
     }
   }
 
@@ -233,63 +208,74 @@ export class AIReviewService {
    * @param apiKey API密钥
    */
   async getSupportedModels(
-    provider: AIProvider = AIProvider.OPENAI,
+    provider?: AIProvider | string,
     apiKey?: string
   ) {
+    const methodName = 'getSupportedModels';
     try {
-      // 获取API密钥（首选传入的，否则使用环境变量）
-      const key = apiKey || process.env.OPENAI_API_KEY;
-      if (!key) {
-        throw new Error('未配置API密钥');
+      const aiProviderEnum = (provider ? provider as AIProvider : AIProvider.OPENAI);
+
+      const serviceConfig: AIServiceConfig | undefined = apiKey
+        ? {
+            provider: aiProviderEnum,
+            apiKey: apiKey
+        }
+        : undefined;
+
+      const reviewAdapter = this.getReviewAdapter(provider, serviceConfig);
+
+      if (typeof (reviewAdapter as any).getSupportedModels === 'function') {
+        const models = await (reviewAdapter as any).getSupportedModels();
+        logger.info(`[${methodName}] Found ${models.length} supported models for provider ${provider || 'default'}.`);
+        return models;
+      } else {
+          logger.warn(`[${methodName}] Adapter for provider ${provider || 'default'} does not support getSupportedModels.`);
+          return [];
       }
 
-      // 获取审校适配器
-      const reviewAdapter = this.getReviewAdapter({
-        provider,
-        apiKey: key,
-        model: 'gpt-3.5-turbo' // 这里只是用来初始化适配器，不会真正使用该模型
-      });
-
-      // 获取适配器支持的模型
-      const models = await reviewAdapter.getAvailableModels();
-      
-      // 过滤出具有审校能力的模型
-      return models.filter(model => 
-        model.capabilities.includes('review')
-      );
-
     } catch (error: any) {
-      logger.error('Failed to get supported models', { error });
-      throw new Error(`获取支持的模型失败: ${error.message}`);
+      logger.error(`[${methodName}] Failed to get supported models for provider ${provider || 'default'}:`, { error });
+      throw new AppError(`获取支持的模型失败: ${error.message}`, 500);
     }
   }
 
   /**
-   * 验证API密钥是否有效
+   * 验证特定提供商的API密钥是否有效
    * @param provider AI提供商
    * @param apiKey API密钥
    */
   async validateApiKey(
-    provider: AIProvider = AIProvider.OPENAI,
-    apiKey: string
+    provider?: AIProvider | string,
+    apiKey?: string
   ): Promise<boolean> {
+     const methodName = 'validateApiKey';
+     logger.debug(`[${methodName}] Validating API key for provider: ${provider || 'default'}`);
     try {
-      // 获取审校适配器
-      const reviewAdapter = this.getReviewAdapter({
-        provider,
-        apiKey,
-        model: 'gpt-3.5-turbo' // 这里只是用来初始化适配器，不会真正使用该模型
-      });
+      if (!apiKey) {
+          logger.warn(`[${methodName}] API key not provided for validation.`);
+          return false; 
+      }
+      
+      const aiProviderEnum = (provider ? provider as AIProvider : AIProvider.OPENAI);
 
-      // 验证API密钥
-      return await reviewAdapter.validateApiKey();
+      const serviceConfig: AIServiceConfig = {
+          provider: aiProviderEnum,
+          apiKey: apiKey
+      };
 
+      const adapter = this.getReviewAdapter(provider, serviceConfig);
+
+      if (typeof (adapter as any).validateCredentials === 'function') {
+        const isValid = await (adapter as any).validateCredentials();
+        logger.info(`[${methodName}] API key validation result for provider ${provider || 'default'}: ${isValid}`);
+        return isValid;
+      } else {
+        logger.warn(`[${methodName}] Adapter for provider ${provider || 'default'} does not support validateCredentials.`);
+        return false; 
+      }
     } catch (error: any) {
-      logger.error('API key validation failed', { error });
+      logger.error(`[${methodName}] Error validating API key for provider ${provider || 'default'}:`, { error });
       return false;
     }
   }
 }
-
-// 导出服务实例
-export default new AIReviewService(); 

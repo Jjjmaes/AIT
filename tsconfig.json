@@ -20,9 +20,14 @@
       "./node_modules/@types",
       "./src/types"
     ],
-    "types": ["jest", "node"],
-    "jsx": "react-jsx"
+    "types": ["jest", "node"]
   },
-  "include": ["src/**/*", "frontend/src/**/*"],
-  "exclude": ["node_modules", "dist", "client"]
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules", 
+    "dist", 
+    "frontend",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }
