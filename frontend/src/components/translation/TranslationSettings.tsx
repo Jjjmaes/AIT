@@ -34,6 +34,7 @@ interface TranslationSettingsProps {
     terminologyBaseId?: string | null; // <-- Add selected terminology ID (optional)
     useTranslationMemory: boolean;
     translationMemoryId?: string | null; // <-- Add selected TM ID (optional)
+    retranslateTM: boolean; // <-- Add the retranslateTM setting
   };
   onSettingsChange: (settings: any) => void;
 }
@@ -61,6 +62,7 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
         terminologyBaseId: settings.terminologyBaseId || null,
         useTranslationMemory: settings.useTranslationMemory || false,
         translationMemoryId: settings.translationMemoryId || null,
+        retranslateTM: settings.retranslateTM || false, // <-- Initialize form value
       };
       form.setFieldsValue(initialFormValues);
     }
@@ -86,6 +88,7 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
     terminologyBaseId: settings.terminologyBaseId || null,
     useTranslationMemory: settings.useTranslationMemory || false,
     translationMemoryId: settings.translationMemoryId || null,
+    retranslateTM: settings.retranslateTM || false, // <-- Initialize form value
   };
 
   return (
@@ -267,6 +270,23 @@ const TranslationSettings: React.FC<TranslationSettingsProps> = ({
               ) : null
             }
           </Form.Item>
+
+          {/* --- Retranslate TM Segments --- */}
+          <Form.Item
+            label={
+              <span>
+                重新翻译TM匹配片段
+                <Tooltip title="启用后，即使片段已通过翻译记忆库匹配 (TRANSLATED_TM)，也会将其包含在翻译任务中（是否实际重新翻译取决于服务逻辑）">
+                  <InfoCircleOutlined style={{ marginLeft: 8 }} />
+                </Tooltip>
+              </span>
+            }
+            name="retranslateTM"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+
         </Card>
       </Form>
     </div>

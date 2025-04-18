@@ -8,6 +8,7 @@ export interface StartSingleFileAIPayload {
   options?: { // Keep options for other, optional settings
     tmId?: string | null;
     tbId?: string | null;
+    retranslateTM?: boolean; // Add the optional flag
     // Add other options if backend expects them
   };
 }

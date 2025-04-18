@@ -15,6 +15,7 @@ import promptTemplateRoutes from './routes/promptTemplate.routes';
 import terminologyRoutes from './routes/terminology.routes';
 import translationMemoryRoutes from './routes/translationMemory.routes';
 import aiConfigRoutes from './routes/aiConfig.routes';
+import translationRoutes from './routes/translation.routes';
 import { errorHandler } from './middleware/error.middleware';
 import { authenticateJwt } from './middleware/auth.middleware'; // Corrected casing
 
@@ -80,6 +81,7 @@ app.use('/api/notifications', authenticateJwt, notificationRoutes);
 app.use('/api/prompts', authenticateJwt, promptTemplateRoutes);
 app.use('/api/terms', authenticateJwt, terminologyRoutes);
 app.use('/api/v1/tm', authenticateJwt, translationMemoryRoutes);
+app.use('/api/translation', authenticateJwt, translationRoutes);
 
 // --- SSE Endpoint (Requires Authentication) ---
 app.get('/api/sse/updates', authenticateJwt, (req: any, res) => { // Corrected casing

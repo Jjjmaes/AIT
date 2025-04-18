@@ -1,12 +1,13 @@
 import React from 'react';
 import { Typography, Progress, Card, List, Tag, Button, Space, Empty, Alert, Spin, Statistic, Row, Col } from 'antd';
 import { CheckCircleOutlined, SyncOutlined, WarningOutlined, FileTextOutlined } from '@ant-design/icons';
+import { TranslationStatusResponse } from '../../api/translation';
 
 const { Title, Text, Paragraph } = Typography;
 
 interface TranslationProgressProps {
   jobId: string | null;
-  status: any; // Replace with proper type when available
+  status: TranslationStatusResponse | null;
   isLoading: boolean;
   onViewReview: (fileId: string) => void;
 }
@@ -17,6 +18,10 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
   isLoading,
   onViewReview,
 }) => {
+  // --- Add Log --- 
+  console.log('[TranslationProgress] Rendering with props:', { jobId, status, isLoading });
+  // --- End Log ---
+
   if (!jobId) {
     return (
       <Empty description="暂无翻译任务" />
@@ -95,7 +100,7 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
               <div>
                 <Paragraph>部分文件可能未能成功翻译。请查看下方详情。</Paragraph>
                 <ul>
-                  {status.errors.map((error: any, index: number) => (
+                  {status?.errors?.map((error: any, index: number) => (
                     <li key={index}>{error.message}</li>
                   ))}
                 </ul>
@@ -112,6 +117,9 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
           itemLayout="horizontal"
           dataSource={status?.files || []}
           renderItem={(file: any) => {
+            // --- Add Log ---
+            console.log('[TranslationProgress] Rendering file item:', file);
+            // --- End Log ---
             const fileStatus = file.status;
             let statusTag;
             

@@ -51,7 +51,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
   // Log raw job data first
   logger.info(`[Worker Job ${job.id}] START Processing job. Raw Data:`, job.data); 
   
-  const { type, projectId, fileId, options = {}, userId, requesterRoles, aiConfigId, promptTemplateId } = job.data;
+  // Explicitly type options when destructuring and provide a default value
+  const { type, projectId, fileId, options = {} as TranslationOptions, userId, requesterRoles, aiConfigId, promptTemplateId } = job.data;
   
   // Explicitly log the extracted values
   logger.debug(`[Worker Job ${job.id}] Extracted - promptTemplateId: ${promptTemplateId}, aiConfigId: ${aiConfigId}`); 
@@ -114,7 +115,13 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
       const result = await segmentService.getSegmentsByFileId(fileId);
       totalSegments = result.total;
       result.segments.forEach((s: ISegment) => {
-          if (s.status === SegmentStatus.PENDING || s.status === SegmentStatus.ERROR) {
+          // Base condition: always include PENDING and ERROR
+          let shouldTranslate = s.status === SegmentStatus.PENDING || s.status === SegmentStatus.ERROR;
+          // Optionally include TRANSLATED_TM based on the job option
+          if (options?.retranslateTM === true && s.status === SegmentStatus.TRANSLATED_TM) {
+              shouldTranslate = true;
+          }
+          if (shouldTranslate) {
               segmentsToTranslate.push({ segmentId: s._id.toString(), fileId });
           }
       });
@@ -132,7 +139,13 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
           const result = await segmentService.getSegmentsByFileId(file._id.toString());
           projectSegmentCount += result.total;
           result.segments.forEach((s: ISegment) => {
-              if (s.status === SegmentStatus.PENDING || s.status === SegmentStatus.ERROR) {
+              // Base condition: always include PENDING and ERROR
+              let shouldTranslate = s.status === SegmentStatus.PENDING || s.status === SegmentStatus.ERROR;
+              // Optionally include TRANSLATED_TM based on the job option
+              if (options?.retranslateTM === true && s.status === SegmentStatus.TRANSLATED_TM) {
+                  shouldTranslate = true;
+              }
+              if (shouldTranslate) {
                   segmentsToTranslate.push({ segmentId: s._id.toString(), fileId: file._id.toString() });
               }
           });
@@ -182,34 +195,24 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
             // Ensure options passed to translateSegment include the determined languages
             const finalOptions: TranslationOptions = {
                 ...options,
-                sourceLanguage: determinedSourceLang!, // Use determined languages
+                sourceLanguage: determinedSourceLang!,
                 targetLanguage: determinedTargetLang!,
             };
             
-            // Log before calling the service
             logger.debug(`[Worker Job ${job.id}] Calling translationService.translateSegment for segment ${segmentId}...`);
-            // Correctly call translateSegment with individual arguments
             updatedSegment = await translationService.translateSegment(
-                segmentId, 
-                userId, 
-                requesterRoles, 
-                aiConfigId,         // Pass aiConfigId directly
-                promptTemplateId,   // Pass promptTemplateId directly
-                finalOptions        // Pass the options with guaranteed languages
+                segmentId, userId, requesterRoles, aiConfigId, promptTemplateId, finalOptions
             );
             processedSegments++;
             logger.debug(`[Worker Job ${job.id}] Successfully processed segment ${segmentId}. Status: ${updatedSegment?.status}`);
         } catch (error: any) {
-            // Log the specific error for this segment
-            logger.error(`[Worker Job ${job.id}] Error processing segment ${segmentId}: ${error.message}`, { error }); // Log the full error object
+            logger.error(`[Worker Job ${job.id}] Error processing segment ${segmentId}: ${error.message}`, { error });
             erroredSegments++;
-            // Ensure a string is always pushed, even if error.message is undefined
             errors.push(`Segment ${segmentId}: ${String(error?.message ?? 'Unknown segment error')}`);
-            // Segment status should be updated within translateSegment's catch block
-            updatedSegment = null; // Ensure segment is null on error
+            updatedSegment = null;
         }
 
-        // --- Trigger AI Review if Translation Succeeded --- 
+        // --- Trigger AI Review (Keep this logic inside the loop) ---
         if (updatedSegment && updatedSegment.status === SegmentStatus.TRANSLATED) {
             logger.debug(`[Worker Job ${job.id}] Segment ${segmentId} translated by AI, attempting to queue for review...`);
             try {
@@ -227,44 +230,48 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
                 // Do not fail the translation job if queuing review fails
             }
         } else if (updatedSegment && updatedSegment.status === SegmentStatus.TRANSLATED_TM) {
-            logger.info(`Job ${job.id}: Segment ${segmentId} was translated by TM, skipping AI review trigger.`);
-            // Decide if TM translated segments should also go to review queue?
-            // Maybe add an option? For now, skipping.
+             logger.info(`Job ${job.id}: Segment ${segmentId} was translated by TM, skipping AI review trigger.`);
         } else {
-             // Log if segment update failed or status wasn't TRANSLATED
              logger.warn(`Job ${job.id}: Segment ${segmentId} not queued for review (Status: ${updatedSegment?.status || 'Update Failed'}).`);
         }
         // ---------------------------------------------------
 
-        // Update progress (percentage)
+        // --- Update BullMQ progress (Keep inside loop) ---
         const progress = totalSegments > 0 ? Math.round(((processedSegments + erroredSegments) / totalSegments) * 100) : 100;
         logger.debug(`[Worker Job ${job.id}] Updating BullMQ progress: ${progress}% (${processedSegments + erroredSegments}/${totalSegments})`);
         await job.updateProgress(progress);
-
-        // **NOW, explicitly update the File document and trigger SSE**
-        try {
-            logger.debug(`[Worker Job ${job.id}] Calling projectService.updateFileProgress for file ${currentFileId}...`);
-            await projectService.updateFileProgress(currentFileId, userId); 
-            logger.debug(`[Worker Job ${job.id}] Finished projectService.updateFileProgress for file ${currentFileId}.`);
-        } catch (updateError: any) { 
-            // Log if updating the file progress itself fails, but don't fail the whole job for this
-            logger.error(`[Worker Job ${job.id}] Error calling updateFileProgress for file ${currentFileId}: ${updateError.message}`, updateError);
-        } 
-        // --- End File Progress Update ---
-    }
+        // -----------------------------------------------
+    } // <--- End of for...of loop
 
     // Use logger.info for final job outcome
     logger.info(`[Worker Job ${job.id}] FINISHED Segment Loop. Processed: ${processedSegments}, Errors: ${erroredSegments}, Total Segments in Job: ${totalSegments}`);
+
+    // --- Final File Progress Update (Call ONCE after loop) ---
+    const finalFileId = fileId; // Use fileId from the job data (works for 'file' type)
+    if (finalFileId && type === 'file') { 
+        try {
+            logger.info(`[Worker Job ${job.id}] Calling final projectService.updateFileProgress for file ${finalFileId}...`);
+            await projectService.updateFileProgress(finalFileId, userId); 
+            logger.info(`[Worker Job ${job.id}] Finished final projectService.updateFileProgress for file ${finalFileId}.`);
+        } catch (updateError: any) { 
+            // Log AND re-throw the error to fail the job if final update fails
+            logger.error(`[Worker Job ${job.id}] CRITICAL: Error calling final updateFileProgress for file ${finalFileId}: ${updateError.message}`, updateError);
+            throw updateError; // Re-throw the error
+        } 
+    } else if (type === 'project') {
+        // TODO: Implement final status update logic for project jobs
+        logger.warn(`[Worker Job ${job.id}] Final status update for project-level jobs not fully implemented.`);
+    }
+    // --- End Final File Progress Update ---
 
     if (erroredSegments > 0) {
       // Throw an error to mark the job as failed, providing details
       const failureMsg = `${erroredSegments} segment(s) failed to translate. Errors: ${errors.join('; ')}`;
       logger.error(`[Worker Job ${job.id}] Failing job due to segment errors: ${failureMsg}`);
-      // --- TEMPORARY DIAGNOSTIC --- 
-      // Throw a simple hardcoded error instead of the complex message
-      throw new Error('HARDCODED_JOB_FAILURE_DUE_TO_SEGMENT_ERRORS');
+      // --- REMOVE TEMPORARY DIAGNOSTIC ---
+      // throw new Error('HARDCODED_JOB_FAILURE_DUE_TO_SEGMENT_ERRORS');
       // --- END TEMPORARY DIAGNOSTIC ---
-      // throw new Error(failureMsg); // Original line commented out
+      throw new Error(failureMsg); // Throw the actual error message
     }
 
     logger.info(`[Worker Job ${job.id}] COMPLETED Successfully.`);

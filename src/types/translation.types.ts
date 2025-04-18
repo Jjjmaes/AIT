@@ -22,6 +22,7 @@ export interface TranslationOptions {
   useTranslationMemory?: boolean;
   useTerminology?: boolean;
   preserveFormatting?: boolean;
+  retranslateTM?: boolean;
   context?: {
     projectName: string;
     fileName?: string;
@@ -262,4 +263,23 @@ export interface ProjectTranslationStatus {
     failed: number;
   };
   lastUpdated: Date;
-} 
+}
+
+// --- ADD Frontend-compatible Status Response Type ---
+// Based on frontend/src/api/translation.ts
+export interface TranslationStatusResponse {
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'pending' | 'active' | 'unknown'; // Allow backend states too
+  progress: number;
+  completedFiles: number;
+  totalFiles: number;
+  errors?: Array<{ fileId: string; message: string }>;
+  files: Array<{
+    id: string;
+    originalName: string;
+    status: string; // Can use FileStatus or SegmentStatus values here
+    progress: number;
+    sourceLanguage?: string; // Make optional if not always available
+    targetLanguage?: string; // Make optional if not always available
+  }>;
+}
+// --- END Frontend-compatible Status Response Type --- 

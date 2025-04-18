@@ -720,7 +720,7 @@ export class ProjectService implements ProjectService {
              // Removed redundant else block from previous edit attempt
         } else if (totalSegments > 0) { // If still processing
              // If some translation has started, set status to TRANSLATING
-             if (translatedCount > 0 && finalStatus === FileStatus.PROCESSING || finalStatus === FileStatus.PENDING || finalStatus === FileStatus.EXTRACTED) {
+             if (translatedCount > 0 && (finalStatus === FileStatus.PROCESSING || finalStatus === FileStatus.PENDING || finalStatus === FileStatus.EXTRACTED)) {
                  finalStatus = FileStatus.TRANSLATING;
              }
              // Add logic here if you have a distinct REVIEWING status to set

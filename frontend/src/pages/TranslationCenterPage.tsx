@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Typography, Card, Steps, Button, Alert, Divider, message, Tooltip, Spin, Table,
@@ -9,17 +9,18 @@ import {
   LoadingOutlined, CheckCircleOutlined, ClockCircleOutlined, FileOutlined,
   SyncOutlined, WarningOutlined, SearchOutlined
 } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, UseQueryResult, QueryClient } from '@tanstack/react-query';
 import { useAuth } from "../context/AuthContext";
 
 import { getProjectById, getProjects, Project } from '../api/projectService';
 import { getFilesByProjectId, FileType } from '../api/fileService';
-import { startSingleFileAITranslation, StartSingleFileAIPayload, StartAITranslationResponse } from '../api/aiTranslationService';
+import { startSingleFileAITranslation, StartSingleFileAIPayload } from '../api/aiTranslationService';
 // Assuming PromptTemplate interface includes a 'type' field ('translation' | 'review')
 import { getPromptTemplates, PromptTemplate } from '../api/promptTemplateService';
 import { getAllAIConfigs, AIConfig } from '../api/aiConfigService';
 import { getTerminologyBases, TerminologyBase } from '../api/terminologyService';
 import { getTranslationMemories, TranslationMemory } from '../api/translationMemoryService';
+import { getTranslationStatus, TranslationStatusResponse } from '../api/translation';
 
 import FileList from '../components/translation/FileList';
 import TranslationSettings from '../components/translation/TranslationSettings';
@@ -53,8 +54,16 @@ const TranslationCenterPage: React.FC = () => {
     terminologyBaseId: null as string | null,
     useTranslationMemory: false,
     translationMemoryId: null as string | null,
+    retranslateTM: false,
     reviewPromptTemplateId: null as string | null, // Ensure it allows null
   });
+
+  // State for polling
+  const [pollingJobId, setPollingJobId] = useState<string | null>(null);
+  const [translationStatus, setTranslationStatus] = useState<TranslationStatusResponse | null>(null);
+  const [isPolling, setIsPolling] = useState<boolean>(false);
+  const [pollingError, setPollingError] = useState<string | null>(null);
+  const intervalRef = useRef<any | null>(null); // Ref to hold interval ID
 
   // Statistics for dashboard cards
   const [statistics, setStatistics] = useState({
@@ -124,22 +133,14 @@ const TranslationCenterPage: React.FC = () => {
   const project = projectResponse;
 
   // Fetch project files
-  const { data: filesResponse, isLoading: filesLoading, error: filesFetchError } = useQuery({
+  const { 
+    data: filesResponse, 
+    isLoading: filesLoading, 
+    error: filesFetchError 
+  }: UseQueryResult<FileType[], Error> = useQuery<FileType[]>({
     queryKey: ['projectFiles', projectId],
     queryFn: () => getFilesByProjectId(projectId as string),
     enabled: !!projectId,
-    select: (res: FileType[]): FileType[] => { // Expect res to be FileType[]
-        // console.log('[Select Function - Files] Received data:', res);
-        // Directly return the array if it is one, otherwise return empty
-        if (Array.isArray(res)) {
-            return res;
-        } else {
-            // This case might happen if queryFn returns something unexpected
-            // or if there was an upstream transformation issue.
-            console.error('[Select Function - Files] Expected an array but received:', res);
-            return [];
-        }
-    },
   });
   const files = filesResponse;
 
@@ -165,8 +166,9 @@ const TranslationCenterPage: React.FC = () => {
 
   // Filter templates client-side (assuming templates have a 'type' property)
   // TODO: Ensure PromptTemplate interface (in promptTemplateService.ts) has a 'type' field ('translation' | 'review')
-  const translationPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type === 'translation');
-  const reviewPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type === 'review');
+  // Add safety check for t.type existence
+  const translationPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type && t.type === 'translation');
+  const reviewPromptTemplates = allPromptTemplates.filter((t: PromptTemplate) => t.type && t.type === 'review');
   // Add isLoading state for review prompts based on the single query
   const reviewPromptsLoading = promptsLoading; // Use the same loading state
 
@@ -233,6 +235,11 @@ const TranslationCenterPage: React.FC = () => {
 
     console.log('启动翻译，文件:', selectedFileIds, '设置:', translationSettings);
     message.loading({ content: '正在为所选文件启动翻译...', key: 'startTranslation' });
+    // Reset polling state before starting
+    setPollingJobId(null);
+    setTranslationStatus(null);
+    setIsPolling(false);
+    setPollingError(null);
 
     // Get selected file details for better error messages
     const selectedFiles = files?.filter(f => selectedFileIds.includes(f._id)) || [];
@@ -253,7 +260,9 @@ const TranslationCenterPage: React.FC = () => {
                 // Keep other options nested if needed, or remove if not used
                 options: {
                   tmId: translationSettings.useTranslationMemory ? translationSettings.translationMemoryId : null,
-                  tbId: translationSettings.useTerminology ? translationSettings.terminologyBaseId : null
+                  tbId: translationSettings.useTerminology ? translationSettings.terminologyBaseId : null,
+                  // Add the retranslateTM flag from state
+                  retranslateTM: translationSettings.retranslateTM 
                 }
             };
             // Call the correct function that sends the payload
@@ -264,43 +273,47 @@ const TranslationCenterPage: React.FC = () => {
 
         let successCount = 0;
         let failureCount = 0;
+
         results.forEach((result, index) => {
-            const fileId = selectedFileIds[index];
+            const file = selectedFiles[index];
             if (result.status === 'fulfilled' && result.value.success) {
-                console.log(`文件 ${fileId} 翻译启动成功 (Job ID: ${result.value.jobId || 'N/A'})`);
                 successCount++;
+                console.log(`File ${file.originalName} translation started successfully. Job ID: ${result.value.jobId || 'N/A'}`);
             } else {
-                // Check if error is available and has a message
-                const errorMsg = result.status === 'rejected'
-                  ? (result.reason instanceof Error ? result.reason.message : String(result.reason))
-                  : (result.value?.message || '未知错误');
-                console.error(`文件 ${fileId} 翻译启动失败:`, errorMsg);
-                message.error(`文件 ${selectedFiles.find(f=>f._id === fileId)?.fileName || fileId} 翻译启动失败: ${errorMsg}`, 5); // Show specific error
                 failureCount++;
+                const errorMessage = (result.status === 'rejected')
+                    ? result.reason?.message || '未知错误'
+                    : result.value?.message || '启动失败';
+                console.error(`File ${file.originalName} failed to start translation:`, errorMessage);
+                // Optionally display individual file errors later
             }
         });
 
-        if (successCount > 0 && failureCount === 0) {
-            message.success({ content: `所有 ${successCount} 个文件的翻译已成功启动`, key: 'startTranslation', duration: 3 });
+        message.destroy('startTranslation'); // Remove loading message
+
+        if (successCount > 0) {
+            message.success({
+                content: `${successCount}个文件已成功提交翻译。失败 ${failureCount}个。`,
+                key: 'translationResult', // Use a different key
+                duration: 5
+            });
+            // Set the polling job ID to the ID of the FIRST selected file
+            const firstFileId = selectedFileIds.length > 0 ? selectedFileIds[0] : null;
+            setPollingJobId(firstFileId);
+            setCurrentStep(2);
+            // Optionally refetch project files data to show updated status (like 'processing')
             queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
-            setCurrentStep(prev => Math.min(prev + 1, 2)); // Move to progress
-        } else if (successCount > 0 && failureCount > 0) {
-            message.warning({ content: `${successCount}个文件启动成功, ${failureCount}个失败`, key: 'startTranslation', duration: 5 });
-            queryClient.invalidateQueries({ queryKey: ['projectFiles', projectId] });
-            setCurrentStep(prev => Math.min(prev + 1, 2)); // Still move to progress? Or stay?
-        } else { // Only failures
-             message.error({ content: '所有选定文件的翻译启动失败', key: 'startTranslation', duration: 3 });
+        } else {
+            message.error({ content: `所有 ${failureCount}个文件启动翻译失败。请检查控制台获取详情。`, key: 'translationResult', duration: 5 });
+            setPollingJobId(null); // Ensure no polling if all fail
         }
 
-    } catch (error) { // Catch errors outside Promise.allSettled (e.g., network issues before loop)
-        console.error('Error starting translation job(s): ', error);
-        // FIX: Add type check before accessing error.message
-        const errorMsg = error instanceof Error ? error.message : '未知错误';
-        message.error({ content: `启动翻译时发生错误: ${errorMsg}`, key: 'startTranslation', duration: 3 });
-    } finally {
-        // message.destroy('startTranslation'); // Implicitly destroyed by success/error/warning
+    } catch (error: any) {
+        message.destroy('startTranslation');
+        console.error('Error during translation start process:', error);
+        message.error(error.message || '启动翻译过程中发生意外错误');
+        setPollingJobId(null); // Ensure no polling on general error
     }
-
   };
 
   // Handle file selection
@@ -371,6 +384,81 @@ const TranslationCenterPage: React.FC = () => {
 
     return matchesSearch && matchesFilter;
   });
+
+  // --- MOVE Polling useEffect Hook HERE (Before conditional returns) ---
+  useEffect(() => {
+    // Function to clear interval
+    const clearPollingInterval = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        setIsPolling(false);
+        console.log('Polling stopped.');
+      }
+    };
+
+    // Only poll if we are on the progress step AND have a job ID
+    if (currentStep === 2 && pollingJobId) {
+      console.log(`Starting polling for jobId: ${pollingJobId}`);
+      setIsPolling(true);
+      setPollingError(null);
+
+      const pollStatus = async () => {
+        console.log(`Polling status for fileId: ${pollingJobId}...`); // Log the ID being polled
+        try {
+          // Fetch the wrapper response { success: boolean, data: TranslationStatusResponse }
+          const wrapperResponse = await getTranslationStatus(pollingJobId!);
+          console.log('[TranslationCenter Polling] Received wrapperResponse:', wrapperResponse);
+          
+          // --- Extract the actual status data --- 
+          if (wrapperResponse && wrapperResponse.success && wrapperResponse.data) {
+            const statusData: TranslationStatusResponse = wrapperResponse.data;
+            console.log('[TranslationCenter Polling] Extracted statusData:', statusData);
+            setTranslationStatus(statusData);
+            setPollingError(null); // Clear error on successful poll
+
+            // Stop polling if completed or failed (use extracted data)
+            if (statusData.status === 'completed' || statusData.status === 'failed') {
+              clearPollingInterval();
+            }
+          } else {
+            // Handle cases where response format is unexpected
+            console.error('[TranslationCenter Polling] Invalid status response format:', wrapperResponse);
+            setPollingError('无效的状态响应格式');
+            // Optionally stop polling on invalid format
+            // clearPollingInterval();
+          }
+        } catch (err: any) {
+          console.error('Error polling translation status:', err);
+          setPollingError(err.message || '获取翻译状态时出错');
+          // Optional: Implement retry logic or stop polling after too many errors
+          // For now, we continue polling even after an error, but show the error
+          // clearPollingInterval(); // Uncomment to stop polling on error
+        }
+      };
+
+      // Initial poll immediately
+      pollStatus();
+      // Set interval for subsequent polls
+      intervalRef.current = setInterval(pollStatus, 5000); // Poll every 5 seconds
+
+      // Cleanup function for useEffect
+      return () => {
+        clearPollingInterval();
+      };
+    } else {
+      // Clear interval if step changes or jobId becomes null
+      clearPollingInterval();
+      // Reset status if we navigate away from the progress step
+      if (currentStep !== 2) {
+          setTranslationStatus(null);
+          // Don't clear pollingJobId here automatically, user might navigate back
+          // setPollingJobId(null);
+          setPollingError(null);
+      }
+    }
+  }, [currentStep, pollingJobId]); // Dependencies: run effect when step or jobId changes
+  // --- END MOVE Polling useEffect Hook ---
 
   // === Conditional Rendering Logic ===
 
@@ -640,7 +728,7 @@ const TranslationCenterPage: React.FC = () => {
       icon: <CloudOutlined />,
       content: (
         <FileList
-          files={files || []}
+          files={files || []} 
           onSelectFiles={handleFileSelect}
           selectedFileIds={selectedFileIds}
         />
@@ -652,26 +740,27 @@ const TranslationCenterPage: React.FC = () => {
       content: (
         <TranslationSettings
           project={project}
-          promptTemplates={translationPromptTemplates} // Pass filtered translation templates
-          reviewPromptTemplates={reviewPromptTemplates} // Pass filtered review templates
-          aiConfigs={aiConfigs || []}
+          promptTemplates={translationPromptTemplates}
+          reviewPromptTemplates={reviewPromptTemplates}
+          aiConfigs={aiConfigs || []} 
           terminologyBases={terminologyBases}
           translationMemories={translationMemories}
-          settings={translationSettings} // Pass the state object
+          settings={translationSettings}
           onSettingsChange={handleSettingsChange}
         />
       ),
     },
     {
-      title: '翻译进度',
-      icon: <LoadingOutlined />,
+      icon: isPolling ? <SyncOutlined spin /> : (translationStatus?.status === 'completed' ? <CheckCircleOutlined /> : <LoadingOutlined />),
       content: (
         <TranslationProgress
-          // Pass placeholder props to satisfy types - needs refactoring
-          jobId={null}
-          status={null}
-          isLoading={false}
-          onViewReview={() => {console.warn('onViewReview not implemented for per-file progress yet')}}
+          jobId={pollingJobId}
+          status={translationStatus} 
+          isLoading={isPolling && !translationStatus} 
+          onViewReview={(fileId) => {
+              console.log(`Navigating to review for file: ${fileId}`);
+              message.info(`审阅功能待实现 (文件 ID: ${fileId})`);
+          }}
         />
       ),
     },
@@ -734,15 +823,6 @@ const TranslationCenterPage: React.FC = () => {
 
           <Col span={24}>
             <div className="steps-content" style={{ padding: '16px', minHeight: '300px' }}>
-              {currentStep === 1 && (
-                <Alert
-                  message="必要配置提示"
-                  description="请确保完成以下关键配置：1. 翻译提示词；2. 审校提示词；3. AI引擎；4. 如需使用，启用并选择术语库和翻译记忆库。只有完成这些配置才能提交有效的翻译任务。"
-                  type="warning"
-                  showIcon
-                  style={{ marginBottom: '16px' }}
-                />
-              )}
               {steps[currentStep].content}
             </div>
           </Col>
@@ -751,7 +831,7 @@ const TranslationCenterPage: React.FC = () => {
             <Divider style={{ margin: '16px 0' }} />
 
             <div className="steps-action" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              {currentStep > 0 && currentStep < 2 && (
+              {currentStep === 1 && (
                 <Button onClick={handlePrev} style={{ marginRight: 8 }}>
                   上一步
                 </Button>
@@ -771,7 +851,6 @@ const TranslationCenterPage: React.FC = () => {
                 <Button
                   type="primary"
                   onClick={handleStartTranslation}
-                  // Disable button based on validation logic used in handleNext/handleStartTranslation
                   disabled={
                     !translationSettings.aiModelId ||
                     !translationSettings.promptTemplateId ||
@@ -782,6 +861,27 @@ const TranslationCenterPage: React.FC = () => {
                 >
                   启动翻译
                 </Button>
+              )}
+
+              {currentStep === 2 && (
+                <>
+                  {translationStatus?.status === 'failed' && (
+                    <Button 
+                      danger 
+                      onClick={() => message.info('重新翻译失败片段功能待实现')}
+                    >
+                      重新翻译失败片段
+                    </Button>
+                  )}
+                  {translationStatus?.status === 'completed' && (
+                    <Button 
+                      type="primary" 
+                      onClick={() => message.info('提交审校功能待实现')}
+                    >
+                      提交审校
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </Col>

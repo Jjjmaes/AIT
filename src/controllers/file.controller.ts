@@ -6,9 +6,13 @@ import logger from '../utils/logger';
 import { FileType } from '../models/file.model';
 import { validateFileType } from '../utils/fileUtils'; // Assuming validateFileType exists here
 import fs from 'fs/promises'; // Import fs for cleanup
-import { translationQueueService } from '../services/translationQueue.service'; // Import queue service
+import { translationQueueService, JobStatus } from '../services/translationQueue.service'; // Import queue service AND JobStatus type
+import { JobState } from 'bullmq'; // <-- Import JobState from bullmq
 import { projectService } from '../services/project.service'; // Import project service for validation
 import { aiConfigService } from '../services/aiConfig.service';
+import { TranslationStatusResponse } from '../types/translation.types'; // <-- Import the new type
+import { File, FileStatus, IFile } from '../models/file.model'; // Import File model and status
+import { Segment, SegmentStatus } from '../models/segment.model'; // Import Segment model and status
 
 // Assuming AuthRequest extends Request and includes user info
 // Define it here or import from auth middleware if defined there
@@ -252,6 +256,112 @@ export class FileController {
       next(error);
     }
   }
+
+  // --- Method to get job status (ENHANCED) ---
+  getTranslationJobStatus = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const methodName = 'getTranslationJobStatus';
+    const { jobId: requestedJobId } = req.params; // Rename to avoid confusion
+    const userId = req.user?.id;
+    const userRoles = req.user?.role ? [req.user.role] : [];
+
+    try {
+      // Extract the actual MongoDB File ID from the Job ID
+      const fileId = requestedJobId?.startsWith('file-') 
+                     ? requestedJobId.split('-')[1] 
+                     : requestedJobId; // Fallback if prefix is missing
+
+      if (!fileId) {
+        return next(new ValidationError('无法从任务ID中解析文件ID'));
+      }
+      validateId(fileId, '文件ID'); // Validate the extracted ID format
+
+      if (!userId) {
+        return next(new AppError('认证失败，无法获取用户ID', 401));
+      }
+
+      logger.info(`User ${userId} fetching status for file/job ${fileId}`);
+
+      // 1. Fetch File temporarily to get projectId (no permission check yet)
+      const tempFile = await File.findById(fileId).select('projectId').lean().exec();
+      if (!tempFile || !tempFile.projectId) {
+          logger.warn(`File or project ID not found for file ID: ${fileId}`);
+          return next(new NotFoundError(`文件 ${fileId} 未找到`));
+      }
+      const projectId = tempFile.projectId.toString();
+      // --- Move validation here ---
+      validateId(projectId, '项目');
+
+      // 2. Fetch the File document properly using service for permission check
+      const fileDoc: IFile | null = await fileManagementService.getFileById(fileId, projectId, userId, userRoles);
+      if (!fileDoc) { 
+          // This case implies a permission error from the service
+          logger.warn(`Permission denied for file ID: ${fileId}, User: ${userId}`);
+          return next(new AppError(`无权访问文件 ${fileId}`, 403)); // Return 403 Forbidden
+      }
+
+      // 3. Fetch Segment counts for progress calculation
+      // Use fileDoc!._id as fileDoc is guaranteed non-null here by checks above
+      const totalSegments = await Segment.countDocuments({ fileId: fileDoc!._id });
+      const completedSegments = await Segment.countDocuments({ 
+          fileId: fileDoc!._id, 
+          status: { $in: [SegmentStatus.TRANSLATED, SegmentStatus.TRANSLATED_TM] } 
+      });
+      const erroredSegments = await Segment.countDocuments({ 
+          fileId: fileDoc!._id, 
+          status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] }
+      });
+      
+      // Use fileDoc directly here as it passed null checks
+      const fileProgress = totalSegments > 0 ? Math.round((completedSegments / totalSegments) * 100) : (fileDoc.status === FileStatus.COMPLETED || fileDoc.status === FileStatus.TRANSLATED ? 100 : 0);
+
+      // 4. Determine overall status (Use File status primarily)
+      let overallStatus: TranslationStatusResponse['status'] = 'processing'; // Default
+      if (fileDoc.status === FileStatus.PENDING) {
+          overallStatus = 'queued'; // Map PENDING to queued for frontend
+      } else if (fileDoc.status === FileStatus.PROCESSING || fileDoc.status === FileStatus.TRANSLATING || fileDoc.status === FileStatus.REVIEWING) {
+          overallStatus = 'processing';
+      } else if (fileDoc.status === FileStatus.COMPLETED || fileDoc.status === FileStatus.TRANSLATED || fileDoc.status === FileStatus.REVIEW_COMPLETED) {
+          overallStatus = 'completed';
+      } else if (fileDoc.status === FileStatus.ERROR) {
+          overallStatus = 'failed';
+      }
+
+      // 5. Construct the detailed response
+      const responseData: TranslationStatusResponse = {
+        status: overallStatus,
+        progress: fileProgress,
+        totalFiles: 1, 
+        completedFiles: (overallStatus === 'completed') ? 1 : 0,
+        // Use fileDoc directly
+        errors: fileDoc.status === FileStatus.ERROR ? [{ fileId: fileDoc._id.toString(), message: fileDoc.errorDetails || '文件处理失败' }] : [],
+        files: [
+          {
+            id: fileDoc._id.toString(),
+            originalName: fileDoc.originalName || fileDoc.fileName, 
+            status: fileDoc.status, 
+            progress: fileProgress,
+            sourceLanguage: fileDoc.metadata?.sourceLanguage, 
+            targetLanguage: fileDoc.metadata?.targetLanguage, 
+          }
+        ],
+      };
+
+      res.status(200).json({
+        success: true,
+        data: responseData
+      });
+
+    } catch (error) {
+      logger.error(`Error in ${this.serviceName}.${methodName} for file/job ${requestedJobId}:`, error);
+      // Handle specific errors like validation or DB issues
+      if (error instanceof NotFoundError) {
+         return res.status(404).json({ success: false, message: error.message });
+      }
+      // Use the central error handler for other types of errors
+      next(error);
+    }
+  };
+  // --- END Method to get job status ---
 }
 
 // Export class directly, instantiation happens in routes file

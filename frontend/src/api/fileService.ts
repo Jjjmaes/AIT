@@ -209,8 +209,25 @@ export const deleteFile = async (fileId: string): Promise<boolean> => {
 /**
  * Start translation process for a file
  */
-export const startFileTranslation = async (projectId: string, fileId: string): Promise<StartTranslationResponse> => {
-  const response = await axiosInstance.post<StartTranslationResponse>(`/projects/${projectId}/files/${fileId}/translate`);
+export const startFileTranslation = async (
+  projectId: string, 
+  fileId: string, 
+  // Add required parameters from backend controller
+  promptTemplateId: string, 
+  aiConfigId: string,
+  options: { retranslateTM?: boolean; [key: string]: any } // Include retranslateTM in options
+): Promise<StartTranslationResponse> => {
+  // Construct the request body expected by the backend
+  const requestBody = {
+    promptTemplateId,
+    aiConfigId,
+    options // Pass the whole options object
+  };
+  // Pass the body as the second argument to post
+  const response = await axiosInstance.post<StartTranslationResponse>(
+    `/projects/${projectId}/files/${fileId}/translate`, 
+    requestBody
+  );
   return response.data;
 };
 
