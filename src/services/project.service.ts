@@ -681,7 +681,7 @@ export class ProjectService implements ProjectService {
         });
         const failedSegments = await Segment.countDocuments({ 
             fileId: file._id, 
-            status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] } 
+            status: { $in: [SegmentStatus.REVIEW_FAILED, SegmentStatus.TRANSLATION_FAILED] } 
             // CHECK ENUM: Add review failure status if it exists
         });
         

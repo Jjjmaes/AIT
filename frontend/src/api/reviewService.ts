@@ -136,3 +136,50 @@ export const confirmReviewTask = async (taskId: string): Promise<void> => {
 
 
 // Add other review-related API functions here (e.g., getReviewSegments)
+
+import { axiosInstance as api } from './base';
+
+// Define the payload for starting AI review
+export interface StartAIReviewPayload {
+  aiConfigId: string;
+  reviewPromptTemplateId: string;
+  // Add any other options the backend might need
+}
+
+// Define the expected response structure
+export interface StartAIReviewResponse {
+  success: boolean;
+  message?: string;
+  reviewJobId?: string; // Might return a job ID for polling review status
+}
+
+/**
+ * Starts the AI review process for a specific file.
+ */
+export const startAIReview = async (
+  projectId: string,
+  fileId: string,
+  payload: StartAIReviewPayload
+): Promise<StartAIReviewResponse> => {
+  const apiUrl = `/api/projects/${projectId}/files/${fileId}/review`; // Example API endpoint
+  console.log(`Calling AI review endpoint: POST ${apiUrl}`, payload);
+  try {
+    // TODO: Replace with actual API call when backend is ready
+    // Simulating a successful response for now
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+    console.warn('Simulating successful AI review start. Implement actual API call!');
+    return {
+      success: true,
+      message: 'AI review process started successfully (simulated).',
+      reviewJobId: `review-${fileId}-${Date.now()}` // Example job ID
+    };
+    // --- Replace simulation above with actual API call ---
+    // const response = await api.post<StartAIReviewResponse>(apiUrl, payload);
+    // return response.data;
+    // -----------------------------------------------------
+  } catch (error: any) {
+    console.error(`Error starting AI review for file ${fileId}:`, error);
+    const message = error.response?.data?.message || error.message || "Failed to start AI review.";
+    return { success: false, message };
+  }
+};

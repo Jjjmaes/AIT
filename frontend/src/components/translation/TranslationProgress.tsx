@@ -191,7 +191,7 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
         {isCompleted && (
           <div style={{ textAlign: 'center', marginTop: 24 }}>
             <Paragraph type="success">
-              <CheckCircleOutlined /> 翻译和自动审校已完成！您现在可以进入审校页面查看结果。
+              <CheckCircleOutlined /> AI 翻译已完成！请返回上一页面，点击“提交审校”按钮进行自动审校。
             </Paragraph>
           </div>
         )}

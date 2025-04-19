@@ -1,52 +1,41 @@
 // src/routes/review.routes.ts
 
-import { Router } from 'express';
-import { Request, Response } from 'express';
-import { authenticateJwt } from '../middleware/auth.middleware';
-import * as segmentValidator from '../validators/segmentValidator';
-import { validateRequest } from '../middleware/validate.middleware';
+import express from 'express';
 import * as reviewController from '../controllers/review.controller';
+import { authenticateJwt } from '../middleware/auth.middleware';
+import { validateRequest } from '../middleware/validate.middleware';
+import * as segmentValidator from '../validators/segmentValidator';
 import logger from '../utils/logger';
 
-// 创建路由器实例
-const router = Router();
+const router = express.Router();
 
-// 审校路由
-// 段落审校相关路由
-router.post('/segment', reviewController.requestSegmentReview);
-router.post('/segment/complete', validateRequest(segmentValidator.validateCompleteSegmentReview), reviewController.completeSegmentReview);
-router.get('/segment/:segmentId', reviewController.getSegmentReviewResult);
-router.post('/segment/:segmentId/finalize', reviewController.finalizeSegmentReview);
+// === Segment Review Routes ===
 
-// 段落问题相关路由
-router.post('/segment/issue', validateRequest(segmentValidator.validateAddSegmentIssue), reviewController.addSegmentIssue);
-router.put('/segment/issue/:issueId/resolve', validateRequest(segmentValidator.validateResolveSegmentIssue), reviewController.resolveSegmentIssue);
+// Request a review for a single segment (queues it - processor currently ignores)
+router.post('/segment/:segmentId/request', authenticateJwt, reviewController.requestSegmentReview);
 
-// 批量更新段落状态
-router.post('/segment/batch-status', validateRequest(segmentValidator.validateBatchUpdateSegmentStatus), reviewController.batchUpdateSegmentStatus);
+// === Segment Issue Routes ===
 
-// 直接审校文本
-router.post('/text', validateRequest(segmentValidator.validateDirectTextReview), reviewController.reviewTextDirectly);
+// === Batch Segment Routes ===
 
-// 队列相关路由
-router.post('/queue/segment', authenticateJwt, validateRequest(segmentValidator.validateReviewSegment), reviewController.queueSegmentReview);
-router.post('/queue/text', authenticateJwt, validateRequest(segmentValidator.validateDirectTextReview), reviewController.queueTextReview);
-router.post('/queue/batch', authenticateJwt, validateRequest(segmentValidator.validateBatchSegmentReview), reviewController.queueBatchSegmentReview);
-router.post('/queue/file', authenticateJwt, validateRequest(segmentValidator.validateFileReview), reviewController.queueFileReview);
+// Fetch reviewable segments (kept, assumes service method exists/will exist)
+router.get('/files/:fileId/segments', authenticateJwt, reviewController.getReviewableSegments);
+
+// === File Review Routes ===
+
+// === Direct Text Review ===
+router.post('/text', authenticateJwt, reviewController.reviewTextDirectly);
+
+// === Model Info ===
+router.get('/models', authenticateJwt, reviewController.getSupportedReviewModels);
+
+// === Queue Management Routes ===
+router.post('/queue/segment', authenticateJwt, reviewController.queueSegmentReview);
+router.post('/queue/text', authenticateJwt, reviewController.queueTextReview);
+router.post('/queue/batch', authenticateJwt, reviewController.queueBatchSegmentReview);
+router.post('/queue/file', authenticateJwt, reviewController.queueFileReview);
 router.get('/queue/status/:taskId', authenticateJwt, reviewController.getReviewTaskStatus);
 router.delete('/queue/:taskId', authenticateJwt, reviewController.cancelReviewTask);
-
-// 获取支持的审校模型
-router.get('/models', reviewController.getSupportedReviewModels);
-
-// 获取可审校段落
-router.get(
-    '/files/:fileId/segments',
-    reviewController.getReviewableSegments
-);
-
-// 文件结束审校
-router.post('/files/:fileId/finalize', authenticateJwt, reviewController.finalizeFileReview);
 
 // 记录路由注册
 logger.info('Review routes updated to use namespace import for controller');

@@ -4,71 +4,69 @@ import logger from '../utils/logger';
 import { handleServiceError } from '../utils/errorHandler';
 import { AppError } from '../utils/errors';
 import 'dotenv/config'; // Load environment variables
-// Assuming ReviewOptions might be defined elsewhere, or define inline
-// import { ReviewOptions } from '../review.service'; // Or relevant path
+// Remove TypeDI imports if no longer needed for this file
+// import { Inject, Service } from 'typedi';
+// import { WinstonLoggerToken } from '../config/logger.config'; // Removed incorrect import
 
 const QUEUE_NAME = 'review-jobs';
 
-// Data structure for AI review jobs
+// Job data structure - Now for FILE or PROJECT review
 export interface ReviewJobData {
-  type: 'segment'; // Initially just segment review
-  segmentId: string;
-  userId: string; // User who initiated the original translation job
+  type: 'file' | 'project'; // Type of review job
+  userId: string; // User who initiated the review
   requesterRoles: string[]; // Roles of the user who initiated
-  // Add any other context needed for the review, e.g., projectId
-  projectId?: string; 
-  // Add relevant review options if needed (e.g., specific model, template)
-  // options?: Partial<ReviewOptions>; 
+  projectId: string; // Always include project ID
+  fileId?: string; // Include file ID if type is 'file'
+  // Options passed from frontend/API
+  options: {
+    aiConfigId: string;
+    reviewPromptTemplateId: string;
+    // Add other relevant review options here, e.g., force re-review?
+  };
 }
 
-// Status interface (can reuse or adapt from translationQueue)
+// Define possible job states if needed (BullMQ uses standard ones)
+// export type ReviewJobStatus = JobState | 'custom_state'; 
+
 export interface JobStatus {
-  jobId: string;
-  status: JobState | 'unknown';
-  progress: string | number | object | boolean;
-  failedReason?: string;
-  returnValue?: any;
-  timestamp: number;
-  processedOn?: number;
-  finishedOn?: number;
+    jobId: string;
+    status: JobState | 'unknown'; // Use BullMQ's JobState
+    progress: number;
+    failedReason?: string;
+    returnValue?: any;
 }
 
+// Remove @Service() decorator if not using TypeDI injection here
 class ReviewQueueService {
-  // Make queue and connection optional or handle initialization differently
-  private queue?: Queue<ReviewJobData>;
-  private connection?: Redis;
-  private serviceName = 'ReviewQueueService';
+  private queue: Queue<ReviewJobData>;
+  private connection: Redis;
+  private readonly serviceName = 'ReviewQueueService';
 
+  // Revert constructor to not inject logger
   constructor() {
-    // Use same connection options as translation queue for simplicity
     const connectionOptions = {
       host: process.env.REDIS_HOST || '127.0.0.1',
       port: parseInt(process.env.REDIS_PORT || '6379', 10),
       password: process.env.REDIS_PASSWORD || undefined,
       maxRetriesPerRequest: null
     };
-    
-    // Optionally, only connect if Redis is configured or needed
-    // For now, we comment out the connection and queue creation
-    /*
+
     this.connection = new Redis(connectionOptions);
-    this.connection.on('error', (err: Error) => logger.error('Redis Connection Error (Review Queue)', err));
+    this.connection.on('error', (err: Error) => logger.error('Redis Connection Error (Review Queue)', err)); // Use imported logger
 
     this.queue = new Queue<ReviewJobData>(QUEUE_NAME, {
         connection: this.connection,
         defaultJobOptions: {
-            attempts: 2, // Maybe fewer retries for review?
+            attempts: 2,
             backoff: {
                 type: 'exponential',
-                delay: 10000, // Longer delay?
+                delay: 10000,
             },
             removeOnComplete: { count: 1000 },
             removeOnFail: { count: 5000 }
         }
     });
-    logger.info(`Review queue service initialized. Connected to Redis: ${connectionOptions.host}:${connectionOptions.port}`);
-    */
-   logger.warn(`Review queue service initialized WITHOUT Redis connection (temporary).`);
+    logger.info(`Review queue service initialized. Connected to Redis: ${connectionOptions.host}:${connectionOptions.port}`); // Use imported logger
   }
 
   // Create a unique job ID for segment review
@@ -77,49 +75,46 @@ class ReviewQueueService {
   }
 
   /**
-   * Adds an AI review job for a specific segment.
-   * Uses segmentId as part of the jobId to prevent duplicate review jobs for the same segment.
+   * Adds an AI review job for an entire file.
+   * The worker will handle fetching and batching segments.
    */
-  async addSegmentReviewJob(
-    segmentId: string,
-    userId: string,
-    requesterRoles: string[],
-    // options?: Partial<ReviewOptions> 
-  ): Promise<string | null> { // Return null if job already exists
-    const methodName = 'addSegmentReviewJob';
-    const jobId = this.getJobId(segmentId);
-    const jobData: ReviewJobData = { type: 'segment', segmentId, userId, requesterRoles, /* options */ };
-    
-    try {
-        // Check if a job with this ID already exists (active, waiting, delayed, completed, failed)
-        // Temporarily disable check as queue is disabled
-        // const existingJob = await this.queue?.getJob(jobId);
-        // if (existingJob) {
-        //      const state = await existingJob.getState();
-        //      logger.warn(`[${this.serviceName}.${methodName}] Job ${jobId} for segment ${segmentId} already exists with status ${state}. Skipping add.`);
-        //      return null; // Indicate job was not added
-        // }
+  async addFileReviewJob(
+    jobDetails: Omit<ReviewJobData, 'type'> & { type: 'file', fileId: string } // Enforce file type
+  ): Promise<Job<ReviewJobData>> {
+    const methodName = 'addFileReviewJob';
+    if (!this.queue) {
+      // This check might be redundant if constructor ensures queue is initialized
+      logger.error(`[${this.serviceName}.${methodName}] Attempted to add job but queue is not initialized.`); // Use imported logger
+      throw new AppError('Review queue is not initialized.', 500);
+    }
+    const { fileId, projectId } = jobDetails;
+    // Use a job ID related to the file review request
+    const jobId = `file-review-${fileId}-${Date.now()}`;
 
-        // Add the job with the specific ID
-        // Temporarily bypass adding to the queue
-        // await this.queue.add(jobId, jobData, { jobId });
-        logger.warn(`TEMPORARY: Skipped adding segment review job ${jobId} to queue.`);
-        return jobId; // Still return jobId as if added
+    try {
+      const job = await this.queue.add(jobId, jobDetails, { jobId });
+      logger.info(`[${this.serviceName}.${methodName}] Queued AI review job ${jobId} for file ${fileId} in project ${projectId}`); // Use imported logger
+      return job;
     } catch (error) {
-      logger.error(`Error in ${this.serviceName}.${methodName}:`, error);
-      throw handleServiceError(error, this.serviceName, methodName, '添加 AI 审校任务');
+      logger.error(`[${this.serviceName}.${methodName}] Error queuing review job for file ${fileId}:`, error); // Use imported logger
+      throw handleServiceError(error, this.serviceName, methodName, '添加文件审校任务');
     }
   }
 
   // Add getJobStatus, cancelJob similar to TranslationQueueService if needed
 
   async close(): Promise<void> {
-    // Temporarily do nothing
-    // await this.queue?.close();
-    // await this.connection?.quit();
-    logger.info('Review queue service shutdown skipped (temporary).');
+    try {
+        await this.queue?.close();
+        await this.connection?.quit();
+        logger.info('Review queue service shutdown complete.'); // Use imported logger
+    } catch (error) {
+        logger.error('Error closing review queue service:', error); // Use imported logger
+    }
   }
 }
 
-// Export singleton instance
-export const reviewQueueService = new ReviewQueueService();
+// Export the class itself, but also create a singleton instance for direct use
+// This matches the pattern likely used elsewhere (e.g., logger)
+const reviewQueueService = new ReviewQueueService();
+export { ReviewQueueService, reviewQueueService };

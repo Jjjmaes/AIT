@@ -1,5 +1,5 @@
 console.log('--- Loading terminology.routes.ts ---'); // Diagnostic log
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateJwt } from '../middleware/auth.middleware';
 // Import Controller class and Container
 import { TerminologyController, termsCsvUploadMiddleware } from '../controllers/terminology.controller';
@@ -18,48 +18,36 @@ router.use(authenticateJwt);
 
 // --- Routes for Terminology Lists --
 router.route('/')
-  .get(terminologyController.getAll)     // GET /api/terms (with query filters)
-  .post(
-    // validateRequest(terminologyValidator.create), // Optional validation
-    terminologyController.create        // POST /api/terms
-  );
+  .get((req: Request, res: Response, next: NextFunction) => terminologyController.getAll(req, res, next))     // GET /api/terms (with query filters)
+  .post((req: Request, res: Response, next: NextFunction) => terminologyController.create(req, res, next));
 
 router.route('/:terminologyId')
-  .get(terminologyController.getById)    // GET /api/terms/:terminologyId
-  .put(
-    // validateRequest(terminologyValidator.update), // Optional validation
-    terminologyController.update       // PUT /api/terms/:terminologyId (updates list details)
-   )
-  .delete(terminologyController.delete); // DELETE /api/terms/:terminologyId
+  .get((req: Request, res: Response, next: NextFunction) => terminologyController.getById(req, res, next))    // GET /api/terms/:terminologyId
+  .put((req: Request, res: Response, next: NextFunction) => terminologyController.update(req, res, next))       // PUT /api/terms/:terminologyId (updates list details)
+  .delete((req: Request, res: Response, next: NextFunction) => terminologyController.delete(req, res, next)); // DELETE /api/terms/:terminologyId
 
 // GET /api/terms/:terminologyId/terms - Get all terms within a specific list
-router.get('/:terminologyId/terms', terminologyController.getTermsByListId);
+router.get('/:terminologyId/terms', (req: Request, res: Response, next: NextFunction) => terminologyController.getTermsByListId(req, res, next));
 
 // Export route
-router.get('/:terminologyId/export', terminologyController.exportById);
+router.get('/:terminologyId/export', (req: Request, res: Response, next: NextFunction) => terminologyController.exportById(req, res, next));
 
 // --- Routes for Terms within a List --
 
 // Add/Update a specific term (using PUT or POST)
 // Using PUT for idempotency (upsert)
-router.put('/:terminologyId/terms',
-    // validateRequest(terminologyValidator.upsertTerm), // Optional validation
-    terminologyController.upsertTerm      // PUT /api/terms/:terminologyId/terms
-);
+router.put('/:terminologyId/terms', (req: Request, res: Response, next: NextFunction) => terminologyController.upsertTerm(req, res, next));
 
 // Remove a specific term
 // Using DELETE with term identifier (source text) in the body
-router.delete('/:terminologyId/terms',
-    // validateRequest(terminologyValidator.removeTerm), // Optional validation
-    terminologyController.removeTerm      // DELETE /api/terms/:terminologyId/terms
-);
+router.delete('/:terminologyId/terms', (req: Request, res: Response, next: NextFunction) => terminologyController.removeTerm(req, res, next));
 
 // --- Route for Importing Terms ---
 // POST /api/terms/:terminologyId/import
 router.post(
     '/:terminologyId/import',
     termsCsvUploadMiddleware,       // Handle CSV file upload (field 'termsfile')
-    terminologyController.importTerms // Process the import
+    (req: Request, res: Response, next: NextFunction) => terminologyController.importTerms(req, res, next)
 );
 
 export default router;

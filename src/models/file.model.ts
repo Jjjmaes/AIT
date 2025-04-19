@@ -5,10 +5,13 @@ export enum FileStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
   EXTRACTED = 'extracted',
+  QUEUED = 'queued',
   TRANSLATING = 'translating',
   TRANSLATED = 'translated',
+  PENDING_REVIEW = 'pending_review',
   REVIEWING = 'reviewing',
   REVIEW_COMPLETED = 'review_completed',
+  CONFIRMED = 'confirmed',
   COMPLETED = 'completed',
   ERROR = 'error'
 }

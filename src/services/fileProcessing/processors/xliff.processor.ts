@@ -101,7 +101,8 @@ export class XliffProcessor implements IFileProcessor {
         case SegmentStatus.TRANSLATED:
             return 'translated';
         case SegmentStatus.PENDING:
-        case SegmentStatus.ERROR:
+        case SegmentStatus.TRANSLATION_FAILED:
+        case SegmentStatus.REVIEW_FAILED:
         default:
             return 'new'; // Or 'needs-translation' depending on exact spec needs
     }
@@ -116,7 +117,8 @@ export class XliffProcessor implements IFileProcessor {
       case SegmentStatus.TRANSLATED:
         return 'Translated';
       case SegmentStatus.PENDING:
-      case SegmentStatus.ERROR:
+      case SegmentStatus.TRANSLATION_FAILED:
+      case SegmentStatus.REVIEW_FAILED:
       default:
         return 'NeedsTranslation';
     }

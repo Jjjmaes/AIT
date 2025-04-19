@@ -134,7 +134,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
             determinedTargetLang = options?.targetLanguage || projectDoc.languagePairs?.[0]?.target;
 
             // Query segments for this file
-            const queryStatuses = [SegmentStatus.PENDING, SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED];
+            // Replace ERROR with REVIEW_FAILED
+            const queryStatuses = [SegmentStatus.PENDING, SegmentStatus.REVIEW_FAILED, SegmentStatus.TRANSLATION_FAILED];
             if (options?.retranslateTM) queryStatuses.push(SegmentStatus.TRANSLATED_TM);
             // Add other retranslate statuses if options exist (e.g., based on options.retranslateAI, etc.)
 
@@ -158,7 +159,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
                 return { message: 'No files found in project' };
             }
 
-            const queryStatuses = [SegmentStatus.PENDING, SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED];
+            // Replace ERROR with REVIEW_FAILED
+            const queryStatuses = [SegmentStatus.PENDING, SegmentStatus.REVIEW_FAILED, SegmentStatus.TRANSLATION_FAILED];
             if (options?.retranslateTM) queryStatuses.push(SegmentStatus.TRANSLATED_TM);
             // Add other retranslate statuses if options exist
 
@@ -246,9 +248,10 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
                         translation: exactMatch.entry.targetText,
                         status: SegmentStatus.TRANSLATED_TM,
                         translatedLength: exactMatch.entry.targetText.length,
-                        translationMetadata: { aiModel: 'TM_100%', tokenCount: 0, processingTime: 0 },
-                        translationCompletedAt: new Date(),
-                        error: undefined
+                        // Store translation info in metadata field
+                        metadata: { translationInfo: { aiModel: 'TM_100%', tokenCount: 0, processingTime: 0 } },
+                        translatedAt: new Date(), // Use translatedAt
+                        errorDetails: undefined // Clear previous error details
                     });
                      logger.debug(`[Worker Job ${jobId}] Segment index ${segment.index} (ID: ${segment._id}) processed by TM.`);
                 } else {
@@ -337,15 +340,16 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
                                 translation: translation,
                                 status: SegmentStatus.TRANSLATED,
                                 translatedLength: translation.length,
-                                translationMetadata: {
-                                    aiModel: aiResponse.model,
-                                    promptTemplateId: segmentPromptTemplateId, // Store ObjectId
-                                    tokenCount: aiResponse.usage?.total_tokens, // Assign total batch tokens for now
-                                    // TODO: Accurate token/time assignment per segment is complex in batches
-                                    // processingTime: approximateTimePerSegment?
+                                // Store translation info in metadata field
+                                metadata: {
+                                    translationInfo: {
+                                        aiModel: aiResponse.model,
+                                        promptTemplateId: segmentPromptTemplateId,
+                                        tokenCount: aiResponse.usage?.total_tokens,
+                                    }
                                 },
-                                translationCompletedAt: new Date(),
-                                error: undefined
+                                translatedAt: new Date(), // Use translatedAt
+                                errorDetails: undefined // Clear previous error details
                             });
                             // --- ADDED: Log the successful translation --- 
                             logger.debug(`[Worker Job ${jobId}] Batch ${currentBatchIndex}, Segment ${segment.index} (ID: ${segmentIdStr}) Translated: "${translation}"`);
@@ -358,7 +362,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
                             errors.push(errMsg);
                             await segmentService.updateSegment(segmentIdStr, {
                                 status: SegmentStatus.TRANSLATION_FAILED,
-                                error: errMsg
+                                // Use errorDetails field
+                                errorDetails: errMsg
                             });
                             batchErrorCount++;
                         }
@@ -382,7 +387,8 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
 
                     // Attempt to mark all segments in the failed batch as ERROR
                     try {
-                         await Segment.updateMany({ _id: { $in: batchSegmentIds } }, { $set: { status: SegmentStatus.ERROR, error: batchErrorMsg } });
+                         // Use TRANSLATION_FAILED and errorDetails
+                         await Segment.updateMany({ _id: { $in: batchSegmentIds } }, { $set: { status: SegmentStatus.TRANSLATION_FAILED, errorDetails: batchErrorMsg } });
                     } catch (updateErr) {
                          logger.error(`[Worker Job ${jobId}] Failed to mark segments as ERROR after batch failure`, updateErr);
                     }
@@ -451,7 +457,7 @@ async function processJob(job: Job<TranslationJobData>): Promise<any> {
             logger.error(`[Worker Job ${jobId}] Failed to update progress during fatal error handling:`, progressError);
         }
         // TODO: Consider marking remaining PENDING/TRANSLATING segments as error on fatal worker crash?
-        // await Segment.updateMany({ _id: { $in: allSegmentsInScope.map(s=>s._id) }, status: { $in: [SegmentStatus.PENDING, SegmentStatus.TRANSLATING]}}, { $set: { status: SegmentStatus.ERROR, error: `Worker fatal error: ${error.message}`}});
+        // await Segment.updateMany({ _id: { $in: allSegmentsInScope.map(s=>s._id) }, status: { $in: [SegmentStatus.PENDING, SegmentStatus.TRANSLATING]}}, { $set: { status: SegmentStatus.TRANSLATION_FAILED, errorDetails: `Worker fatal error: ${error.message}`}});
 
         throw error; // Rethrow original error to fail the BullMQ job
     }

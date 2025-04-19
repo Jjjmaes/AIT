@@ -21,6 +21,7 @@ import { getAllAIConfigs, AIConfig } from '../api/aiConfigService';
 import { getTerminologyBases, TerminologyBase } from '../api/terminologyService';
 import { getTranslationMemories, TranslationMemory } from '../api/translationMemoryService';
 import { getTranslationStatus, TranslationStatusResponse } from '../api/translation';
+import { startAIReview } from '../api/reviewService';
 
 import FileList from '../components/translation/FileList';
 import TranslationSettings from '../components/translation/TranslationSettings';
@@ -70,6 +71,9 @@ const TranslationCenterPage: React.FC = () => {
     activeTranslations: 0,
     completedToday: 0,
   });
+
+  // Add loading state
+  const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
 
   // useEffect to fetch projects list if no projectId is provided
   useEffect(() => {
@@ -467,6 +471,59 @@ const TranslationCenterPage: React.FC = () => {
   // Reverted dependency array to only include currentStep and pollingJobId
   }, [currentStep, pollingJobId]); 
   // --- END MOVE Polling useEffect Hook ---
+
+  // Handler to start the REVIEW process
+  const handleSubmitReview = async () => {
+    // Validation: Ensure we have necessary data
+    if (!projectId) {
+      message.error('错误：项目ID丢失。');
+      return;
+    }
+    // For now, assume we review the first selected file (consistent with polling)
+    const fileIdToReview = selectedFileIds.length > 0 ? selectedFileIds[0] : null;
+    if (!fileIdToReview) {
+      message.error('错误：未选择要审校的文件。');
+      return;
+    }
+    if (!translationSettings.aiModelId) {
+      message.error('错误：未配置AI引擎用于审校。');
+      return;
+    }
+    if (!translationSettings.reviewPromptTemplateId) {
+      message.error('错误：未选择审校提示词模板。');
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    message.loading({ content: '正在提交AI自动审校任务...', key: 'submitReview' });
+
+    try {
+      const payload = {
+        aiConfigId: translationSettings.aiModelId, // Use the same AI model for now?
+        reviewPromptTemplateId: translationSettings.reviewPromptTemplateId,
+      };
+
+      const response = await startAIReview(projectId, fileIdToReview, payload);
+
+      if (response.success) {
+        // Wrap message call in setTimeout to ensure finally block executes
+        setTimeout(() => {
+          message.success({ content: response.message || 'AI审校已成功启动！', key: 'submitReview', duration: 3 });
+        }, 0);
+        // TODO: What happens next? 
+        // - Start polling review status using response.reviewJobId?
+        // - Update local state to show "Reviewing"?
+        // - Navigate to a different step/page?
+        // For now, we just show the success message.
+      } else {
+        throw new Error(response.message || '启动AI审校失败。');
+      }
+    } catch (error: any) {
+      message.error({ content: `提交审校失败: ${error.message}`, key: 'submitReview', duration: 3 });
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   // === Conditional Rendering Logic ===
 
@@ -884,7 +941,8 @@ const TranslationCenterPage: React.FC = () => {
                   {translationStatus?.status === 'completed' && (
                     <Button 
                       type="primary" 
-                      onClick={() => message.info('提交审校功能待实现')}
+                      onClick={handleSubmitReview}
+                      loading={isSubmittingReview}
                     >
                       提交审校
                     </Button>

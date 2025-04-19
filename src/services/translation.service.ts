@@ -67,7 +67,7 @@ export class TranslationService {
       validateEntityExists(segment, '段落');
 
       // Consider what statuses should prevent re-translation
-      if (segment.status !== SegmentStatus.PENDING && segment.status !== SegmentStatus.ERROR && segment.status !== SegmentStatus.TRANSLATION_FAILED) {
+      if (segment.status !== SegmentStatus.PENDING && segment.status !== SegmentStatus.REVIEW_FAILED && segment.status !== SegmentStatus.TRANSLATION_FAILED) {
         // Allow re-translation if specific options are set (e.g., retranslateTM)
         const allowRetranslate = (options?.retranslateTM && segment.status === SegmentStatus.TRANSLATED_TM);
         if (!allowRetranslate) {
@@ -108,13 +108,17 @@ export class TranslationService {
               translation: exactMatch.entry.targetText, // Use correct property
               status: SegmentStatus.TRANSLATED_TM,
               translatedLength: exactMatch.entry.targetText.length, // Use correct property
-              translationMetadata: {
-                  aiModel: 'TM_100%',
-                  tokenCount: 0,
-                  processingTime: 0
+              metadata: {
+                  tmInfo: {
+                    aiModel: 'TM_100%',
+                    tokenCount: 0,
+                    processingTime: 0,
+                    matchPercentage: exactMatch.score,
+                    tmId: exactMatch.entry._id?.toString()
+                  }
               },
-              translationCompletedAt: new Date(),
-              error: undefined
+              translatedAt: new Date(),
+              errorDetails: undefined
           };
           // Use injected service
           const updatedSegment = await this.segmentSvc.updateSegment(segmentId, tmUpdateData);
@@ -219,14 +223,16 @@ export class TranslationService {
         translation: response.translatedText,
         status: SegmentStatus.TRANSLATED,
         translatedLength: response.translatedText?.length ?? 0,
-        translationMetadata: {
-          aiModel: response.modelInfo.model,
-          promptTemplateId: promptTemplateObjectId,
-          tokenCount: response.tokenCount?.total,
-          processingTime: processingTime,
+        metadata: {
+          translationInfo: {
+             aiModel: response.modelInfo.model,
+             promptTemplateId: promptTemplateObjectId,
+             tokenCount: response.tokenCount?.total,
+             processingTime: processingTime,
+          }
         },
-        translationCompletedAt: new Date(),
-        error: undefined
+        translatedAt: new Date(),
+        errorDetails: undefined
       };
 
       // Use injected service
@@ -245,7 +251,7 @@ export class TranslationService {
       logger.error(`Error in ${this.serviceName}.${methodName} for segment ${segmentId}:`, error);
       try {
           // Use injected service
-          await this.segmentSvc.updateSegment(segmentId, { status: SegmentStatus.ERROR, error: (error instanceof Error ? error.message : '未知翻译错误') });
+          await this.segmentSvc.updateSegment(segmentId, { status: SegmentStatus.TRANSLATION_FAILED, errorDetails: (error instanceof Error ? error.message : '未知翻译错误') });
       } catch (updateError) {
           logger.error(`Failed to mark segment ${segmentId} as ERROR after translation failure:`, updateError);
       }
@@ -346,7 +352,7 @@ export class TranslationService {
         // Count segments by final status relevant to completion
         const translatedTmCount = await Segment.countDocuments({ fileId: file._id, status: SegmentStatus.TRANSLATED_TM });
         const translatedAiCount = await Segment.countDocuments({ fileId: file._id, status: SegmentStatus.TRANSLATED });
-        const failedCount = await Segment.countDocuments({ fileId: file._id, status: { $in: [SegmentStatus.ERROR, SegmentStatus.TRANSLATION_FAILED] } });
+        const failedCount = await Segment.countDocuments({ fileId: file._id, status: { $in: [SegmentStatus.REVIEW_FAILED, SegmentStatus.TRANSLATION_FAILED] } });
 
         // Count total segments expected for this file
         const expectedSegments = file.segmentCount || await Segment.countDocuments({ fileId: file._id });

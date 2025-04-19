@@ -1,18 +1,20 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import { IFile } from './file.model';
 import { IUser } from './user.model';
+import { IProject } from './project.model';
 
 export enum SegmentStatus {
-  PENDING = 'pending', // Initial state, awaiting translation
-  TRANSLATING = 'translating', // AI translation in progress
-  TRANSLATED = 'translated', // AI translation complete, awaiting review
-  TRANSLATED_TM = 'translated_tm', // Translated using 100% TM match
-  REVIEW_PENDING = 'review_pending', // Awaiting human review (replaces translated/translated_tm?)
-  REVIEWING = 'reviewing', // Human review in progress
-  REVIEW_COMPLETED = 'review_completed', // Review done, potentially needs final confirmation
-  CONFIRMED = 'confirmed', // Final approved state (replaces COMPLETED?)
-  ERROR = 'error', // Generic processing error
-  TRANSLATION_FAILED = 'translation_failed' // Specific error during AI translation step
+  PENDING = 'pending',               // Segment extracted, ready for translation
+  TRANSLATING = 'translating',         // Sent to AI for translation
+  TRANSLATION_FAILED = 'translation_failed', // AI translation attempt failed
+  TRANSLATED_TM = 'translated_tm',     // Translated using Translation Memory
+  TRANSLATED = 'translated',           // AI translation completed, ready for review
+  // PENDING_REVIEW state might not be needed at segment level if file status tracks it
+  REVIEWING = 'reviewing',             // Sent to AI for review (or assigned to human)
+  REVIEW_FAILED = 'review_failed',       // AI review attempt failed (NEW)
+  REVIEW_COMPLETED = 'review_completed',   // AI review completed (or human review done)
+  NEEDS_MANUAL_REVIEW = 'needs_manual_review', // AI review flagged issues requiring human check
+  CONFIRMED = 'confirmed'            // Final state after human review/acceptance
 }
 
 export enum IssueType {
@@ -97,40 +99,40 @@ export interface IReviewResult {
   acceptedChanges?: boolean; // 是否接受AI修改
 }
 
+// Define the structure for review issues
+export interface IReviewIssue extends Document {
+  type: string; // e.g., 'grammar', 'terminology', 'style', 'mistranslation'
+  severity: 'critical' | 'major' | 'minor' | 'suggestion';
+  description: string;
+  suggestion?: string; // Optional AI suggestion
+  resolved: boolean;
+  resolvedBy?: Types.ObjectId | IUser;
+  resolvedAt?: Date;
+}
+
+// Interface for the Segment document
 export interface ISegment extends Document {
-  fileId: mongoose.Types.ObjectId;
-  index: number;
+  fileId: Types.ObjectId | IFile;
+  projectId: Types.ObjectId | IProject;
+  index: number; // Order within the file
   sourceText: string;
-  sourceLength: number;
   translation?: string;
-  translatedLength?: number;
-  review?: string;
-  finalText?: string;
   status: SegmentStatus;
-  issues?: IIssue[];
-  reviewer?: mongoose.Types.ObjectId;
-  aiScores?: IReviewScore[];
-  qualityScore?: number;
-  translationMetadata?: {
-    aiModel?: string;
-    promptTemplateId?: mongoose.Types.ObjectId;
-    tokenCount?: number;
-    processingTime?: number;
-  };
-  reviewMetadata?: {
-    aiModel?: string;
-    promptTemplateId?: mongoose.Types.ObjectId;
-    tokenCount?: number;
-    processingTime?: number;
-    acceptedChanges?: boolean;
-    modificationDegree?: number;
-  };
-  metadata?: Record<string, any>;
-  translationCompletedAt?: Date;
-  reviewCompletedAt?: Date;
-  error?: string;
+  sourceLength: number;
+  translatedLength?: number;
+  metadata?: Record<string, any>; // Store things like XLIFF ID, context keys
+  issues?: IReviewIssue[]; // Array to store review findings
+  locked?: boolean; // Prevent modification
   createdAt: Date;
   updatedAt: Date;
+  translatedAt?: Date;
+  reviewedAt?: Date; // Timestamp for review completion (NEW)
+  errorDetails?: string; // Store error messages (NEW)
+  // Optional fields for tracking review process
+  reviewer?: Types.ObjectId | IUser; 
+  reviewStartedAt?: Date;
+  // Optional field for final confirmed text after review/edits
+  finalText?: string; 
 }
 
 // Define IssueSchema for embedding
@@ -229,97 +231,47 @@ const ReviewResultSchema = new Schema<IReviewResult>({
   _id: false
 });
 
-const segmentSchema = new Schema<ISegment>(
-  {
-    fileId: {
-      type: Schema.Types.ObjectId,
-      ref: 'File',
-      required: true,
-      index: true
-    },
-    index: { type: Number, required: true },
-    sourceText: {
-      type: String,
-      required: true
-    },
-    sourceLength: {
-      type: Number,
-      required: true
-    },
-    translation: {
-      type: String
-    },
-    translatedLength: {
-      type: Number
-    },
-    review: {
-      type: String
-    },
-    finalText: {
-      type: String
-    },
-    status: {
-      type: String,
-      enum: Object.values(SegmentStatus),
-      default: SegmentStatus.PENDING,
-      index: true
-    },
-    issues: [IssueSchema],
-    reviewer: {
-      type: Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    aiScores: [ReviewScoreSchema],
-    qualityScore: {
-        type: Number,
-        min: 0,
-        max: 100
-    },
-    translationMetadata: {
-      aiModel: String,
-      promptTemplateId: {
-        type: Schema.Types.ObjectId,
-        ref: 'PromptTemplate'
-      },
-      tokenCount: Number,
-      processingTime: Number
-    },
-    reviewMetadata: {
-      aiModel: String,
-      promptTemplateId: {
-        type: Schema.Types.ObjectId,
-        ref: 'PromptTemplate'
-      },
-      tokenCount: Number,
-      processingTime: Number,
-      acceptedChanges: Boolean,
-      modificationDegree: Number
-    },
-    metadata: {
-      type: Schema.Types.Mixed
-    },
-    translationCompletedAt: {
-      type: Date
-    },
-    reviewCompletedAt: {
-      type: Date
-    },
-    error: {
-      type: String
-    }
-  },
-  {
-    timestamps: true
-  }
-);
+// Mongoose Schema definition
+const ReviewIssueSchema = new Schema<IReviewIssue>({
+  type: { type: String, required: true },
+  severity: { type: String, required: true, enum: ['critical', 'major', 'minor', 'suggestion'] },
+  description: { type: String, required: true },
+  suggestion: { type: String },
+  resolved: { type: Boolean, default: false },
+  resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  resolvedAt: { type: Date },
+}, { _id: true, timestamps: true }); // Add timestamps to issues?
 
-// Compound index for efficient querying within a file
-segmentSchema.index({ fileId: 1, index: 1 });
+const SegmentSchema = new Schema<ISegment>({
+  fileId: { type: Schema.Types.ObjectId, ref: 'File', required: true, index: true },
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
+  index: { type: Number, required: true },
+  sourceText: { type: String, required: true },
+  translation: { type: String },
+  status: { type: String, enum: Object.values(SegmentStatus), default: SegmentStatus.PENDING, index: true },
+  sourceLength: { type: Number, required: true },
+  translatedLength: { type: Number },
+  metadata: { type: Schema.Types.Mixed },
+  issues: [ReviewIssueSchema], // Embed issues
+  locked: { type: Boolean, default: false },
+  translatedAt: { type: Date },
+  reviewedAt: { type: Date }, // Add field (NEW)
+  errorDetails: { type: String }, // Add field (NEW)
+  reviewer: { type: Schema.Types.ObjectId, ref: 'User' },
+  reviewStartedAt: { type: Date },
+  finalText: { type: String },
+}, {
+  timestamps: true // Adds createdAt and updatedAt automatically
+});
+
+// Compound index for faster lookups within a file
+SegmentSchema.index({ fileId: 1, index: 1 });
 
 // Existing indexes
-segmentSchema.index({ fileId: 1 });
-segmentSchema.index({ status: 1 });
-segmentSchema.index({ reviewer: 1 });
+SegmentSchema.index({ fileId: 1 });
+SegmentSchema.index({ status: 1 });
+SegmentSchema.index({ reviewer: 1 });
 
-export const Segment = mongoose.model<ISegment>('Segment', segmentSchema);
+// Model
+export const Segment = mongoose.model<ISegment>('Segment', SegmentSchema);
 export const Issue = mongoose.model<IIssue>('Issue', IssueSchema);
