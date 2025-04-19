@@ -552,7 +552,8 @@ export class TerminologyService {
         ].join(',');
       });
 
-      const csvContent = header + rows.join('\n');
+      // Prepend UTF-8 BOM for better compatibility with Excel
+      const csvContent = '\uFEFF' + header + rows.join('\n'); 
       logger.info(`[${this.serviceName}.${methodName}] Exported ${terminology.terms.length} terms for terminology ${terminologyId}`);
       return csvContent;
 

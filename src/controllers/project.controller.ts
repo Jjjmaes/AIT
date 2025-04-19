@@ -67,6 +67,10 @@ export default class ProjectController {
         deadline: validatedData.deadline ? new Date(validatedData.deadline) : undefined,
       };
 
+      // --- DEBUG LOG: Check data before saving ---
+      logger.debug('[ProjectController.createProject] Data before calling service:', JSON.stringify(createDto, null, 2));
+      // --- END DEBUG LOG ---
+
       // Use constructor-injected service
       const project = await this.projectService.createProject(createDto);
       
@@ -198,6 +202,10 @@ export default class ProjectController {
         logger.warn(`No valid fields provided for updating project ${projectId}`);
         return res.status(400).json({ success: false, message: '没有提供可更新的字段' });
       }
+
+      // --- DEBUG LOG: Check data before saving ---
+      logger.debug('[ProjectController.updateProject] Data before calling service:', JSON.stringify(updateDto, null, 2));
+      // --- END DEBUG LOG ---
 
       const project = await this.projectService.updateProject(projectId, userId, updateDto);
       

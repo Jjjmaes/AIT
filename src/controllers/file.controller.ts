@@ -79,54 +79,72 @@ export class FileController {
       // Use the first language pair from the project
       const { source: projectSourceLang, target: projectTargetLang } = project.languagePairs[0];
 
-      // --- Filename Decoding ---
-      let decodedOriginalName = req.file.originalname;
+      // --- Filename Handling ---
+      // --- DEBUG LOG: Check raw originalname from Multer ---
+      logger.debug(`[FileController.uploadFile] Raw req.file.originalname from Multer: \"${req.file.originalname}\"`);
+      // --- END DEBUG LOG ---
+
+      // --- Attempt to Decode Misinterpreted Filename (from fonthub project) ---
+      const rawOriginalName = req.file.originalname; // Name from multer
+      let correctedOriginalName = rawOriginalName; // Default to received name
       try {
-        // Multer should handle RFC 5987 percent-encoding, but this adds robustness
-        decodedOriginalName = decodeURIComponent(req.file.originalname);
-        // Optional: Add further sanitization/normalization if needed
-        // decodedOriginalName = path.normalize(decodedOriginalName);
-      } catch (e) {
-        // Log if decoding fails, but proceed with the raw name as a fallback
-        // This might happen if the name is already UTF-8 and contains '%' incorrectly
-        logger.warn(`Failed to decode originalname: "${req.file.originalname}". Using raw value. Error:`, e);
+          // Assume the rawOriginalName is UTF-8 bytes misinterpreted as Latin-1
+          const misinterpretedAsLatin1Buffer = Buffer.from(rawOriginalName, 'latin1');
+          // Now, interpret that buffer correctly as UTF-8
+          const hopefullyCorrectUTF8 = misinterpretedAsLatin1Buffer.toString('utf8');
+
+          // Heuristic check: If the result is different AND contains CJK characters, assume correction was successful
+          // Using a regex for CJK Unified Ideographs, Hiragana, Katakana, Hangul Syllables
+          // Adjusted range slightly based on common usage: U+4E00 to U+9FFF (CJK), U+3040 to U+30FF (Hiragana/Katakana), U+AC00 to U+D7FF (Hangul)
+          if (hopefullyCorrectUTF8 !== rawOriginalName && /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7ff]/.test(hopefullyCorrectUTF8)) {
+             logger.debug(`[FileController.uploadFile] Corrected filename via Latin-1 -> UTF-8 decode: \"${rawOriginalName}\" -> \"${hopefullyCorrectUTF8}\"`);
+             correctedOriginalName = hopefullyCorrectUTF8;
+          } else {
+              logger.debug(`[FileController.uploadFile] Filename \"${rawOriginalName}\" does not appear to need correction or correction failed/resulted in non-CJK.`);
+          }
+      } catch (decodeError) {
+          logger.error(`[FileController.uploadFile] Error attempting to correct filename \"${rawOriginalName}\":`, decodeError);
+          // Keep the original name if decoding fails
       }
-      // --- End Filename Decoding ---
+      // --- End Decoding Attempt ---
 
-      logger.info(`User ${userId} uploading file "${decodedOriginalName}" to project ${projectId} (Languages: ${projectSourceLang} -> ${projectTargetLang})`);
+      // USE potentially corrected name for subsequent operations
+      logger.info(`User ${userId} uploading file \"${correctedOriginalName}\" to project ${projectId} (Languages: ${projectSourceLang} -> ${projectTargetLang})`);
 
-      // Use decoded name for validation
-      const fileType = validateFileType(decodedOriginalName, req.file.mimetype);
+      // Use the potentially corrected name for validation
+      const fileType = validateFileType(correctedOriginalName, req.file.mimetype);
       if (!fileType) {
-          // Use decoded name in error message too
-          // Clean up the uploaded file before throwing error
+          // Use potentially corrected name in error message too
           if (req.file?.path) {
              fs.unlink(req.file.path).catch(unlinkErr => logger.error(`Failed to delete invalid file type ${req.file?.path}:`, unlinkErr));
           }
-          throw new ValidationError(`不支持的文件类型: "${decodedOriginalName}" (MIME: ${req.file.mimetype})`);
+          throw new ValidationError(`不支持的文件类型: \"${correctedOriginalName}\" (MIME: ${req.file.mimetype})`);
       }
 
       // --- Prepare File Info ---
       const fileInfo = {
-        path: req.file.path,            // Path where multer saved the temp file
-        filePath: req.file.path,        // Duplicate, maybe consolidate later
-        originalName: decodedOriginalName, // *** Use the decoded name ***
+        path: req.file.path,
+        filePath: req.file.path,
+        originalName: correctedOriginalName, // *** Use the potentially corrected name ***
         mimeType: req.file.mimetype,
         size: req.file.size,
-        fileType: fileType,             // Determined file category (e.g., 'document', 'xliff')
-        destination: req.file.destination,// Folder where multer saved the file
-        filename: req.file.filename     // Unique temporary filename generated by multer
+        fileType: fileType,
+        destination: req.file.destination,
+        filename: req.file.filename
       };
       // --- End Prepare File Info ---
 
+      // --- DEBUG LOG: Check fileInfo before saving (using potentially corrected name) ---
+      logger.debug('[FileController.uploadFile] File info before calling service:', JSON.stringify(fileInfo, null, 2));
+      // --- END DEBUG LOG ---
+
       // Pass languages obtained from the project to the service
-      // Use injected service: this.fileManagementService
       const fileRecord = await this.fileManagementService.processUploadedFile(
         projectId,
         userId,
-        fileInfo,
-        projectSourceLang, // Use language from project
-        projectTargetLang, // Use language from project
+        fileInfo, // Pass fileInfo containing the potentially corrected name
+        projectSourceLang,
+        projectTargetLang,
         userRoles
       );
 

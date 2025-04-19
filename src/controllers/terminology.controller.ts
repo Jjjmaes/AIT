@@ -250,7 +250,7 @@ export class TerminologyController {
       const csvContent = await this.terminologyService.exportTerminology(terminologyId, userId);
       
       // Set headers for file download
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="terminology_${terminologyId}.csv"`);
       res.status(200).send(csvContent);
 

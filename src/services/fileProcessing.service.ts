@@ -64,10 +64,18 @@ export class FileProcessingService {
       );
       logger.info(`[${this.serviceName}.${methodName}] Extracted ${segmentCount} segments from file ${fileId}.`);
 
+      // --- ADD INFO LOG CHECKPOINT 1 --- 
+      logger.info(`[${this.serviceName}.${methodName}] === CHECKPOINT BEFORE DELETE ===`);
+      // --- END INFO LOG --- 
+
       // --- Clear Old Segments ---
       // Ensure atomicity: delete old segments before inserting new ones
       await Segment.deleteMany({ fileId: file._id });
       logger.info(`[${this.serviceName}.${methodName}] Cleared existing segments for file ${fileId}.`);
+
+      // --- ADD INFO LOG CHECKPOINT 2 --- 
+      logger.info(`[${this.serviceName}.${methodName}] === CHECKPOINT AFTER DELETE ===`);
+      // --- END INFO LOG ---
 
       // --- Save Segments ---
       if (segmentCount > 0 && extractedSegmentsData.length > 0) {
