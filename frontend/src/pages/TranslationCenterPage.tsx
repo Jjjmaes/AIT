@@ -9,7 +9,7 @@ import {
   LoadingOutlined, CheckCircleOutlined, ClockCircleOutlined, FileOutlined,
   SyncOutlined, WarningOutlined, SearchOutlined
 } from '@ant-design/icons';
-import { useQuery, useQueryClient, UseQueryResult, QueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, UseQueryResult } from '@tanstack/react-query';
 import { useAuth } from "../context/AuthContext";
 
 import { getProjectById, getProjects, Project } from '../api/projectService';
@@ -62,7 +62,6 @@ const TranslationCenterPage: React.FC = () => {
   const [pollingJobId, setPollingJobId] = useState<string | null>(null);
   const [translationStatus, setTranslationStatus] = useState<TranslationStatusResponse | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(false);
-  const [pollingError, setPollingError] = useState<string | null>(null);
   const intervalRef = useRef<any | null>(null); // Ref to hold interval ID
 
   // Statistics for dashboard cards
@@ -239,7 +238,6 @@ const TranslationCenterPage: React.FC = () => {
     setPollingJobId(null);
     setTranslationStatus(null);
     setIsPolling(false);
-    setPollingError(null);
 
     // Get selected file details for better error messages
     const selectedFiles = files?.filter(f => selectedFileIds.includes(f._id)) || [];
@@ -278,7 +276,7 @@ const TranslationCenterPage: React.FC = () => {
             const file = selectedFiles[index];
             if (result.status === 'fulfilled' && result.value.success) {
                 successCount++;
-                console.log(`File ${file.originalName} translation started successfully. Job ID: ${result.value.jobId || 'N/A'}`);
+                console.log(`File ${file.originalName} translation started successfully. Job ID: ${result.value.data?.jobId || 'N/A'}`);
             } else {
                 failureCount++;
                 const errorMessage = (result.status === 'rejected')
@@ -298,11 +296,13 @@ const TranslationCenterPage: React.FC = () => {
                 duration: 5
             });
             
-            // --- FIX: Store the ACTUAL Job ID for polling ---
+            // --- FIX: Store the ACTUAL Job ID for polling ---            
             // Find the first successful result to get its jobId
             const firstSuccessfulResult = results.find(r => r.status === 'fulfilled' && r.value.success);
-            const actualJobId = firstSuccessfulResult?.status === 'fulfilled' ? firstSuccessfulResult.value.jobId : null;
-            
+            // --- UPDATED: Access jobId inside the nested data object --- 
+            const actualJobId = firstSuccessfulResult?.status === 'fulfilled' ? firstSuccessfulResult.value.data?.jobId : null;
+            // ---------------------------------------------------------
+
             if (actualJobId) {
                  setPollingJobId(actualJobId); // <-- Set the correct jobId
                  setCurrentStep(2);
@@ -407,17 +407,21 @@ const TranslationCenterPage: React.FC = () => {
       }
     };
 
-    // Only poll if we are on the progress step AND have a job ID
+    // Reverted: Now we poll using the composite jobId received from the start call
+    // const fileIdToPoll = selectedFileIds.length > 0 ? selectedFileIds[0] : null;
+
+    // Only poll if we are on the progress step AND have a pollingJobId
+    // if (currentStep === 2 && pollingJobId && fileIdToPoll) { <-- Reverted this condition
     if (currentStep === 2 && pollingJobId) {
-      console.log(`Starting polling for jobId: ${pollingJobId}`);
+      console.log(`Starting polling for jobId: ${pollingJobId}`); // Log the actual jobId
       setIsPolling(true);
-      setPollingError(null);
 
       const pollStatus = async () => {
-        console.log(`Polling status for fileId: ${pollingJobId}...`); // Log the ID being polled
+        console.log(`Polling status for jobId: ${pollingJobId}...`); // Use pollingJobId
         try {
           // Fetch the wrapper response { success: boolean, data: TranslationStatusResponse }
-          const wrapperResponse = await getTranslationStatus(pollingJobId!);
+          // --- UPDATED: Pass pollingJobId to getTranslationStatus --- 
+          const wrapperResponse = await getTranslationStatus(pollingJobId);
           console.log('[TranslationCenter Polling] Received wrapperResponse:', wrapperResponse);
           
           // --- Extract the actual status data --- 
@@ -425,7 +429,6 @@ const TranslationCenterPage: React.FC = () => {
             const statusData: TranslationStatusResponse = wrapperResponse.data;
             console.log('[TranslationCenter Polling] Extracted statusData:', statusData);
             setTranslationStatus(statusData);
-            setPollingError(null); // Clear error on successful poll
 
             // Stop polling if completed or failed (use extracted data)
             if (statusData.status === 'completed' || statusData.status === 'failed') {
@@ -434,16 +437,13 @@ const TranslationCenterPage: React.FC = () => {
           } else {
             // Handle cases where response format is unexpected
             console.error('[TranslationCenter Polling] Invalid status response format:', wrapperResponse);
-            setPollingError('无效的状态响应格式');
-            // Optionally stop polling on invalid format
-            // clearPollingInterval();
+            message.error('获取翻译状态失败：响应格式无效'); // Use Ant Design message instead
+            clearPollingInterval(); // Stop polling on invalid format for now
           }
         } catch (err: any) {
           console.error('Error polling translation status:', err);
-          setPollingError(err.message || '获取翻译状态时出错');
-          // Optional: Implement retry logic or stop polling after too many errors
-          // For now, we continue polling even after an error, but show the error
-          // clearPollingInterval(); // Uncomment to stop polling on error
+          message.error(err.message || '获取翻译状态时出错'); // Use Ant Design message
+          clearPollingInterval(); // Stop polling on error for now
         }
       };
 
@@ -462,12 +462,10 @@ const TranslationCenterPage: React.FC = () => {
       // Reset status if we navigate away from the progress step
       if (currentStep !== 2) {
           setTranslationStatus(null);
-          // Don't clear pollingJobId here automatically, user might navigate back
-          // setPollingJobId(null);
-          setPollingError(null);
       }
     }
-  }, [currentStep, pollingJobId]); // Dependencies: run effect when step or jobId changes
+  // Reverted dependency array to only include currentStep and pollingJobId
+  }, [currentStep, pollingJobId]); 
   // --- END MOVE Polling useEffect Hook ---
 
   // === Conditional Rendering Logic ===
@@ -869,7 +867,7 @@ const TranslationCenterPage: React.FC = () => {
                     (translationSettings.useTranslationMemory && !translationSettings.translationMemoryId)
                   }
                 >
-                  启动翻译
+                  提交翻译
                 </Button>
               )}
 

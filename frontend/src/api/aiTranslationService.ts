@@ -14,11 +14,13 @@ export interface StartSingleFileAIPayload {
 }
 
 // Define the structure of the response expected from the backend
-// Added export
+// Updated to match the actual API response structure
 export interface StartAITranslationResponse {
   success: boolean;
   message?: string;
-  jobId?: string; // Backend returns jobId
+  data?: {        // Add the nested data object
+    jobId?: string; // jobId is inside data
+  };
 }
 
 // --- Function to start translation FOR A SINGLE FILE ---

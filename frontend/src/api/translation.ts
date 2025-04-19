@@ -38,11 +38,13 @@ export const startTranslation = async (data: TranslationStartRequest) => {
 };
 
 /**
- * Get translation job status (based on File ID)
+ * Get translation job status (based on Job ID received from start translation)
  * NOTE: Backend wraps the response in { success: boolean, data: TranslationStatusResponse }
+ * NOTE: Reverted parameter to jobId to match the actual backend route
  */
-export const getTranslationStatus = async (fileId: string): Promise<{ success: boolean; data: TranslationStatusResponse }> => {
-  const response = await axiosInstance.get<{ success: boolean; data: TranslationStatusResponse }>(`/translation/status/${fileId}`);
+export const getTranslationStatus = async (jobId: string): Promise<{ success: boolean; data: TranslationStatusResponse }> => {
+  // Use jobId in the URL as defined in the backend route
+  const response = await axiosInstance.get<{ success: boolean; data: TranslationStatusResponse }>(`/translation/status/${jobId}`);
   return response.data; // Return the whole wrapper object
 };
 

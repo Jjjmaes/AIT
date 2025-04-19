@@ -96,6 +96,7 @@ function App() {
                 {/* Translation */}
                 <Route path="/translate" element={<TranslationCenterPage />} />
                 <Route path="/projects/:projectId/translate" element={<TranslationCenterPage />} />
+                <Route path="/projects/:projectId/files/:fileId/translate" element={<TranslationCenterPage />} />
 
                 {/* Review */}
                 <Route path="/files/:fileId/review" element={<FileReviewPage />} />

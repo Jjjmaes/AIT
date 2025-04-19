@@ -302,7 +302,6 @@ export class FileController {
           // Remove projectId and fileId validation
           // validateId(projectId, '项目'); 
           // validateId(fileId, '文件');
-          validateId(jobId, '任务');
           if (!userId) return next(new AppError('认证失败', 401));
 
           // Remove project/file permission checks as IDs are not available from route

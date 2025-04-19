@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getFilesByProjectId, uploadFile, FileType } from '../api/fileService';
+import { getFilesByProjectId, uploadFile, FileType, startFileTranslation } from '../api/fileService';
 import { useFileStore, FileState } from '../store/fileStore'; // Import Zustand store AND FileState type
 import { useFileProgressSSE } from '../hooks/useFileProgressSSE'; // Import SSE hook
 import { Progress, Tag, Button, Table, message, Space } from 'antd'; // Import Ant Design components
@@ -85,22 +85,19 @@ const ProjectFilesPage: React.FC = () => {
   const filesMap = useFileStore((state) => state.files);
   const setFilesInStore = useFileStore((state) => state.setFiles);
   const addFileToStore = useFileStore((state) => state.addFile);
-  // Remove file from store if delete functionality is added later
-  // const removeFileFromStore = useFileStore((state) => state.removeFile);
   
   // --- Initialize SSE Connection --- 
-  useFileProgressSSE(); // This hook manages connection lifecycle
+  useFileProgressSSE(); 
 
-  // Local state for UI interaction (loading, errors, upload form)
+  // Local state for UI interaction
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  // Keep uploadError/Success local as they relate to the upload action itself
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
-  // --- Fetch Initial Data --- 
+  // --- Fetch Initial Data (Files ONLY) --- 
   const fetchData = useCallback(async () => {
     if (!projectId) {
       setError('Project ID is missing');
@@ -111,32 +108,32 @@ const ProjectFilesPage: React.FC = () => {
     setError(null);
 
     try {
+      // Fetch only files now
       const fetchedFiles = await getFilesByProjectId(projectId!);
-      // --- Normalize and update the Zustand store --- 
+
+      // --- Process Files (existing logic) ---
       const normalizedFiles = fetchedFiles.map(f => ({
-          id: f._id, // Use _id from backend as id
+          id: f._id, 
           projectId: f.projectId,
           fileName: f.fileName || f.originalName || 'Unnamed File',
           originalName: f.originalName,
           fileSize: f.fileSize,
           mimeType: f.mimeType,
-          type: f.type, // Assuming type is FileType enum string
-          // Handle both potential progress structures from backend
+          type: f.type, 
           progress: typeof f.progress === 'number' ? f.progress : (f.progress as any)?.percentage ?? 0,
-          status: f.status || 'pending', // Default to pending if missing
+          status: f.status || 'pending', 
           storageUrl: f.storageUrl,
           createdAt: f.createdAt,
           updatedAt: f.updatedAt,
-          // Add other fields as needed
       }));
       setFilesInStore(normalizedFiles as FileState[]);
-      // --- End Store Update --- 
+      // -----------------------------------
 
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.message || 'An error occurred fetching files';
+      const errorMsg = err.response?.data?.message || err.message || 'An error occurred fetching files'; // Updated error message
       console.error('Fetch files error:', err);
       setError(errorMsg);
-      setFilesInStore([]); // Clear store on error
+      setFilesInStore([]); 
     } finally {
       setIsLoading(false);
     }
@@ -214,7 +211,6 @@ const ProjectFilesPage: React.FC = () => {
       dataIndex: 'fileName',
       key: 'fileName',
       render: (text: string, record: FileState) => (
-         // Link to translation center or review page based on status?
         <Link to={`/projects/${projectId}/files/${record.id}/translate`}>{text}</Link> 
       ),
     },
@@ -229,7 +225,6 @@ const ProjectFilesPage: React.FC = () => {
       dataIndex: 'progress',
       key: 'progress',
       render: (progress: number, record: FileState) => (
-         // Use the progress value directly from the store state (already normalized)
          <Progress 
             percent={progress} 
             size="small" 
@@ -252,13 +247,40 @@ const ProjectFilesPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: FileState) => (
-        <Space size="middle">
-           {/* Add actions like Download, Delete, Go to Editor/Review */} 
-          <Button size="small" onClick={() => navigate(`/projects/${projectId}/files/${record.id}/translate`)}>编辑</Button>
-          {/* <Button size="small" danger onClick={() => handleDeleteFile(record.id)}>删除</Button> */} 
-        </Space>
-      ),
+      render: (_: any, record: FileState) => {
+        // Determine if the 'Start Translation' button should be shown/enabled
+        const canStartTranslation = !['translating', 'reviewing', 'completed', 'translated'].includes(record.status);
+
+        return (
+          <Space size="middle">
+            {/* Edit Button (existing) */}
+            <Button 
+              size="small" 
+              onClick={() => navigate(`/projects/${projectId}/files/${record.id}/translate`)}
+            >
+              编辑
+            </Button>
+
+            {/* --- MODIFIED: Start Translation Button (now just navigates) --- */}
+            <Button 
+              type="primary"
+              size="small"
+              icon={<TranslationOutlined />} 
+              onClick={() => {
+                console.log(`Navigating: projectId=${projectId}, fileId=${record.id}`);
+                navigate(`/projects/${projectId}/files/${record.id}/translate`);
+              }}
+              style={{ display: canStartTranslation ? 'inline-block' : 'none' }}
+            >
+              启动翻译
+            </Button>
+            {/* --------------------------------------- */}
+
+            {/* Delete Button (placeholder) */}
+            {/* <Button size="small" danger onClick={() => handleDeleteFile(record.id)}>删除</Button> */} 
+          </Space>
+        );
+      },
     },
   ];
 
